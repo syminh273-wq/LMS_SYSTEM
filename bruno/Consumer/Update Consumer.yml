@@ -1,0 +1,19 @@
+info:
+  name: Update Consumer
+  type: http
+  seq: 3
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/v1/account/consumers/{{consumerUid}}"
+  auth: bearer
+
+auth:bearer {
+  token: {{consumer_access_token}}
+}
+  body:
+    type: json
+    data: |-
+      {
+        "full_name": "Updated Name"
+      }

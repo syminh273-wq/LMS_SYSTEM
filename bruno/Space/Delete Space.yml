@@ -1,0 +1,13 @@
+info:
+  name: Delete Space
+  type: http
+  seq: 6
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/account/spaces/{{spaceUid}}"
+  auth: bearer
+
+auth:bearer {
+  token: {{consumer_access_token}}
+}

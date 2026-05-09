@@ -1,0 +1,13 @@
+info:
+  name: List Spaces
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/account/spaces"
+  auth: bearer
+
+auth:bearer {
+  token: {{consumer_access_token}}
+}

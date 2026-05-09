@@ -1,0 +1,10 @@
+Django>=4.0,<5.0
+cassandra-driver
+python-decouple==3.8
+django-cassandra-engine
+djangorestframework
+djangorestframework-simplejwt
+django-filter
+channels
+daphne
+django-cors-headers

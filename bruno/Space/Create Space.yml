@@ -1,0 +1,23 @@
+info:
+  name: Create Space
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/account/spaces"
+  auth: bearer
+
+auth:bearer {
+  token: {{consumer_access_token}}
+}
+  body:
+    type: json
+    data: |-
+      {
+        "name": "New Space",
+        "slug": "new-space",
+        "description": "Description",
+        "logo_url": "https://example.com/logo.png",
+        "cover_url": "https://example.com/cover.png"
+      }

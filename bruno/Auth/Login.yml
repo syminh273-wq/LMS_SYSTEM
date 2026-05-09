@@ -1,0 +1,35 @@
+info:
+  name: Login
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/account/login"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{username}}",
+        "password": "{{password}}"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = res.getBody();
+        if (data.access) {
+          bru.setEnvVar("consumer_access_token", data.access);
+        }
+  variables:
+    - name: username
+      value: "{{email}}"
+    - name: password
+      value: "{{password}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

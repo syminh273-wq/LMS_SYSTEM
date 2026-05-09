@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Test</title>
+</head>
+<body>
+    <h2>Chat Room: <span id="room-name">{{ room_name }}</span></h2>
+    <div id="chat-log" style="border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px;"></div>
+    <input id="chat-message-input" type="text" size="100" placeholder="Type your message..."><br>
+    <input id="chat-message-submit" type="button" value="Send">
+
+    <script>
+        const roomName = "{{ room_name }}";
+        const chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/chat/' + roomName + '/'
+        );
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const chatLog = document.querySelector('#chat-log');
+            const messageElement = document.createElement('div');
+            
+            if (data.type === 'chat_message') {
+                messageElement.innerHTML = `<strong>${data.sender || 'Anonymous'}:</strong> ${data.message}`;
+            } else if (data.type === 'error') {
+                messageElement.style.color = 'red';
+                messageElement.innerText = `Error: ${data.message}`;
+            }
+            
+            chatLog.appendChild(messageElement);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        };
+
+        chatSocket.onclose = function(e) {
+            console.error('Chat socket closed unexpectedly');
+        };
+
+        document.querySelector('#chat-message-input').focus();
+        document.querySelector('#chat-message-input').onkeyup = function(e) {
+            if (e.keyCode === 13) {  // enter, return
+                document.querySelector('#chat-message-submit').click();
+            }
+        };
+
+        document.querySelector('#chat-message-submit').onclick = function(e) {
+            const messageInputDom = document.querySelector('#chat-message-input');
+            const message = messageInputDom.value;
+            chatSocket.send(JSON.stringify({
+                'type': 'chat_message',
+                'message': message,
+                'sender': 'User_' + Math.floor(Math.random() * 1000)
+            }));
+            messageInputDom.value = '';
+        };
+    </script>
+</body>
+</html>

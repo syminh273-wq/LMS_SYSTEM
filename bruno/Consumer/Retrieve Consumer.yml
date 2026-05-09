@@ -1,0 +1,13 @@
+info:
+  name: Retrieve Consumer
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/account/consumers/{{consumerUid}}"
+  auth: bearer
+
+auth:bearer {
+  token: {{consumer_access_token}}
+}

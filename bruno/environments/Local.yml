@@ -1,0 +1,10 @@
+name: Local
+variables:
+  - name: baseUrl
+    value: http://localhost:8000
+  - name: email
+    value: minh.ho@chek.vn
+  - name: password
+    value: "@Minh1182004"
+  - name: consumer_access_token
+    value: ""

@@ -1,0 +1,19 @@
+info:
+  name: Update Space
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/v1/account/spaces/{{spaceUid}}"
+  auth: bearer
+
+auth:bearer {
+  token: {{consumer_access_token}}
+}
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Updated Name"
+      }
