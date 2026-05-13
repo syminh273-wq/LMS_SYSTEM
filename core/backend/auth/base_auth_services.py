@@ -15,6 +15,10 @@ class BaseAuthService(BaseService):
         password = data.pop('password', None)
         if password:
             data['password'] = make_password(password)
+
+        if 'email' in data and not data.get('username'):
+            data['username'] = data['email']
+
         return self.create(**data)
 
     def authenticate(self, username, password, login_field="email"):

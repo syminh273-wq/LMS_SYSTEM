@@ -10,7 +10,7 @@ class ConsumerLoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = ConsumerService().authenticate(
-            username=serializer.validated_data['username'],
+            username=serializer.validated_data['email'],
             password=serializer.validated_data['password']
         )
         if user:

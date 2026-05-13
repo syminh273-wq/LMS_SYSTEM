@@ -12,7 +12,7 @@ class ConsumerRegisterView(APIView):
                 {"message": "Registration failed", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             ConsumerService().register(serializer.validated_data)
             return Response(

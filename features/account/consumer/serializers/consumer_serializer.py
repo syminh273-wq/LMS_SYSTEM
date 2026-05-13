@@ -39,9 +39,34 @@ class UpdateSerializer(serializers.Serializer):
     avatar_url = serializers.URLField(required=False)
 
 class RegisterSerializer(serializers.Serializer):
-    email = serializers.CharField(required=True)
-    password = serializers.CharField(write_only=True)
+    full_name = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        default=''
+    )
+    email = serializers.EmailField(
+        required=True,
+        error_messages={
+            'invalid': 'Invalid email format.',
+            'blank': 'Email cannot be blank.',
+            'required': 'Email is required.'
+        }
+    )
+    password = serializers.CharField(
+        write_only=True,
+        error_messages={
+            'blank': 'Password cannot be blank.',
+            'required': 'Password is required.'
+        }
+    )
+
+    def validate_email(self, value):
+        from features.account.consumer.models import Consumer
+        if Consumer.objects.filter(email=value, is_deleted=False).allow_filtering().first():
+            raise serializers.ValidationError('Email already registered.')
+        return value
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
