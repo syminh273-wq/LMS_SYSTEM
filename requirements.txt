@@ -8,3 +8,4 @@ django-filter
 channels
 daphne
 django-cors-headers
+boto3
