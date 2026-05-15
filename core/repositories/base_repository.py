@@ -24,11 +24,12 @@ class BaseRepository:
         return self.model.objects.using(alias) if alias else self.model.objects
 
     def _filter_qs(self, qs, **kwargs):
-        """Apply .filter() and add .allow_filtering() for Cassandra."""
-        qs = qs.filter(**kwargs)
-        if self._is_cassandra:
-            return qs.allow_filtering()
-        return qs
+        """Apply .filter() to the queryset."""
+        return qs.filter(**kwargs)
+
+    def order_by(self, qs, *args):
+        """Apply .order_by() to the queryset."""
+        return qs.order_by(*args)
 
     def all(self):
         qs = self._qs()

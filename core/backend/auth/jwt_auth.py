@@ -4,9 +4,16 @@ from rest_framework import exceptions
 class CassandraJWTAuthentication(JWTAuthentication):
     def get_user(self, validated_token):
         try:
-            from features.account.consumer.models.consumer import Consumer
             user_id = validated_token['user_id']
-            user = Consumer.objects.filter(uid=user_id).allow_filtering().first()
+            user_type = validated_token.get('user_type', 'consumer')
+
+            if user_type == 'space':
+                from features.account.space.models.space import Space
+                user = Space.objects.filter(uid=user_id).allow_filtering().first()
+            else:
+                from features.account.consumer.models.consumer import Consumer
+                user = Consumer.objects.filter(uid=user_id).allow_filtering().first()
+
             if not user:
                 raise exceptions.AuthenticationFailed('User not found', code='user_not_found')
             

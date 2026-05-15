@@ -1,0 +1,21 @@
+info:
+  name: Create Classroom
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/space/course/classrooms/"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Advanced Mathematics",
+        "description": "A comprehensive course on calculus and linear algebra.",
+        "max_students": 30
+      }
+  auth: bearer
+
+auth:bearer {
+  token: "{{space_access_token}}"
+}

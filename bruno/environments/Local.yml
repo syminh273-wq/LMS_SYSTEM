@@ -8,3 +8,5 @@ variables:
     value: "@Minh1182004"
   - name: consumer_access_token
     value: ""
+  - name: space_access_token
+    value: ""

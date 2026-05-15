@@ -11,8 +11,5 @@ class Repository(BaseRepository):
             raise Space.DoesNotExist('Space not found.')
         return instance
 
-    def get_by_owner(self, owner_uid):
-        return self.filter(owner_uid=owner_uid, is_deleted=False)
-
     def get_active(self):
         return self.filter(is_active=True, is_deleted=False)

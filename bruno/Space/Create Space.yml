@@ -5,11 +5,11 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/v1/account/spaces"
+  url: "{{baseUrl}}/api/v1/space/account"
   auth: bearer
 
 auth:bearer {
-  token: {{consumer_access_token}}
+  token: "{{space_access_token}}"
 }
   body:
     type: json

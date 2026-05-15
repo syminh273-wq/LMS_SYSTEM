@@ -1,35 +1,45 @@
 from rest_framework import serializers
+from features.account.space.models.space import Space
 
-
-class Serializer(serializers.Serializer):
+class SpaceAccountSerializer(serializers.Serializer):
     uid = serializers.UUIDField(read_only=True)
-    owner_uid = serializers.UUIDField()
+    email = serializers.EmailField()
+    full_name = serializers.CharField()
     name = serializers.CharField()
-    slug = serializers.SlugField()
-    description = serializers.CharField()
-    logo_url = serializers.CharField()
-    cover_url = serializers.CharField()
-    is_active = serializers.BooleanField()
-    created_at = serializers.DateTimeField()
-    updated_at = serializers.DateTimeField()
+    slug = serializers.CharField()
+    description = serializers.CharField(required=False, allow_blank=True)
+    logo_url = serializers.SerializerMethodField()
+    cover_url = serializers.SerializerMethodField()
+    is_active = serializers.BooleanField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
 
+    def get_logo_url(self, obj):
+        if not obj.logo_url:
+            return ""
+        from core.storages.storage_service import storage_service
+        return storage_service.get_public_url(obj.logo_url)
 
-class CreateSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=255)
-    slug = serializers.SlugField(max_length=100)
-    description = serializers.CharField(required=False, default='')
-    logo_url = serializers.URLField(required=False, default='')
-    cover_url = serializers.URLField(required=False, default='')
+    def get_cover_url(self, obj):
+        if not obj.cover_url:
+            return ""
+        from core.storages.storage_service import storage_service
+        return storage_service.get_public_url(obj.cover_url)
 
-    def validate_slug(self, value):
-        from features.account.space.models import Space
-        if Space.objects.filter(slug=value, is_deleted=False).allow_filtering().first():
-            raise serializers.ValidationError('Slug already taken.')
-        return value
+class SpaceAccountCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    full_name = serializers.CharField(required=False, allow_blank=True, default='')
+    name = serializers.CharField(required=False, allow_blank=True, default='')
+    slug = serializers.CharField(required=False, allow_blank=True, default='')
 
+class SpaceAccountUpdateSerializer(serializers.Serializer):
+    full_name = serializers.CharField(required=False)
+    name = serializers.CharField(required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    logo_url = serializers.CharField(required=False, allow_blank=True)
+    cover_url = serializers.CharField(required=False, allow_blank=True)
 
-class UpdateSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=255, required=False)
-    description = serializers.CharField(required=False)
-    logo_url = serializers.URLField(required=False)
-    cover_url = serializers.URLField(required=False)
+class SpaceAccountLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)

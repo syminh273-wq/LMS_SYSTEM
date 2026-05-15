@@ -1,25 +1,18 @@
 info:
-  name: Register
+  name: Space Register
   type: http
   seq: 2
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/v1/account/register"
+  url: "{{baseUrl}}/api/v1/space/account/register/"
   body:
     type: json
     data: |-
       {
-        "email": "{{email}}",
+       "email": "{{email}}",
         "password": "{{password}}"
       }
-
-runtime:
-  variables:
-    - name: email
-      value: minh.ho@chek.vn
-    - name: password
-      value: "@Minh1182004"
 
 settings:
   encodeUrl: true

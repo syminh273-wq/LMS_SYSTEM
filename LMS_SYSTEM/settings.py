@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     # Local apps
     'core',
     'features.account',
+    'features.course.classroom',
+    'features.sharing',
 ]
 
 REST_FRAMEWORK = {
@@ -64,6 +66,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ),
+    'EXCEPTION_HANDLER': 'core.backend.exceptions.global_exception_handler',
 }
 
 from datetime import timedelta
@@ -119,6 +122,7 @@ WSGI_APPLICATION = 'LMS_SYSTEM.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# noinspection PyUnresolvedReferences
 from core.configs.database import DATABASES as CASSANDRA_DATABASES
 
 DATABASES = {
@@ -174,3 +178,5 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # CORS configuration
 CORS_ALLOW_ALL_ORIGINS = True
+
+CASSANDRA_FALLBACK_ORDER_BY_PYTHON = True

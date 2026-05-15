@@ -5,9 +5,9 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/v1/account/consumers"
+  url: "{{baseUrl}}/api/v1/consumer/account"
   auth: bearer
 
 auth:bearer {
-  token: {{consumer_access_token}}
+  token: "{{consumer_access_token}}"
 }

@@ -1,16 +1,16 @@
 info:
-  name: Login
+  name: Consumer Login
   type: http
   seq: 1
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/v1/account/login"
+  url: "{{baseUrl}}/api/v1/consumer/account/login/"
   body:
     type: json
     data: |-
       {
-        "username": "{{username}}",
+        "email": "{{email}}",
         "password": "{{password}}"
       }
 
@@ -22,14 +22,3 @@ runtime:
         if (data.access) {
           bru.setEnvVar("consumer_access_token", data.access);
         }
-  variables:
-    - name: username
-      value: "{{email}}"
-    - name: password
-      value: "{{password}}"
-
-settings:
-  encodeUrl: true
-  timeout: 0
-  followRedirects: true
-  maxRedirects: 5

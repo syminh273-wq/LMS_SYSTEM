@@ -1,13 +1,14 @@
 from uuid import uuid4
 from cassandra.cqlengine import columns
-from core.models.cassandra import BaseTimeStampModel
+from core.models.abstract_auth import AbstractAuthModel
 
 
-class Space(BaseTimeStampModel):
+class Space(AbstractAuthModel):
     __table_name__ = 'account_spaces'
 
     uid = columns.UUID(primary_key=True, default=uuid4)
-    owner_uid = columns.UUID(index=True, required=False)
+    email = columns.Text(index=True)
+    full_name = columns.Text(default='')
     name = columns.Text(default='')
     slug = columns.Text(index=True, default='')
     description = columns.Text(default='')

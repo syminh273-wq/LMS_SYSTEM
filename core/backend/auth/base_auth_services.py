@@ -1,4 +1,5 @@
 from django.contrib.auth.hashers import make_password, check_password
+from rest_framework import exceptions
 from core.services.base_service import BaseService
 
 
@@ -12,6 +13,10 @@ class BaseAuthService(BaseService):
         """
         Common registration logic: hash the password before creating the record.
         """
+        email = data.get('email')
+        if email and self.repository.filter(email=email).exists():
+            raise exceptions.ValidationError({"email": ["A user with this email already exists."]})
+
         password = data.pop('password', None)
         if password:
             data['password'] = make_password(password)

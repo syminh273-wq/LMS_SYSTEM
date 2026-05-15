@@ -1,7 +1,9 @@
+from rest_framework import exceptions
+from core.backend.auth.base_auth_services import BaseAuthService
 from features.account.space.repositories import Repository
 
 
-class Service:
+class Service(BaseAuthService):
     def __init__(self):
         self.repository = Repository()
 
@@ -14,14 +16,8 @@ class Service:
     def get_by_slug(self, slug: str):
         return self.repository.get_by_slug(slug)
 
-    def get_spaces_of_owner(self, owner_uid):
-        return self.repository.get_by_owner(owner_uid)
-
     def get_active_spaces(self):
         return self.repository.get_active()
-
-    def create_space(self, owner_uid, data: dict):
-        return self.repository.create(owner_uid=owner_uid, **data)
 
     def update(self, instance, **kwargs):
         return self.repository.update(instance, **kwargs)
@@ -31,3 +27,9 @@ class Service:
 
     def deactivate(self, instance):
         return self.repository.update(instance, is_active=False)
+
+    def register(self, data: dict):
+        slug = data.get('slug')
+        if slug and self.repository.filter(slug=slug).exists():
+            raise exceptions.ValidationError({"slug": ["A space with this slug already exists."]})
+        return super().register(data)

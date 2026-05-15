@@ -9,3 +9,4 @@ channels
 daphne
 django-cors-headers
 boto3
+qrcode==8.2

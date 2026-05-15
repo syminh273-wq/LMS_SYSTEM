@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from ..serializers.consumer_serializer import UpdateSerializer, Serializer
+from ..serializers.consumer_serializer import ConsumerAccountUpdateSerializer, ConsumerAccountSerializer
 from ..services.consumer_service import ConsumerService
 import uuid
 import os
@@ -23,7 +23,9 @@ class ConsumerUpdateView(APIView):
                 
                 avatar_file = request.FILES['avatar']
                 file_extension = os.path.splitext(avatar_file.name)[1]
-                unique_filename = f"avatars/{user_uid}{file_extension}"
+                # Ensure UID is string and format prefix correctly
+                unique_filename = f"avatars/{str(user_uid)}{file_extension}"
+                print(f"DEBUG: uploading {unique_filename}")
                 
                 # Try R2 first
                 try:
@@ -31,8 +33,7 @@ class ConsumerUpdateView(APIView):
                     if result['success']:
                         # Store only the object key (relative path)
                         data['avatar_url'] = result['object_key']
-                    else:
-                        raise Exception(result.get('message', 'R2 upload failed'))
+                        print(f"DEBUG: R2 upload success, key={result['object_key']}")
                 except Exception as e:
                     # Fallback to local storage
                     print(f"R2 upload failed, falling back to local: {str(e)}")
@@ -53,11 +54,11 @@ class ConsumerUpdateView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-        # Remove 'avatar' from data to prevent Serializer/UpdateSerializer from trying to process it again
+        # Remove 'avatar' from data to prevent ConsumerSerializer/ConsumerUpdateSerializer from trying to process it again
         if 'avatar' in data:
             del data['avatar']
         
-        serializer = UpdateSerializer(data=data, partial=True)
+        serializer = ConsumerAccountUpdateSerializer(data=data, partial=True)
         if not serializer.is_valid():
             return Response(
                 {"message": "Update failed", "errors": serializer.errors},
@@ -72,7 +73,7 @@ class ConsumerUpdateView(APIView):
             return Response(
                 {
                     "message": "Profile updated successfully",
-                    "data": Serializer(updated_user).data
+                    "data": ConsumerAccountSerializer(updated_user).data
                 }, 
                 status=status.HTTP_200_OK
             )

@@ -5,12 +5,12 @@ from features.account.consumer.views.consumer_login_view import ConsumerLoginVie
 from features.account.consumer.views.consumer_register_view import ConsumerRegisterView
 from features.account.consumer.views.consumer_update_view import ConsumerUpdateView
 
-router = DefaultRouter(trailing_slash=False)
+router = DefaultRouter(trailing_slash=True)
 router.register(r'consumers', ViewSet, basename='api_consumers')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('login', ConsumerLoginView.as_view(), name='api_login'),
-    path('register', ConsumerRegisterView.as_view(), name='api_register'),
-    path('update-profile', ConsumerUpdateView.as_view(), name='api_update_profile'),
+    path('login/', ConsumerLoginView.as_view(), name='api_login'),
+    path('register/', ConsumerRegisterView.as_view(), name='api_register'),
+    path('update-profile/', ConsumerUpdateView.as_view(), name='api_update_profile'),
 ]
