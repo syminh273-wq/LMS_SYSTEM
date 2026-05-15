@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     'features.account',
     'features.course.classroom',
     'features.sharing',
+    'features.resource',
+    'features.chat',
 ]
 
 REST_FRAMEWORK = {

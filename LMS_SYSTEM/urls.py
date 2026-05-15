@@ -11,6 +11,8 @@ urlpatterns = [
     path('api/v1/space/account/', include('features.account.space.urls')),
     path('api/v1/space/course/', include('features.course.urls')),
     path('api/v1/sharing/', include('features.sharing.urls')),
+    path('api/v1/resource/', include('features.resource.urls')),
+    path('api/v1/chat/', include('features.chat.urls')),
     path('api/v1/public/', include('core.urls')),
     path('test-chat/<str:room_name>/', test_chat_view, name='test_chat'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

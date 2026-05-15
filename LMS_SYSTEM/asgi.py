@@ -13,12 +13,12 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'LMS_SYSTEM.settings')
 
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
+from core.ws.middleware.jwt_auth_middleware import JWTAuthMiddleware
 import core.ws.routing
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
+    "websocket": JWTAuthMiddleware(
         URLRouter(
             core.ws.routing.websocket_urlpatterns
         )
