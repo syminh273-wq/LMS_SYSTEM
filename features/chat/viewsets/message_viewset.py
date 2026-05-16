@@ -21,10 +21,10 @@ class MessageViewSet(UserScopeMixin, ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            limit = int(request.query_params.get('limit', 30))
+            limit = int(request.query_params.get('limit', 10))
             limit = min(max(limit, 1), 100)
         except (ValueError, TypeError):
-            limit = 30
+            limit = 10
 
         before_uid = request.query_params.get('before_uid')
         service = MessageService()

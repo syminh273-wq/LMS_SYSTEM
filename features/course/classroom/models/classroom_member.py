@@ -4,8 +4,8 @@ from django_cassandra_engine.models import DjangoCassandraModel
 
 
 class ClassroomMember(DjangoCassandraModel):
-    classroom_uid = columns.UUID(partition_key=True)
-    member_id = columns.UUID(primary_key=True, clustering_order="ASC")
+    member_id = columns.UUID(partition_key=True)
+    classroom_uid = columns.UUID(primary_key=True, clustering_order="DESC", index=True)
     member_type = columns.Text(default='consumer')   # 'space' | 'consumer'
     member_name = columns.Text(default='')
     member_avatar = columns.Text(default='')
@@ -16,4 +16,4 @@ class ClassroomMember(DjangoCassandraModel):
     __table_name__ = 'course_classroom_members'
 
     class Meta:
-        get_pk_field = 'member_id'
+        get_pk_field = 'classroom_uid'

@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 
+import uuid
+
 from core.views.api.base_viewset import BaseModelViewSet
 from core.views.mixins import UserScopeMixin
 from core.serializers.classroom import ClassroomResponseSerializer
@@ -11,6 +13,8 @@ from features.course.classroom.services import Service
 from features.account.space.models.space import Space
 from features.sharing.services import LinkService
 from features.sharing.serializers.link_response_serializer import LinkResponseSerializer
+from features.chat.services.conversation_service import ConversationService
+from features.chat.serializers.conversation_serializer import ConversationSerializer
 
 class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     serializer_class = ClassroomResponseSerializer
@@ -69,6 +73,15 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
         service.delete(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get'])
+    def conversation(self, request, uid=None):
+        """Return (or auto-create) the channel conversation for this classroom."""
+        conv = ConversationService().get_or_create_channel(
+            classroom_uid=uuid.UUID(str(uid)),
+            created_by_id=request.user.uid,
+        )
+        return Response(ConversationSerializer(conv).data)
 
     @action(detail=True, methods=['get'])
     def sharing_link(self, request, uid=None):
