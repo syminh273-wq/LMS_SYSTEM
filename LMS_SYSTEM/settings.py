@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'core',
     'features.account',
     'features.course.classroom',
+    'features.course.exam',
     'features.sharing',
     'features.resource',
     'features.chat',
