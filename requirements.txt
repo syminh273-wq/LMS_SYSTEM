@@ -10,3 +10,13 @@ daphne
 django-cors-headers
 boto3
 qrcode==8.2
+
+# AI / RAG
+requests
+langchain
+langchain-core
+langchain-community
+langchain-chroma
+langchain-text-splitters
+chromadb
+pypdf

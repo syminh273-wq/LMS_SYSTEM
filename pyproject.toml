@@ -19,6 +19,16 @@ dependencies = [
     "boto3",
     "qrcode==8.2",
     "firebase-admin",
+    # AI / RAG
+    "requests",
+    "langchain",
+    "langchain-core",
+    "langchain-community",
+    # langchain-chroma installed separately via pip (depends on chromadb)
+    "langchain-text-splitters",
+    # chromadb + onnxruntime + numpy managed via pip (Python 3.9 arm64 wheel compat)
+    "numpy>=1.22,<2.0",
+    "pypdf",
 ]
 
 [project.optional-dependencies]
