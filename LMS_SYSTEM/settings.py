@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'features.sharing',
     'features.resource',
     'features.chat',
+    'features.course.meeting_room',
 ]
 
 REST_FRAMEWORK = {
