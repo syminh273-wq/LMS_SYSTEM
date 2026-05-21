@@ -7,4 +7,5 @@ router.register(r'classrooms', ConsumerClassroomViewSet, basename='consumer-clas
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('meeting-rooms/', include('features.course.meeting_room.urls')),
 ]
