@@ -27,6 +27,14 @@ class MeetingRoomViewSet(viewsets.ViewSet):
         room = self.service.create(request.user, serializer.validated_data)
         return Response(MeetingRoomSerializer(room).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=['post'])
+    def quick_start(self, request):
+        serializer = CreateMeetingRoomRequest(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        room = self.service.quick_start(request.user, serializer.validated_data)
+        return Response(MeetingRoomSerializer(room).data, status=status.HTTP_201_CREATED)
+
     def retrieve(self, request, pk=None):
         room = self.service.find(pk)
         if not room:
