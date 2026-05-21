@@ -4,6 +4,9 @@ from features.course.classroom.models import Classroom
 class Repository(BaseRepository):
     model = Classroom
 
+    def get_by_uid(self, uid):
+        return self.model.objects(bucket=0, uid=uid, is_deleted=False).first()
+
     def get_active_classrooms(self):
         # We must filter by bucket to use ORDER BY uid in Cassandra
         return self.filter(bucket=0, status='active', is_deleted=False).order_by('uid')
