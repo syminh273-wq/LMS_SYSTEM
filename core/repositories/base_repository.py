@@ -58,12 +58,12 @@ class BaseRepository:
         return instance
 
     def delete(self, instance: Any):
-        if self._is_cassandra:
-            instance.update(is_deleted=True, deleted_at=datetime.now())
+        if hasattr(instance, 'soft_delete'):
+            instance.soft_delete()
         else:
             instance.is_deleted = True
             instance.deleted_at = datetime.now()
-            instance.save(update_fields=['is_deleted', 'deleted_at'])
+            instance.save()
 
     def find(self, uid: Any):
         if self._is_cassandra:

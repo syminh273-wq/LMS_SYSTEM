@@ -18,10 +18,14 @@ class BaseTimeStampModel(DjangoCassandraModel):
         return super().save(*args, **kwargs)
 
     def soft_delete(self):
-        self.update(is_deleted=True, deleted_at=datetime.now())
+        self.is_deleted = True
+        self.deleted_at = datetime.now()
+        self.save()
 
     def restore(self):
-        self.update(is_deleted=False, deleted_at=None)
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save()
 
     @property
     def pk(self):
