@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/v1/chat/', include('features.chat.urls')),
     path('api/v1/space/quiz/', include('features.quiz.urls')),
     path('api/v1/consumer/quiz/', include('features.quiz.consumer_urls')),
+    path('api/v1/notification/', include('features.notification.urls')),
     path('api/v1/public/', include('core.urls')),
     path('test-chat/<str:room_name>/', test_chat_view, name='test_chat'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
