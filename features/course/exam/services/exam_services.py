@@ -1,7 +1,9 @@
 from datetime import datetime, time
+from uuid import UUID
 
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+from rest_framework.exceptions import ValidationError
 
 from features.course.exam.repositories import ExamRepository
 
@@ -103,4 +105,12 @@ class ExamService:
         return self.exam_repo.soft_delete(exam)
 
     def list_student_exams(self, classroom_id):
-        return self.exam_repo.list_published_by_classroom(classroom_id)
+        if not classroom_id:
+            raise ValidationError({"detail": "classroom_id is required."})
+
+        try:
+            classroom_uid = classroom_id if isinstance(classroom_id, UUID) else UUID(str(classroom_id))
+        except ValueError:
+            raise ValidationError({"classroom_id": "Invalid UUID."})
+
+        return self.exam_repo.list_published_by_classroom(classroom_uid)

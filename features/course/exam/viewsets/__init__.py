@@ -1,4 +1,8 @@
-from .exam_viewsets import SpaceExamViewSet, ConsumerClassroomExamViewSet
+from .exam_viewsets import (
+    ConsumerClassroomExamViewSet,
+    ConsumerExamListViewSet,
+    SpaceExamViewSet,
+)
 from .exam_submission_viewset import (
     ConsumerExamSubmissionViewSet,
     ConsumerMyExamSubmissionViewSet,

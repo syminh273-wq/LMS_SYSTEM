@@ -65,3 +65,14 @@ class ConsumerClassroomExamViewSet(APIView):
     def get(self, request, uid):
         exams = self.exam_service.list_student_exams(uid)
         return Response([serialize_exam(exam) for exam in exams])
+
+
+class ConsumerExamListViewSet(APIView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.exam_service = ExamService()
+
+    def get(self, request):
+        classroom_id = request.query_params.get("classroom_id")
+        exams = self.exam_service.list_student_exams(classroom_id)
+        return Response([serialize_exam(exam) for exam in exams])

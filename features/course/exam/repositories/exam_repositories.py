@@ -20,8 +20,13 @@ class ExamRepository:
         return Exam.objects(teacher_id=teacher_id, is_deleted=False)
 
     def list_published_by_classroom(self, classroom_id):
+        try:
+            classroom_uid = classroom_id if isinstance(classroom_id, UUID) else UUID(str(classroom_id))
+        except ValueError:
+            return []
+
         return Exam.objects(
-            classroom_id=classroom_id,
+            classroom_id=classroom_uid,
             status="published",
             is_deleted=False
         )
