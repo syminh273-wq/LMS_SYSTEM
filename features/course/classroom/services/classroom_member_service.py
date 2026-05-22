@@ -1,4 +1,7 @@
+import logging
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ClassroomMemberService:
@@ -12,13 +15,37 @@ class ClassroomMemberService:
         name = getattr(user, 'full_name', '') or getattr(user, 'username', '') or ''
         avatar = getattr(user, 'avatar_url', '') or getattr(user, 'logo_url', '') or ''
         member_type = 'space' if hasattr(user, 'logo_url') else 'consumer'
-        return self.repo.create(
+        member = self.repo.create(
             member_id=user.uid,
             classroom_uid=classroom_uid,
             member_type=member_type,
             member_name=name,
             member_avatar=avatar,
             role=role,
+        )
+        try:
+            self._notify_teacher(classroom_uid, user, name)
+        except Exception as e:
+            logger.warning(f"[ClassroomMember] Failed to send join notification: {e}")
+        return member
+
+    def _notify_teacher(self, classroom_uid, user, student_name):
+        from features.course.classroom.services.classroom_service import Service
+        from features.notification.services.notification_service import NotificationService
+        classroom = Service().find(str(classroom_uid))
+        if not classroom or not classroom.teacher_id:
+            return
+        NotificationService().send_notification(
+            target_uid=classroom.teacher_id,
+            notify_type='student_joined',
+            title='Học viên mới tham gia lớp học',
+            content=f'{student_name} đã tham gia lớp {classroom.name}',
+            metadata={
+                'classroom_uid': str(classroom.uid),
+                'classroom_name': classroom.name,
+                'student_uid': str(user.uid),
+                'student_name': student_name,
+            }
         )
 
     def leave(self, classroom_uid, member_id):
