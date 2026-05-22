@@ -19,14 +19,11 @@ dependencies = [
     "boto3",
     "qrcode==8.2",
     "firebase-admin",
-    # AI / RAG
     "requests",
     "langchain",
     "langchain-core",
     "langchain-community",
-    # langchain-chroma installed separately via pip (depends on chromadb)
     "langchain-text-splitters",
-    # chromadb + onnxruntime + numpy managed via pip (Python 3.9 arm64 wheel compat)
     "numpy>=1.22,<2.0",
     "pypdf",
 ]
@@ -38,6 +35,29 @@ dev = [
 
 [tool.poetry]
 package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+django = ">=4.0,<5.0"
+cassandra-driver = "^3.30.0"
+python-decouple = "3.8"
+django-cassandra-engine = "^1.10.0"
+djangorestframework = "^3.17.1"
+djangorestframework-simplejwt = "^5.5.1"
+django-filter = "25.1"
+channels = "^4.3.2"
+daphne = "^4.2.1"
+django-cors-headers = "^4.9.0"
+boto3 = "^1.43.13"
+qrcode = "8.2"
+firebase-admin = "^7.4.0"
+requests = "^2.34.2"
+langchain = "0.3.30"
+langchain-core = "0.3.86"
+langchain-community = "0.3.31"
+langchain-text-splitters = "0.3.11"
+numpy = ">=1.22,<2.0"
+pypdf = "^6.12.0"
 
 [build-system]
 requires = ["poetry-core"]
