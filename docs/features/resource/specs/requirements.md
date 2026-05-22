@@ -9,9 +9,11 @@
 | UR-RES-01 | UR | As a user, I want to upload a file and receive a URL so that I can attach it to an exam or message. | BR-RES-01 | High | Upload returns `uid`, `url`, `name`, `file_type`, `size`. | v1.0 |
 | UR-RES-02 | UR | As a user, I want to list my uploaded files so that I can reuse them. | BR-RES-03 | Medium | List endpoint returns all resources owned by the authenticated user. | v1.0 |
 | UR-RES-03 | UR | As a user, I want to delete a file I no longer need. | BR-RES-03 | Low | Soft delete sets `is_deleted = True`; file no longer appears in list. | v1.0 |
+| UR-RES-04 | UR | As a user, I want to replace an uploaded file so modules can keep the same resource reference. | BR-RES-01 | Medium | PATCH reupload keeps the same `uid` and updates `name`, `file_type`, `url`, and `size`. | v1.0 |
 | FR-RES-01 | FR | The system shall store resource records in `resource_resources` with `bucket` as partition key and `uid` (UUID v7) as clustering key DESC. | BR-RES-01 | High | Resource queries use bucket + uid for efficient retrieval. | v1.0 |
 | FR-RES-02 | FR | The system shall index `owner_id` and `owner_type` to support owner-scoped listing. | BR-RES-03 | High | List query with `owner_id` filter returns results without full-table scan. | v1.0 |
 | FR-RES-03 | FR | The system shall upload files to the public R2 bucket by default and return the public CDN URL. | BR-RES-02 | High | Upload response `url` is accessible without authentication headers. | v1.0 |
 | FR-RES-04 | FR | The system shall store arbitrary key-value metadata on the resource record via the `metadata` map column. | — | Low | Metadata values are persisted and returned in resource responses. | v1.0 |
+| FR-RES-05 | FR | The system shall allow owners to reupload a resource file without creating a new resource row. | UR-RES-04 | Medium | Only the owner can reupload; successful upload updates the existing row and attempts to remove the old object. | v1.0 |
 | NFR-RES-01 | NFR | Upload endpoint must respond within 3 seconds for files up to 10MB under normal network conditions. | — | High | Upload test with a 10MB file completes in under 3 seconds on a standard connection. | v1.0 |
 | NFR-RES-02 | NFR | Deleted resources must not appear in list or detail queries. | BR-RES-03 | High | List and detail endpoints filter `is_deleted = False`. | v1.0 |

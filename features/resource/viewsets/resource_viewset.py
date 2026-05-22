@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+import json
 
 from core.views.api.base_viewset import BaseModelViewSet
 from core.views.mixins import UserScopeMixin
@@ -95,6 +96,37 @@ class ResourceViewSet(UserScopeMixin, BaseModelViewSet):
             )
         else:
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['patch'], url_path='reupload')
+    def reupload(self, request, uid=None):
+        instance = self.service.find(uid)
+
+        if instance.owner_id != request.user.uid:
+            raise PermissionDenied("You do not have permission to update this resource.")
+
+        if 'file' not in request.FILES:
+            return Response({
+                'success': False,
+                'message': 'No file provided'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        metadata = request.data.get('metadata', None)
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except ValueError:
+                metadata = {}
+
+        result = self.service.reupload_resource(
+            resource=instance,
+            file_obj=request.FILES['file'],
+            metadata=metadata,
+        )
+
+        if result.get('success'):
+            return Response(self.get_serializer(result['data']).data)
+
+        return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         instance = self.service.find(kwargs['uid'])

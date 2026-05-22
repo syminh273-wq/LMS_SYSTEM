@@ -43,4 +43,4 @@ Consumer / Space (account module)
 |---|---|---|
 | Exam | `resource_uid`, `resource_url`, `resource_name` | Attach uploaded file to exam |
 | Message | `resource_uid`, `resource_url`, `resource_name`, `resource_size` | Attach file to chat message |
-| Submission *(planned)* | `resource_uid`, `resource_url`, `resource_name` | Student submits uploaded file |
+| ExamSubmission | `resource_uid`, `resource_url`, `resource_name` | Student submits uploaded file |
