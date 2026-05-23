@@ -4,11 +4,11 @@ version = "0.1.0"
 description = "Learning Management System built with Django + Cassandra"
 authors = [{ name = "hsminh" }]
 readme = "README.md"
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.10,<3.14"
 dependencies = [
-    "Django>=4.0,<5.0",
+    "Django>=4.0,<6.0",
     "cassandra-driver",
-    "python-decouple==3.8",
+    "python-decouple",
     "django-cassandra-engine",
     "djangorestframework",
     "djangorestframework-simplejwt",
@@ -17,14 +17,14 @@ dependencies = [
     "daphne",
     "django-cors-headers",
     "boto3",
-    "qrcode==8.2",
+    "qrcode",
     "firebase-admin",
     "requests",
     "langchain",
     "langchain-core",
     "langchain-community",
     "langchain-text-splitters",
-    "numpy>=1.22,<2.0",
+    "numpy>=1.22",
     "pypdf",
 ]
 
@@ -37,26 +37,26 @@ dev = [
 package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-django = ">=4.0,<5.0"
+python = ">=3.10,<3.14"
+django = ">=4.0,<6.0"
 cassandra-driver = "^3.30.0"
-python-decouple = "3.8"
+python-decouple = "^3.8"
 django-cassandra-engine = "^1.10.0"
 djangorestframework = "^3.17.1"
 djangorestframework-simplejwt = "^5.5.1"
-django-filter = "25.1"
+django-filter = "^25.1"
 channels = "^4.3.2"
 daphne = "^4.2.1"
 django-cors-headers = "^4.9.0"
-boto3 = "^1.43.13"
-qrcode = "8.2"
+boto3 = "^1.43.0"
+qrcode = "^8.2"
 firebase-admin = "^7.4.0"
-requests = "^2.34.2"
-langchain = "0.3.30"
-langchain-core = "0.3.86"
-langchain-community = "0.3.31"
-langchain-text-splitters = "0.3.11"
-numpy = ">=1.22,<2.0"
+requests = "^2.32.0"
+langchain = "^0.3.30"
+langchain-core = "^0.3.86"
+langchain-community = "^0.3.31"
+langchain-text-splitters = "^0.3.11"
+numpy = ">=1.22"
 pypdf = "^6.12.0"
 
 [build-system]
