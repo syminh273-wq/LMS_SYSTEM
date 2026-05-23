@@ -34,10 +34,16 @@ class ConsumerMyExamSubmissionViewSet(APIView):
         self.submission_service = ExamSubmissionService()
 
     def get(self, request, exam_uid):
-        submission = self.submission_service.get_my_submission(
-            exam_id=exam_uid,
-            student_id=request.user.uid,
-        )
+        try:
+            submission = self.submission_service.get_my_submission(
+                exam_id=exam_uid,
+                student_id=request.user.uid,
+            )
+        except ValueError as exc:
+            if str(exc) == "Submission not found":
+                return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+            raise
+
         return Response(serialize_exam_submission(submission))
 
 
