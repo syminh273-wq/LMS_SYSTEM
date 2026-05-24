@@ -11,6 +11,7 @@ class ClassroomMember(DjangoCassandraModel):
     member_avatar = columns.Text(default='')
     role = columns.Text(default='student')            # 'teacher' | 'student'
     joined_at = columns.DateTime(default=datetime.utcnow)
+    status = columns.Text(default='approved')          # 'pending' | 'approved'
     is_deleted = columns.Boolean(default=False)
 
     __table_name__ = 'course_classroom_members'

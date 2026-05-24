@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timezone as datetime_timezone
 
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -57,7 +57,7 @@ class ExamService:
             raise ValueError("Invalid due_date format")
 
         if timezone.is_aware(parsed_due_date):
-            parsed_due_date = timezone.make_naive(parsed_due_date, timezone.utc)
+            parsed_due_date = timezone.make_naive(parsed_due_date, datetime_timezone.utc)
 
         data["due_date"] = parsed_due_date
         return data

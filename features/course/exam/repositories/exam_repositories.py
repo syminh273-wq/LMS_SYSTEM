@@ -19,6 +19,9 @@ class ExamRepository:
     def list_by_teacher(self, teacher_id):
         return Exam.objects(teacher_id=teacher_id, is_deleted=False)
 
+    def list_by_classroom(self, classroom_id):
+        return Exam.objects(classroom_id=classroom_id, is_deleted=False)
+
     def list_published_by_classroom(self, classroom_id):
         return Exam.objects(
             classroom_id=classroom_id,

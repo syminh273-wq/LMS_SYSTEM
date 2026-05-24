@@ -22,14 +22,37 @@ class ClassroomMemberService:
             member_name=name,
             member_avatar=avatar,
             role=role,
+            status='pending',
         )
         try:
-            self._notify_teacher(classroom_uid, user, name)
+            self._notify_teacher_pending(classroom_uid, user, name)
         except Exception as e:
-            logger.warning(f"[ClassroomMember] Failed to send join notification: {e}")
+            logger.warning(f"[ClassroomMember] Failed to send pending notification: {e}")
         return member
 
-    def _notify_teacher(self, classroom_uid, user, student_name):
+    def approve(self, classroom_uid, member_id, approved_by_id):
+        from features.course.classroom.services.classroom_service import Service
+        from rest_framework.exceptions import PermissionDenied, NotFound
+        classroom = Service().find(str(classroom_uid))
+        if str(classroom.teacher_id) != str(approved_by_id):
+            raise PermissionDenied("Chỉ giáo viên mới có thể duyệt thành viên.")
+        member = self.repo.approve_member(classroom_uid, member_id)
+        if not member:
+            raise NotFound("Không tìm thấy thành viên.")
+        return member
+
+    def reject(self, classroom_uid, member_id, rejected_by_id):
+        from features.course.classroom.services.classroom_service import Service
+        from rest_framework.exceptions import PermissionDenied
+        classroom = Service().find(str(classroom_uid))
+        if str(classroom.teacher_id) != str(rejected_by_id):
+            raise PermissionDenied("Chỉ giáo viên mới có thể từ chối thành viên.")
+        self.leave(classroom_uid, member_id)
+
+    def get_pending_members(self, classroom_uid):
+        return list(self.repo.get_pending_members(classroom_uid))
+
+    def _notify_teacher_pending(self, classroom_uid, user, student_name):
         from features.course.classroom.services.classroom_service import Service
         from features.notification.services.notification_service import NotificationService
         classroom = Service().find(str(classroom_uid))
@@ -37,9 +60,9 @@ class ClassroomMemberService:
             return
         NotificationService().send_notification(
             target_uid=classroom.teacher_id,
-            notify_type='student_joined',
-            title='Học viên mới tham gia lớp học',
-            content=f'{student_name} đã tham gia lớp {classroom.name}',
+            notify_type='student_join_request',
+            title='Yêu cầu tham gia lớp học',
+            content=f'{student_name} đang chờ được phê duyệt vào lớp {classroom.name}',
             metadata={
                 'classroom_uid': str(classroom.uid),
                 'classroom_name': classroom.name,
@@ -58,6 +81,14 @@ class ClassroomMemberService:
 
     def is_member(self, classroom_uid, member_id):
         return self.repo.is_member(classroom_uid, member_id)
+
+    def kick(self, classroom_uid, member_id, kicked_by_id):
+        from features.course.classroom.services.classroom_service import Service
+        from rest_framework.exceptions import PermissionDenied
+        classroom = Service().find(str(classroom_uid))
+        if str(classroom.teacher_id) != str(kicked_by_id):
+            raise PermissionDenied("Chỉ giáo viên mới có thể kick sinh viên.")
+        self.leave(classroom_uid, member_id)
 
     def get_joined_classroom_uids(self, member_id):
         rows = self.repo.get_by_member(member_id)

@@ -37,6 +37,22 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     def retrieve(self, request, pk=None):
         """GET /api/v1/consumer/course/classrooms/{uid}/"""
+        from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
+        import uuid as _uuid
+        try:
+            classroom_uid = _uuid.UUID(str(pk))
+        except ValueError:
+            return Response({'error': 'ID lớp không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        member = ClassroomMemberRepository().get_member(classroom_uid, request.user.uid)
+        if not member or member.is_deleted:
+            return Response({'error': 'Bạn chưa đăng ký tham gia lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        if member.status == 'pending':
+            return Response(
+                {'error': 'Yêu cầu của bạn đang chờ giáo viên phê duyệt.', 'membership_status': 'pending'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         instance = Service().find(pk)
         return Response(ClassroomResponseSerializer(instance).data)
 
@@ -52,8 +68,11 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         if not classroom or getattr(classroom, 'is_deleted', False) or classroom.status != 'active':
             return Response({'error': 'Mã lớp không hợp lệ hoặc lớp không còn hoạt động.'}, status=status.HTTP_404_NOT_FOUND)
 
-        ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
-        return Response(ClassroomResponseSerializer(classroom).data, status=status.HTTP_200_OK)
+        member = ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
+        return Response(
+            {'membership_status': getattr(member, 'status', 'pending')},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=['get'])
     def conversation(self, request, pk=None):
