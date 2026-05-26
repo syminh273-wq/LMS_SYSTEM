@@ -202,3 +202,12 @@ FRONTEND_CONSUMER_URL = config('FRONTEND_CONSUMER_URL', default='http://localhos
 FRONTEND_SPACE_URL = config('FRONTEND_SPACE_URL', default='http://localhost:3003')
 GOOGLE_AUTH_URL = config('GOOGLE_AUTH_URL', default='https://accounts.google.com/o/oauth2/v2/auth')
 GOOGLE_TOKEN_URL = config('GOOGLE_TOKEN_URL', default='https://oauth2.googleapis.com/token')
+
+# Email Settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='')

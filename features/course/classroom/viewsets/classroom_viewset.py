@@ -20,6 +20,8 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     serializer_class = ClassroomResponseSerializer
 
     def get_queryset(self):
+        if isinstance(self.request.user, Space):
+            return Service().get_by_teacher(self.request.user.uid)
         return Service().get_active_classrooms()
 
     def list(self, request, *args, **kwargs):
