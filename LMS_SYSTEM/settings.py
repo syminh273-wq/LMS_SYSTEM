@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'features.course.meeting_room',
     'features.quiz',
     'features.notification',
+    'features.calendar',
 ]
 
 REST_FRAMEWORK = {
