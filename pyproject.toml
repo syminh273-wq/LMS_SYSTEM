@@ -26,6 +26,8 @@ dependencies = [
     "langchain-text-splitters",
     "numpy>=1.22",
     "pypdf",
+    "google-auth (>=2.53.0,<3.0.0)",
+    "google-auth-oauthlib (>=1.4.0,<2.0.0)",
 ]
 
 [project.optional-dependencies]
