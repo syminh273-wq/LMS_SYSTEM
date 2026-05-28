@@ -132,6 +132,14 @@ class QuizService(BaseService):
     def get_student_attempts(self, quiz_uid, classroom_id, student_uid):
         return self.attempt_repo.get_by_student(quiz_uid, classroom_id, student_uid)
 
+    # ── Question update ───────────────────────────────────────────────────────
+
+    def find_question(self, quiz_id, question_uid):
+        return self.question_repo.find_question(quiz_id, question_uid)
+
+    def update_question(self, question, **fields):
+        return self.question_repo.update(question, **fields)
+
     # ── Delete ─────────────────────────────────────────────────────────────────
 
     def delete_quiz(self, quiz_uid):

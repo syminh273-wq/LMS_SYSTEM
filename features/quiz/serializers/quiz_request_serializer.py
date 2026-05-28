@@ -47,6 +47,17 @@ class QuizAssignUpdateRequestSerializer(serializers.Serializer):
     passing_score_pct  = serializers.IntegerField(required=False, min_value=0, max_value=100)
 
 
+class QuizQuestionUpdateRequestSerializer(serializers.Serializer):
+    question_text  = serializers.CharField(required=False)
+    option_a       = serializers.CharField(required=False)
+    option_b       = serializers.CharField(required=False)
+    option_c       = serializers.CharField(required=False)
+    option_d       = serializers.CharField(required=False)
+    correct_answer = serializers.ChoiceField(choices=['a', 'b', 'c', 'd'], required=False)
+    explanation    = serializers.CharField(required=False, allow_blank=True)
+    order          = serializers.IntegerField(required=False)
+
+
 class QuizSubmitRequestSerializer(serializers.Serializer):
     answers = serializers.DictField(
         child=serializers.ChoiceField(choices=['a', 'b', 'c', 'd']),

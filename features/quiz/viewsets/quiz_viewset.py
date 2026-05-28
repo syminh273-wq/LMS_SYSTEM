@@ -11,12 +11,14 @@ from features.quiz.serializers.quiz_request_serializer import (
     QuizUpdateRequestSerializer,
     QuizAssignRequestSerializer,
     QuizAssignUpdateRequestSerializer,
+    QuizQuestionUpdateRequestSerializer,
 )
 from features.quiz.serializers.quiz_response_serializer import (
     QuizResponseSerializer,
     QuizDetailResponseSerializer,
     QuizAssignmentResponseSerializer,
     QuizAttemptResponseSerializer,
+    QuizQuestionSerializer,
 )
 from features.quiz.services.quiz_service import QuizService
 from features.quiz.services.quiz_generation_service import QuizGenerationService, QUIZ_TYPES, _extract_pdf_text
@@ -243,6 +245,24 @@ class QuizViewSet(BaseModelViewSet):
             return Response({'detail': 'classroom_id is required.'}, status=400)
         attempts = self.service.get_all_attempts(kwargs['uid'], classroom_id)
         return Response(QuizAttemptResponseSerializer(list(attempts), many=True).data)
+
+    # ── UPDATE QUESTION  PATCH /quizzes/<uid>/questions/<question_uid>/ ──────
+    @action(detail=True, methods=['patch'], url_path=r'questions/(?P<question_uid>[^/.]+)')
+    def update_question(self, request, uid=None, question_uid=None):
+        quiz = self.service.find(uid)
+        if str(quiz.created_by) != str(request.user.uid):
+            return Response({'detail': 'You do not have permission to edit this quiz.'}, status=status.HTTP_403_FORBIDDEN)
+        if quiz.status != 'draft':
+            return Response({'detail': 'Questions can only be edited while the quiz is in draft status.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = QuizQuestionUpdateRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            return Response({'detail': 'No fields provided to update.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        question = self.service.find_question(quiz.uid, question_uid)
+        updated = self.service.update_question(question, **serializer.validated_data)
+        return Response(QuizQuestionSerializer(updated).data)
 
     # ── UPDATE  PATCH /quizzes/<uid>/ ─────────────────────────────────────
     def partial_update(self, request, *args, **kwargs):
