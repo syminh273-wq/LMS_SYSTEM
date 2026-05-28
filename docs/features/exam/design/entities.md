@@ -54,6 +54,13 @@
 | `feedback` | Text | — | Teacher feedback |
 | `graded_by` | UUID | — | Space account that graded |
 | `graded_at` | DateTime | — | Grading timestamp |
+| `grading_method` | Text | — | `manual` \| `ai` |
+| `ai_model` | Text | — | AI backend/model used for grading |
+| `ai_rubric` | Text | — | Teacher-provided grading rubric |
+| `ai_reason` | Text | — | Overall AI grading reason |
+| `ai_breakdown` | Text | — | JSON list of per-question score reasons |
+| `ai_sources` | Text | — | JSON list of classroom document sources |
+| `ai_confidence` | Float | — | AI confidence score from `0` to `1` |
 | `created_at` | DateTime | — | Creation timestamp |
 | `updated_at` | DateTime | — | Update timestamp |
 | `is_deleted` | Boolean | — | Soft delete flag |

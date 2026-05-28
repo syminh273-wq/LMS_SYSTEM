@@ -6,9 +6,18 @@ router = DefaultRouter()
 router.register(r'', ClassroomViewSet, basename='classroom')
 
 _member = ClassroomMemberViewSet
+_classroom = ClassroomViewSet
 
 urlpatterns = [
     path('', include(router.urls)),
+    # DELETE /classrooms/<uid>/docs/<resource_uid>/
+    path('<str:uid>/docs/<str:resource_uid>/',
+         _classroom.as_view({'delete': 'docs_delete'}),
+         name='classroom-docs-delete'),
+    # POST /classrooms/<uid>/ask-stream/  — SSE streaming AI bot
+    path('<str:uid>/ask-stream/',
+         _classroom.as_view({'post': 'ask_stream'}),
+         name='classroom-ask-stream'),
     # Nested member routes: /classrooms/<classroom_uid>/members/
     path('<str:classroom_uid>/members/',
          _member.as_view({'get': 'list'}),

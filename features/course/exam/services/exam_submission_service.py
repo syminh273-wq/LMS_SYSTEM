@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.exam.repositories import ExamRepository, ExamSubmissionRepository
+from features.course.exam.services.exam_ai_grading_service import ExamAIGradingService
 from features.resource.repositories import ResourceRepository
 
 
@@ -17,6 +18,7 @@ class ExamSubmissionService:
         self.submission_repo = ExamSubmissionRepository()
         self.member_repo = ClassroomMemberRepository()
         self.resource_repo = ResourceRepository()
+        self.ai_grading_service = ExamAIGradingService()
 
     def validate_content(self, data, student_id=None):
         content_type = data.get("content_type")
@@ -142,5 +144,76 @@ class ExamSubmissionService:
         update_data["graded_by"] = teacher_id
         update_data["graded_at"] = datetime.utcnow()
         update_data["status"] = "graded"
+        update_data["grading_method"] = "manual"
 
         return self.submission_repo.update(submission, **update_data)
+
+    def ai_grade_submission(self, submission_id, teacher_id, data):
+        submission = self.get_teacher_submission(submission_id, teacher_id)
+        if submission.grade is not None and not data.get("overwrite", False):
+            raise ValueError("Submission already graded")
+
+        exam = self.exam_repo.get_by_uid(submission.exam_id)
+        if not exam:
+            raise ValueError("Exam not found")
+
+        result = self.ai_grading_service.grade(
+            exam=exam,
+            submission=submission,
+            rubric=data.get("rubric") or "",
+            max_grade=float(data.get("max_grade") or 10),
+            top_k=int(data.get("top_k") or 5),
+        )
+
+        return self.submission_repo.update(
+            submission,
+            grade=result["grade"],
+            feedback=result["feedback"],
+            graded_by=teacher_id,
+            graded_at=result["graded_at"],
+            status="graded",
+            grading_method="ai",
+            ai_model=result["model"],
+            ai_rubric=data.get("rubric") or "",
+            ai_reason=result["reason"],
+            ai_breakdown=self._to_json(result["breakdown"]),
+            ai_sources=self._to_json(result["sources"]),
+            ai_confidence=result["confidence"],
+        )
+
+    def ai_grade_exam_submissions(self, exam_id, teacher_id, data):
+        exam = self.exam_repo.get_by_uid(exam_id)
+        if not exam:
+            raise ValueError("Exam not found")
+        if str(exam.teacher_id) != str(teacher_id):
+            raise ValueError("You do not own this exam")
+
+        submissions = self.submission_repo.list_by_exam(exam.uid)
+        return self._ai_grade_many(submissions, teacher_id, data)
+
+    def ai_grade_classroom_submissions(self, classroom_id, teacher_id, data):
+        exams = self.exam_repo.list_by_teacher(teacher_id)
+        classroom_exams = [exam for exam in exams if str(exam.classroom_id) == str(classroom_id)]
+
+        submissions = []
+        for exam in classroom_exams:
+            submissions.extend(list(self.submission_repo.list_by_exam(exam.uid)))
+
+        return self._ai_grade_many(submissions, teacher_id, data)
+
+    def _ai_grade_many(self, submissions, teacher_id, data):
+        results = []
+        for submission in submissions:
+            try:
+                updated = self.ai_grade_submission(submission.uid, teacher_id, data)
+                results.append({"submission": updated, "success": True, "error": ""})
+            except ValueError as exc:
+                results.append({"submission": submission, "success": False, "error": str(exc)})
+            except Exception as exc:
+                results.append({"submission": submission, "success": False, "error": str(exc)})
+        return results
+
+    def _to_json(self, value):
+        import json
+
+        return json.dumps(value, ensure_ascii=False)

@@ -32,6 +32,14 @@ class ExamSubmission(BaseTimeStampModel):
     graded_by = columns.UUID(required=False)
     graded_at = columns.DateTime(required=False)
 
+    grading_method = columns.Text(default="manual")
+    ai_model = columns.Text(default="")
+    ai_rubric = columns.Text(default="")
+    ai_reason = columns.Text(default="")
+    ai_breakdown = columns.Text(default="")
+    ai_sources = columns.Text(default="")
+    ai_confidence = columns.Float(required=False)
+
     is_deleted = columns.Boolean(default=False)
     deleted_at = columns.DateTime(required=False)
 

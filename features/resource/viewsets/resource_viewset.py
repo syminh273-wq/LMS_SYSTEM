@@ -60,7 +60,6 @@ class ResourceViewSet(UserScopeMixin, BaseModelViewSet):
             except:
                 metadata = {}
 
-        # Allow caller to explicitly set owner_id / owner_type (e.g. classroom upload)
         import uuid as _uuid
         raw_owner_id = request.data.get('owner_id')
         raw_owner_type = request.data.get('owner_type')

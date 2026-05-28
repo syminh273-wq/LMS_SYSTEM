@@ -10,10 +10,16 @@ from features.course.exam.viewsets import (
 router = DefaultRouter()
 router.register(r'classrooms', ConsumerClassroomViewSet, basename='consumer-classroom')
 
+_consumer_classroom = ConsumerClassroomViewSet
+
 urlpatterns = [
     path('classrooms/<uuid:uid>/exams/', ConsumerClassroomExamViewSet.as_view()),
     path('exams/<uuid:exam_uid>/submissions/', ConsumerExamSubmissionViewSet.as_view()),
     path('exams/<uuid:exam_uid>/submissions/me/', ConsumerMyExamSubmissionViewSet.as_view()),
+    # SSE streaming AI bot (manual route — pk used as positional kwarg from router)
+    path('classrooms/<str:pk>/ask-stream/',
+         _consumer_classroom.as_view({'post': 'ask_stream'}),
+         name='consumer-classroom-ask-stream'),
     path('', include(router.urls)),
     path('meeting-rooms/', include('features.course.meeting_room.urls')),
 ]

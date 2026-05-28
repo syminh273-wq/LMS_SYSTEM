@@ -23,18 +23,18 @@ Usage:
 """
 
 import json
-import os
 from typing import Generator, List, Union
 
 import requests
+from decouple import config
 
-_BASE_URL = os.environ.get("OMINIROUTE_BASE_URL", "http://localhost:20128/v1")
+_BASE_URL = config("OMINIROUTE_BASE_URL", default="http://localhost:20128/v1")
 _CHAT_URL = f"{_BASE_URL}/chat/completions"
 _EMBED_URL = f"{_BASE_URL}/embeddings"
 
 
 def _key() -> str:
-    return os.environ.get("OMINIROUTE_API_KEY", "")
+    return config("OMINIROUTE_API_KEY", default="")
 
 
 def _headers() -> dict:

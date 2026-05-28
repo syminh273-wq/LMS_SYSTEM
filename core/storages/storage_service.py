@@ -95,8 +95,9 @@ class StorageService:
         Upload a file-like object to R2 storage. Default to public bucket.
         """
         try:
+            import io
             bucket = self.public_bucket if is_public else self.private_bucket
-            
+
             extra_args = {}
             if is_public:
                 # Ensure correct content type for images so browsers display them
@@ -104,11 +105,19 @@ class StorageService:
                 content_type, _ = mimetypes.guess_type(object_key)
                 if content_type:
                     extra_args['ContentType'] = content_type
-                # Note: R2 uses bucket-level/domain-level public access, 
+                # Note: R2 uses bucket-level/domain-level public access,
                 # but 'public-read' is a standard S3 hint.
                 extra_args['ACL'] = 'public-read'
 
-            self.s3_client.upload_fileobj(file_obj, bucket, object_key, ExtraArgs=extra_args)
+            # Seek to start then buffer into BytesIO.
+            # Django's TemporaryUploadedFile can be closed/GC'd before boto3's
+            # internal multipart threads finish reading, causing
+            # "ValueError: I/O operation on closed file".
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+            buf = io.BytesIO(file_obj.read())
+
+            self.s3_client.upload_fileobj(buf, bucket, object_key, ExtraArgs=extra_args)
             
             return {
                 'success': True,
@@ -354,7 +363,8 @@ class StorageService:
             from django.core.files.storage import default_storage
             from django.core.files.base import ContentFile
             
-            # Ensure the directory exists
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
             path = default_storage.save(object_key, ContentFile(file_obj.read()))
             url = f"{settings.MEDIA_URL}{path}"
             

@@ -1,2 +1,3 @@
 from .exam_services import ExamService
+from .exam_ai_grading_service import ExamAIGradingService
 from .exam_submission_service import ExamSubmissionService

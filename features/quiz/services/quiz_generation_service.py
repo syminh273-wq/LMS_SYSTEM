@@ -16,7 +16,7 @@ import tempfile
 
 import requests
 
-from core.ai.llm.services.omni_route_client import OmniRouteClient
+from core.ai.llm.services.ai_client import AIClient as OmniRouteClient
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PDF text extraction
@@ -81,7 +81,7 @@ def _build_system(persona: str, task_type: str, rules: list, format_rule: str, n
         "role": "system",
         "content": json.dumps({
             "persona": persona,
-            "language_rule": "Write in the SAME language as the document. Auto-detect.",
+            "language_rule": "Always write in Vietnamese. Even if the document is in English, translate the concepts into natural, accurate Vietnamese for the quiz.",
             "task": {
                 "type": task_type,
                 "quantity": f"Exactly {num_questions} questions",
@@ -103,7 +103,7 @@ _RULES = {
     ],
     "true_false": [
         "Each question is a declarative STATEMENT, not a question.",
-        "option_a is always Đúng/True. option_b is always Sai/False.",
+        "option_a is always 'Đúng'. option_b is always 'Sai'.",
         "option_c and option_d are plausible partial-truth distractors.",
         "Exactly half the statements should be TRUE, half FALSE.",
         "False statements must contain one specific, testable error from the document.",

@@ -1,75 +1,53 @@
 """
-RAGService — Retrieval-Augmented Generation for LMS course materials.
+RAGService — thin compatibility wrapper around RAGPipeline.
 
-Supports:
-  - process_document(file_path, metadata)  — chunk & index a PDF/TXT into ChromaDB
-  - get_context(query, k, filter)          — retrieve relevant chunks for a query
-  - process_image(image_path, ...)         — index an image by its vision description
-  - get_image_context(image_path, ...)     — find similar images
-  - update_document(doc_id, new_text)      — correct/update a stored entry
+Existing code that calls RAGService.process_document / get_context continues to work.
+New code should use RAGPipeline directly for the full pipeline experience.
 """
 
-import os
 import uuid
 
-from django.conf import settings
-from langchain_chroma import Chroma
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-from core.ai.embeddings.services.embedding_service import get_embedding_service
 from core.ai.embeddings.services.multimodal_embedding_service import get_multimodal_service
+from core.ai.rag.services.rag_pipeline import RAGPipeline
+from core.ai.vector_store.services.lance_vector_service import LanceVectorService
 
+_TEXT_COLLECTION = RAGPipeline.DEFAULT_COLLECTION
+_IMAGE_COLLECTION = "lms_image_store"
 
-_CHROMA_DIR = os.path.join(settings.BASE_DIR, "chroma_db")
+_pipeline = RAGPipeline()
 
 
 class RAGService:
-    """Stateless RAG service backed by ChromaDB."""
 
-    # ── Text document indexing ────────────────────────────────────────────────
+    # ── Text ──────────────────────────────────────────────────────────────────
 
     @classmethod
-    def process_document(cls, file_path: str, metadata: dict = None):
-        """
-        Chunk a PDF or TXT file and store in ChromaDB.
-        metadata keys are attached to every chunk (e.g. classroom_id, resource_id).
-        """
-        os.makedirs(_CHROMA_DIR, exist_ok=True)
-        loader = PyPDFLoader(file_path) if file_path.endswith(".pdf") else TextLoader(file_path)
-        docs = loader.load()
-
-        if metadata:
-            for doc in docs:
-                doc.metadata.update(metadata)
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = splitter.split_documents(docs)
-
-        Chroma.from_documents(
-            documents=chunks,
-            embedding=get_embedding_service(),
-            persist_directory=_CHROMA_DIR,
-        )
-        print(f"[RAG] Indexed {len(chunks)} chunks from {file_path}")
-        return len(chunks)
+    def process_document(cls, file_path: str, metadata: dict = None) -> int:
+        result = _pipeline.ingest(file_path=file_path, metadata=metadata)
+        return result["chunks"]
 
     @classmethod
     def get_context(cls, query: str, k: int = 3, filter_meta: dict = None) -> str:
-        """
-        Retrieve the top-k relevant document chunks for a query.
-        Returns concatenated text ready to inject as a system message.
-        """
-        if not os.path.exists(_CHROMA_DIR):
-            return ""
-        store = Chroma(
-            persist_directory=_CHROMA_DIR,
-            embedding_function=get_embedding_service(),
-        )
-        results = store.similarity_search(query, k=k, filter=filter_meta or None)
-        return "\n\n".join(doc.page_content for doc in results)
+        hits = _pipeline.search(query, top_k=k, filter_meta=filter_meta)
+        return "\n\n".join(h["document"] for h in hits)
 
-    # ── Image indexing ────────────────────────────────────────────────────────
+    @classmethod
+    def ask(cls, question: str, k: int = 3, filter_meta: dict = None) -> dict:
+        return _pipeline.ask(question, top_k=k, filter_meta=filter_meta)
+
+    @classmethod
+    def ask_stream(cls, question: str, k: int = 3, filter_meta: dict = None):
+        return _pipeline.ask_stream(question, top_k=k, filter_meta=filter_meta)
+
+    @classmethod
+    def update_document(cls, doc_id: str, new_text: str, metadata: dict = None):
+        store = LanceVectorService(_TEXT_COLLECTION)
+        embedder = _pipeline._get_embedder()
+        vector = embedder.embed_query(new_text)
+        store.add(vector=vector, doc_id=doc_id, document=new_text, metadata=metadata or {})
+        print(f"[RAG] Updated {doc_id}")
+
+    # ── Images ────────────────────────────────────────────────────────────────
 
     @classmethod
     def process_image(
@@ -80,29 +58,14 @@ class RAGService:
         content_type: str = "image/png",
         doc_id: str = None,
     ) -> str:
-        """
-        Generate a vision embedding for an image and store it in ChromaDB.
-        Returns the stored doc_id.
-        """
-        os.makedirs(_CHROMA_DIR, exist_ok=True)
         svc = get_multimodal_service()
         vector, img_hash = svc.get_image_embedding(image_source, content_type=content_type)
-
-        store = Chroma(
-            persist_directory=_CHROMA_DIR,
-            embedding_function=get_embedding_service(),
-        )
-
         unique_id = doc_id or f"img_{img_hash}"
         meta = {"image_hash": img_hash, **(metadata or {})}
         content = description or f"Image: {unique_id}"
-
-        store._collection.upsert(
-            ids=[unique_id],
-            embeddings=[vector],
-            documents=[content],
-            metadatas=[meta],
-        )
+        dim = len(vector)
+        store = LanceVectorService(_IMAGE_COLLECTION, embed_dim=dim)
+        store.add(vector=vector, doc_id=unique_id, document=content, metadata=meta)
         print(f"[RAG] Indexed image → {unique_id}")
         return unique_id
 
@@ -115,13 +78,6 @@ class RAGService:
         content_type: str = "image/png",
         threshold: float = 0.5,
     ):
-        """
-        Find similar images in ChromaDB.
-        Returns (context_text, list_of_matched_ids).
-        """
-        if not os.path.exists(_CHROMA_DIR):
-            return "", []
-
         svc = get_multimodal_service()
         try:
             vector, img_hash = svc.get_image_embedding(image_source, content_type=content_type)
@@ -129,64 +85,16 @@ class RAGService:
             print(f"[RAG] Image embedding failed: {exc}")
             return "", []
 
-        store = Chroma(
-            persist_directory=_CHROMA_DIR,
-            embedding_function=get_embedding_service(),
-        )
-
+        store = LanceVectorService(_IMAGE_COLLECTION)
         hash_id = f"img_{img_hash}"
-        try:
-            existing = store._collection.get(ids=[hash_id], include=["documents"])
-            if existing and existing.get("ids"):
-                return existing["documents"][0], [hash_id]
-        except Exception:
-            pass
+        existing = store.get_by_id(hash_id)
+        if existing:
+            return existing["document"], [hash_id]
 
-        results = store._collection.query(
-            query_embeddings=[vector],
-            n_results=k,
-            where=filter_meta or None,
-            include=["documents", "distances"],
-        )
+        results = store.query(vector, n_results=k, where=filter_meta)
         matched_docs, matched_ids = [], []
-        if results and results.get("documents"):
-            for doc, dist, doc_id in zip(
-                results["documents"][0],
-                results["distances"][0],
-                results.get("ids", [[]])[0],
-            ):
-                if dist <= threshold:
-                    matched_docs.append(doc)
-                    matched_ids.append(doc_id)
-
+        for r in results:
+            if r["distance"] <= threshold:
+                matched_docs.append(r["document"])
+                matched_ids.append(r["id"])
         return "\n\n".join(matched_docs), matched_ids
-
-    # ── Update ────────────────────────────────────────────────────────────────
-
-    @classmethod
-    def update_document(cls, doc_id: str, new_text: str, metadata: dict = None):
-        """Update the stored text (and optionally metadata) for an existing entry."""
-        if not os.path.exists(_CHROMA_DIR):
-            return
-        store = Chroma(
-            persist_directory=_CHROMA_DIR,
-            embedding_function=get_embedding_service(),
-        )
-        existing = store._collection.get(ids=[doc_id], include=["embeddings"])
-        old_embs = existing.get("embeddings") if existing else None
-
-        update_meta = metadata or {}
-        if old_embs and len(old_embs) > 0:
-            store._collection.upsert(
-                ids=[doc_id],
-                embeddings=list(old_embs),
-                documents=[new_text],
-                metadatas=[update_meta],
-            )
-        else:
-            store._collection.update(
-                ids=[doc_id],
-                documents=[new_text],
-                metadatas=[update_meta],
-            )
-        print(f"[RAG] Updated {doc_id}")

@@ -1,3 +1,3 @@
-from core.ai.vector_store.services.chroma_vector_service import ChromaVectorService
+from core.ai.vector_store.services.lance_vector_service import LanceVectorService
 
-__all__ = ["ChromaVectorService"]
+__all__ = ["LanceVectorService"]

@@ -1,24 +1,38 @@
 """
-MultimodalEmbeddingService — generate embeddings for images via vision model description.
+MultimodalEmbeddingService — image embeddings via vision model description.
 
-Flow: image → vision model describes it → hash-embed the description → (vector, hash).
+AI_MODE=omni   → OmniRoute /v1/chat/completions  (OpenAI vision format)
+AI_MODE=ollama → Ollama    /api/chat              (images field in message)
+
+Flow: image → vision model describes it → embed the description → (vector, hash).
 """
 
 import base64
 import hashlib
-import os
 from typing import Tuple
 
 import requests
+from decouple import config
+
+_AI_MODE = config("AI_MODE", default="omni").lower()
 
 
 class MultimodalEmbeddingService:
     def __init__(self):
-        self._base_url = os.environ.get("OMINIROUTE_BASE_URL", "http://localhost:20128/v1")
+        if _AI_MODE == "ollama":
+            base = config("OLLAMA_BASE_URL", default="http://localhost:11434")
+            self._chat_url = base + "/api/chat"
+            self._vision_model = config("OLLAMA_VISION_MODEL", default="llava")
+        else:
+            base = config("OMINIROUTE_BASE_URL", default="http://localhost:20128/v1")
+            self._chat_url = base + "/chat/completions"
+            self._vision_model = "fast-vision-combo"
 
     def _headers(self) -> dict:
+        if _AI_MODE == "ollama":
+            return {"Content-Type": "application/json"}
         return {
-            "Authorization": f"Bearer {os.environ.get('OMINIROUTE_API_KEY', '')}",
+            "Authorization": f"Bearer {config('OMINIROUTE_API_KEY', default='')}",
             "Content-Type": "application/json",
         }
 
@@ -49,37 +63,41 @@ class MultimodalEmbeddingService:
         return vector, image_hash
 
     def _describe_image(self, image_b64: str, content_type: str) -> str:
-        payload = {
-            "model": "fast-vision-combo",
-            "stream": False,
-            "messages": [
-                {
+        prompt_text = (
+            "Describe this image in detail for semantic search. "
+            "Include: main subject, key visual features, any text/labels visible, "
+            "context and setting. Be specific and structured."
+        )
+
+        if _AI_MODE == "ollama":
+            payload = {
+                "model": self._vision_model,
+                "stream": False,
+                "messages": [{
+                    "role": "user",
+                    "content": prompt_text,
+                    "images": [image_b64],
+                }],
+            }
+        else:
+            payload = {
+                "model": self._vision_model,
+                "stream": False,
+                "messages": [{
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Describe this image in detail for semantic search. "
-                                "Include: main subject, key visual features, any text/labels visible, "
-                                "context and setting. Be specific and structured."
-                            ),
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:{content_type};base64,{image_b64}"},
-                        },
+                        {"type": "text", "text": prompt_text},
+                        {"type": "image_url", "image_url": {"url": f"data:{content_type};base64,{image_b64}"}},
                     ],
-                }
-            ],
-        }
-        resp = requests.post(
-            f"{self._base_url}/chat/completions",
-            json=payload,
-            headers=self._headers(),
-            timeout=60,
-        )
+                }],
+            }
+
+        resp = requests.post(self._chat_url, json=payload, headers=self._headers(), timeout=60)
         if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"]
+            data = resp.json()
+            if _AI_MODE == "ollama":
+                return data["message"]["content"]
+            return data["choices"][0]["message"]["content"]
         raise RuntimeError(f"Vision description failed ({resp.status_code}): {resp.text}")
 
     @staticmethod

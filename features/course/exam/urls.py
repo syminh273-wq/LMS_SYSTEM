@@ -1,7 +1,9 @@
 from django.urls import path
 from features.course.exam.viewsets import (
+    SpaceExamSubmissionAIGradeViewSet,
     SpaceExamSubmissionDetailViewSet,
     SpaceExamSubmissionGradeViewSet,
+    SpaceExamSubmissionsAIGradeViewSet,
     SpaceExamSubmissionViewSet,
     SpaceExamViewSet,
 )
@@ -9,7 +11,9 @@ from features.course.exam.viewsets import (
 urlpatterns = [
     path('', SpaceExamViewSet.as_view()),
     path('<uuid:exam_uid>/submissions/', SpaceExamSubmissionViewSet.as_view()),
+    path('<uuid:exam_uid>/submissions/ai-grade/', SpaceExamSubmissionsAIGradeViewSet.as_view()),
     path('submissions/<uuid:submission_uid>/', SpaceExamSubmissionDetailViewSet.as_view()),
     path('submissions/<uuid:submission_uid>/grade/', SpaceExamSubmissionGradeViewSet.as_view()),
+    path('submissions/<uuid:submission_uid>/ai-grade/', SpaceExamSubmissionAIGradeViewSet.as_view()),
     path('<uuid:uid>/', SpaceExamViewSet.as_view()),
 ]

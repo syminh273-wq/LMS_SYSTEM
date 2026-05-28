@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from features.course.exam.serializers import (
+    ExamSubmissionAIGradeSerializer,
     ExamSubmissionGradeSerializer,
     ExamSubmissionRequestSerializer,
     serialize_exam_submission,
@@ -107,3 +108,80 @@ class SpaceExamSubmissionGradeViewSet(APIView):
             data=serializer.validated_data,
         )
         return Response(serialize_exam_submission(submission))
+
+
+class SpaceExamSubmissionAIGradeViewSet(APIView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.submission_service = ExamSubmissionService()
+
+    def post(self, request, submission_uid):
+        serializer = ExamSubmissionAIGradeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            submission = self.submission_service.ai_grade_submission(
+                submission_id=submission_uid,
+                teacher_id=request.user.uid,
+                data=serializer.validated_data,
+            )
+        except ValueError as exc:
+            return exam_submission_error_response(exc)
+
+        return Response(serialize_exam_submission(submission))
+
+
+class SpaceExamSubmissionsAIGradeViewSet(APIView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.submission_service = ExamSubmissionService()
+
+    def post(self, request, exam_uid):
+        serializer = ExamSubmissionAIGradeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            results = self.submission_service.ai_grade_exam_submissions(
+                exam_id=exam_uid,
+                teacher_id=request.user.uid,
+                data=serializer.validated_data,
+            )
+        except ValueError as exc:
+            return exam_submission_error_response(exc)
+
+        return Response(serialize_ai_grade_batch(results))
+
+
+class SpaceClassroomExamSubmissionsAIGradeViewSet(APIView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.submission_service = ExamSubmissionService()
+
+    def post(self, request, classroom_uid):
+        serializer = ExamSubmissionAIGradeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        results = self.submission_service.ai_grade_classroom_submissions(
+            classroom_id=classroom_uid,
+            teacher_id=request.user.uid,
+            data=serializer.validated_data,
+        )
+        return Response(serialize_ai_grade_batch(results))
+
+
+def serialize_ai_grade_batch(results):
+    graded = [result for result in results if result["success"]]
+    failed = [result for result in results if not result["success"]]
+    return {
+        "total": len(results),
+        "graded": len(graded),
+        "failed": len(failed),
+        "results": [
+            {
+                "success": result["success"],
+                "error": result["error"],
+                "submission": serialize_exam_submission(result["submission"]),
+            }
+            for result in results
+        ],
+    }
