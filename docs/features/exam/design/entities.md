@@ -22,6 +22,7 @@
 | `resource_url` | Text | — | Cached resource URL |
 | `resource_name` | Text | — | Cached resource display name |
 | `status` | Text | — | `draft` \| `published` \| `closed` |
+| `max_score` | Float | — | Maximum allowed official submission score, default `10.0` |
 | `due_date` | DateTime | — | Optional due date |
 | `created_at` | DateTime | — | Creation timestamp |
 | `updated_at` | DateTime | — | Update timestamp |
@@ -32,7 +33,7 @@
 
 ## 2. ExamSubmission
 
-**Purpose**: Records one active student submission for an exam, including file or markdown content and teacher grading metadata.
+**Purpose**: Records one active student submission for an exam, including file or markdown content and the official teacher-approved grading result.
 
 **Table**: `course_exam_submissions`
 
@@ -50,9 +51,9 @@
 | `resource_name` | Text | — | Cached resource display name |
 | `status` | Text | — | `submitted` \| `late` \| `graded` \| `returned` |
 | `submitted_at` | DateTime | — | Submission timestamp |
-| `grade` | Float | — | Teacher-assigned grade |
-| `feedback` | Text | — | Teacher feedback |
-| `graded_by` | UUID | — | Space account that graded |
+| `grade` | Float | — | Official teacher-approved grade |
+| `feedback` | Text | — | Official teacher-approved feedback |
+| `graded_by` | UUID | — | Space account that finalized grading |
 | `graded_at` | DateTime | — | Grading timestamp |
 | `created_at` | DateTime | — | Creation timestamp |
 | `updated_at` | DateTime | — | Update timestamp |
@@ -63,3 +64,5 @@
 - The first version allows one active submission per `(exam_id, student_id)`.
 - Late submissions are accepted and marked with `status=late`.
 - Resource display fields are denormalized to avoid extra reads when listing submissions.
+- AI and teacher grading actions are stored in `course_grades`; only final teacher grading updates these fields.
+- Official scores are validated against the related exam's `max_score`.

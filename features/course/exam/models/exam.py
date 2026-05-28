@@ -33,6 +33,8 @@ class Exam(BaseTimeStampModel):
 
     status = columns.Text(default='draft')
 
+    max_score = columns.Float(default=10.0)
+
     is_deleted = columns.Boolean(default=False)
 
     due_date = columns.DateTime(required=False)

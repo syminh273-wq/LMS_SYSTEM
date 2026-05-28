@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, time, timezone as datetime_timezone
 
 from django.utils import timezone
@@ -62,9 +63,25 @@ class ExamService:
         data["due_date"] = parsed_due_date
         return data
 
+    def normalize_max_score(self, data):
+        if "max_score" not in data:
+            return data
+
+        try:
+            max_score = float(data["max_score"])
+        except (TypeError, ValueError):
+            raise ValueError("Invalid max_score")
+
+        if not math.isfinite(max_score) or max_score <= 0:
+            raise ValueError("max_score must be greater than 0")
+
+        data["max_score"] = max_score
+        return data
+
     def create_exam(self, teacher_id, data):
         data = self.validate_content(data)
         data = self.normalize_due_date(data)
+        data = self.normalize_max_score(data)
         data["teacher_id"] = teacher_id
 
         if not data.get("status"):
@@ -89,6 +106,7 @@ class ExamService:
     def update_exam(self, uid, data):
         exam = self.get_exam(uid)
         data = self.normalize_due_date(data)
+        data = self.normalize_max_score(data)
 
         if "content_type" in data:
             data = self.validate_content(data)

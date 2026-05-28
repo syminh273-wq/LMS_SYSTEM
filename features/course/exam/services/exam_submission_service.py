@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.exam.repositories import ExamRepository, ExamSubmissionRepository
+from features.course.grade.repositories import GradeRepository
 from features.resource.repositories import ResourceRepository
 
 
@@ -15,6 +16,7 @@ class ExamSubmissionService:
     def __init__(self):
         self.exam_repo = ExamRepository()
         self.submission_repo = ExamSubmissionRepository()
+        self.grade_repo = GradeRepository()
         self.member_repo = ClassroomMemberRepository()
         self.resource_repo = ResourceRepository()
 
@@ -92,6 +94,7 @@ class ExamSubmissionService:
         data["submitted_at"] = datetime.utcnow()
 
         if existing:
+            self.grade_repo.soft_delete_by_submission(existing[0].uid)
             data["grade"] = None
             data["feedback"] = ""
             data["graded_by"] = None
@@ -128,19 +131,3 @@ class ExamSubmissionService:
         if str(exam.teacher_id) != str(teacher_id):
             raise ValueError("You do not own this exam")
         return submission
-
-    def grade_submission(self, submission_id, teacher_id, data):
-        submission = self.get_teacher_submission(submission_id, teacher_id)
-        update_data = {}
-
-        if "grade" in data:
-            update_data["grade"] = float(data["grade"])
-
-        if "feedback" in data:
-            update_data["feedback"] = data.get("feedback") or ""
-
-        update_data["graded_by"] = teacher_id
-        update_data["graded_at"] = datetime.utcnow()
-        update_data["status"] = "graded"
-
-        return self.submission_repo.update(submission, **update_data)

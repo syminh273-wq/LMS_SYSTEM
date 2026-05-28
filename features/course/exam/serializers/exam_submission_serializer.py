@@ -26,6 +26,7 @@ def serialize_exam_submission(submission):
         "status": submission.status,
         "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
         "grade": submission.grade,
+        "score": submission.grade,
         "feedback": submission.feedback,
         "graded_by": str(submission.graded_by) if submission.graded_by else None,
         "graded_at": submission.graded_at.isoformat() if submission.graded_at else None,

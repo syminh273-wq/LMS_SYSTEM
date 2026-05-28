@@ -18,6 +18,7 @@ def serialize_exam(exam):
         "resource_url": exam.resource_url,
         "resource_name": exam.resource_name,
         "status": exam.status,
+        "max_score": exam.max_score if exam.max_score is not None else 10.0,
         "due_date": exam.due_date.isoformat() if exam.due_date else None,
         "created_at": exam.created_at.isoformat() if exam.created_at else None,
         "updated_at": exam.updated_at.isoformat() if exam.updated_at else None,

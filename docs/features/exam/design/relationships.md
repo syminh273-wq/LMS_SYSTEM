@@ -16,6 +16,9 @@ Consumer
 Resource
   ├── Exam.resource_uid
   └── ExamSubmission.resource_uid
+
+ExamSubmission
+  └── Grade.submission_id
 ```
 
 ---
@@ -51,3 +54,9 @@ Resource
 **Type**: One-to-One per file submission
 
 **Business Meaning**: File submissions reference an uploaded resource and cache `resource_url` and `resource_name` for list/detail responses.
+
+### ExamSubmission → Grade
+
+**Type**: One-to-Many
+
+**Business Meaning**: A submission can receive AI suggestions and teacher grading records. Only a teacher-finalized grade is copied onto the submission as the official result.
