@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/v1/notification/', include('features.notification.urls')),
     path('api/v1/space/calendar/', include('features.calendar.urls')),
     path('api/v1/consumer/calendar/', include('features.calendar.consumer_urls')),
+    path('api/v1/consumer/payment/', include('features.payment.urls')),
     path('api/v1/public/', include('core.urls')),
     path('test-chat/<str:room_name>/', test_chat_view, name='test_chat'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'features.quiz',
     'features.notification',
     'features.calendar',
+    'features.payment',
 ]
 
 REST_FRAMEWORK = {
@@ -212,3 +213,11 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='')
+
+# MoMo Payment (sandbox)
+MOMO_PARTNER_CODE = config('MOMO_PARTNER_CODE', default='MOMO')
+MOMO_ACCESS_KEY = config('MOMO_ACCESS_KEY', default='F8BBA842ECF85')
+MOMO_SECRET_KEY = config('MOMO_SECRET_KEY', default='K951B6PE1waDMi640xX08PD3vg6EkVlz')
+MOMO_ENDPOINT = config('MOMO_ENDPOINT', default='https://test-payment.momo.vn/v2/gateway/api/create')
+MOMO_REDIRECT_URL = config('MOMO_REDIRECT_URL', default='http://localhost:3000/payment/result')
+MOMO_IPN_URL = config('MOMO_IPN_URL', default='http://localhost:8000/api/v1/consumer/payment/ipn/')
