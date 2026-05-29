@@ -1,0 +1,14 @@
+version: '3'
+services:
+  chek-scylla-node-1:
+    image: scylladb/scylla:5.1.4
+    container_name: chek-scylla
+    ports:
+      - 9042:9042
+    restart: always
+    volumes:
+      - ./scylla_data:/var/lib/scylla
+      - ./configs/scylla.yaml:/etc/scylla/scylla.yaml
+    command: --seeds=chek-scylla-node-1 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0 --broadcast-rpc-address 127.0.0.1
+volumes:
+  scylla_data:

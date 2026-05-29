@@ -42,7 +42,7 @@ Usage
 import uuid
 from typing import Generator, List, Union
 
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from core.ai.embeddings.services.embedding_service import get_embedding_service
@@ -79,8 +79,15 @@ class RAGPipeline:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _load_and_chunk(self, file_path: str, metadata: dict = None) -> list:
-        """Load a PDF or TXT file and split into chunks using LangChain."""
-        loader = PyPDFLoader(file_path) if file_path.lower().endswith(".pdf") else TextLoader(file_path)
+        """Load a PDF, DOCX, or TXT file and split into chunks using LangChain."""
+        ext = file_path.lower()
+        if ext.endswith(".pdf"):
+            loader = PyPDFLoader(file_path)
+        elif ext.endswith(".docx") or ext.endswith(".doc"):
+            loader = Docx2txtLoader(file_path)
+        else:
+            loader = TextLoader(file_path)
+        
         docs = loader.load()
 
         if metadata:

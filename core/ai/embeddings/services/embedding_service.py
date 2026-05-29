@@ -60,22 +60,29 @@ class OmniRouteEmbeddings(Embeddings):
 class OllamaEmbeddings(Embeddings):
     """LangChain-compatible embeddings via local Ollama /api/embed."""
 
-    def __init__(self, model: str = None, base_url: str = None):
+    def __init__(self, model: str = None, base_url: str = None, batch_size: int = 16):
         self.model = model or config("OLLAMA_EMBED_MODEL", default="nomic-embed-text")
         self.api_url = (base_url or config("OLLAMA_BASE_URL", default="http://localhost:11434")) + "/api/embed"
+        self.batch_size = batch_size
 
     def _call(self, texts: List[str]) -> List[List[float]]:
+        # Increased timeout to 300s for slower machines/large batches
         resp = requests.post(
             self.api_url,
             json={"model": self.model, "input": texts},
-            timeout=120,
+            timeout=300,
         )
         if resp.status_code == 200:
             return resp.json()["embeddings"]
         raise RuntimeError(f"Ollama embed ({resp.status_code}): {resp.text}")
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return self._call(texts)
+        """Process documents in batches to avoid OOM or timeouts."""
+        all_embeddings = []
+        for i in range(0, len(texts), self.batch_size):
+            batch = texts[i : i + self.batch_size]
+            all_embeddings.extend(self._call(batch))
+        return all_embeddings
 
     def embed_query(self, text: str) -> List[float]:
         return self._call([text])[0]
