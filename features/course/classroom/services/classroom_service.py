@@ -3,6 +3,7 @@ import random
 from features.course.classroom.repositories import Repository
 from features.sharing.services import LinkService
 from features.sharing.enums import ResourceType
+from core.search_engine.typesense.indexer import LMSIndexer
 
 class Service:
     def __init__(self):
@@ -37,11 +38,15 @@ class Service:
             }
         })
 
+        LMSIndexer.index_classroom(classroom)
         return classroom
 
     def update(self, instance, **kwargs):
-        return self.repository.update(instance, **kwargs)
+        updated = self.repository.update(instance, **kwargs)
+        LMSIndexer.index_classroom(updated)
+        return updated
 
     def delete(self, instance):
-        # Soft delete using the repository's delete method (which typically handles is_deleted)
-        return self.repository.delete(instance)
+        result = self.repository.delete(instance)
+        LMSIndexer.remove_classroom(str(instance.uid))
+        return result

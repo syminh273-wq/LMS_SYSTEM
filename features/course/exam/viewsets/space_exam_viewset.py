@@ -10,6 +10,7 @@ from features.course.exam.serializers import (
     serialize_exam_submission,
 )
 from features.course.exam.services import ExamService, ExamSubmissionService, ExamSessionService
+from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
 def _parse_meta(raw) -> dict:
@@ -116,13 +117,59 @@ class SpaceExamViewSet(ViewSet):
 
     def create(self, request):
         exam = self.exam_service.create_exam(request.user.uid, request.data.copy())
+        ClassroomActivityLogService().log(
+            classroom_uid=exam.classroom_id,
+            log_level='major',
+            event_type='exam_created',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=exam.uid,
+            target_name=exam.title,
+        )
         return Response(_serialize_exam(exam), status=status.HTTP_201_CREATED)
 
     def update(self, request, uid=None):
-        return Response(_serialize_exam(self.exam_service.update_exam(uid, request.data.copy())))
+        prev_status = None
+        try:
+            prev_status = self.exam_service.get_exam(uid).status
+        except Exception:
+            pass
+        exam = self.exam_service.update_exam(uid, request.data.copy())
+        new_status = request.data.get('status')
+        if new_status == 'published' and prev_status != 'published':
+            ClassroomActivityLogService().log(
+                classroom_uid=exam.classroom_id,
+                log_level='major',
+                event_type='exam_published',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=exam.uid,
+                target_name=exam.title,
+            )
+        return Response(_serialize_exam(exam))
 
     def destroy(self, request, uid=None):
+        try:
+            exam = self.exam_service.get_exam(uid)
+            classroom_id = exam.classroom_id
+            exam_title = exam.title
+        except Exception:
+            classroom_id = None
+            exam_title = ''
         self.exam_service.delete_exam(uid)
+        if classroom_id:
+            ClassroomActivityLogService().log(
+                classroom_uid=classroom_id,
+                log_level='detail',
+                event_type='exam_deleted',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=uid,
+                target_name=exam_title,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ── SUBMISSIONS (exam-scoped) ──────────────────────────────────────────────
@@ -202,6 +249,17 @@ class SpaceExamViewSet(ViewSet):
                 duration_seconds=duration,
                 camera_required=camera_required,
             )
+            ClassroomActivityLogService().log(
+                classroom_uid=exam.classroom_id,
+                log_level='major',
+                event_type='exam_opened',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=exam.uid,
+                target_name=exam.title,
+                metadata={'sessions_count': len(sessions)},
+            )
             return Response({
                 "exam": _serialize_exam(exam),
                 "sessions": [_serialize_session(s) for s in sessions],
@@ -213,6 +271,20 @@ class SpaceExamViewSet(ViewSet):
     def close_online(self, request, uid=None):
         try:
             self.session_service.close_online(uid, request.user.uid)
+            try:
+                exam = self.exam_service.get_exam(uid)
+                ClassroomActivityLogService().log(
+                    classroom_uid=exam.classroom_id,
+                    log_level='major',
+                    event_type='exam_closed',
+                    actor_id=request.user.uid,
+                    actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                    actor_role='teacher',
+                    target_id=exam.uid,
+                    target_name=exam.title,
+                )
+            except Exception:
+                pass
             return Response({"message": "Online session closed"})
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

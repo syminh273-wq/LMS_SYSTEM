@@ -49,6 +49,8 @@ INSTALLED_APPS = [
 
     # Local apps
     'core',
+    'core.search_engine',
+    'features.social',
     'features.account',
     'features.course.classroom',
     'features.course.exam',
@@ -226,3 +228,10 @@ MOMO_IPN_URL = config('MOMO_IPN_URL', default='http://localhost:8000/api/v1/cons
 # Face Recognition Microservice
 FACE_SERVICE_URL = config('FACE_SERVICE_URL', default='http://localhost:8001')
 FACE_VERIFY_THRESHOLD = config('FACE_VERIFY_THRESHOLD', default=0.45, cast=float)
+
+# ── Typesense ──────────────────────────────────────────────────────────────────
+TYPESENSE_PROTOCOL = config('TYPESENSE_PROTOCOL', default='http')
+TYPESENSE_HOST     = config('TYPESENSE_HOST',     default='localhost')
+TYPESENSE_PORT     = config('TYPESENSE_PORT',     default=8108, cast=int)
+TYPESENSE_API_KEY  = config('TYPESENSE_API_KEY',  default='lms-secret-key')
+TYPESENSE_ENABLED  = config('TYPESENSE_ENABLED',  default=True,  cast=bool)

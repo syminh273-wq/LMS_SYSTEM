@@ -11,6 +11,7 @@ from features.course.exam.serializers import (
     serialize_exam_submission,
 )
 from features.course.exam.services import ExamService, ExamSubmissionService, ExamSessionService
+from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
 def _parse_meta(raw) -> dict:
@@ -87,6 +88,21 @@ class ConsumerExamViewSet(ViewSet):
             )
         except ValueError as exc:
             return _submission_error_response(exc)
+        if created:
+            try:
+                exam = self.exam_service.get_exam(exam_uid)
+                ClassroomActivityLogService().log(
+                    classroom_uid=exam.classroom_id,
+                    log_level='detail',
+                    event_type='exam_submitted',
+                    actor_id=request.user.uid,
+                    actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                    actor_role='student',
+                    target_id=exam.uid,
+                    target_name=exam.title,
+                )
+            except Exception:
+                pass
         response_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return Response(serialize_exam_submission(submission), status=response_status)
 

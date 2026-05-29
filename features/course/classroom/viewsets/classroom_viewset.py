@@ -17,6 +17,7 @@ from features.chat.serializers.conversation_serializer import ConversationSerial
 from features.chat.services.conversation_service import ConversationService
 from features.course.classroom.services import Service
 from features.course.classroom.services.classroom_doc_service import ClassroomDocService
+from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
 from features.sharing.serializers.link_response_serializer import LinkResponseSerializer
 from features.sharing.services import LinkService
@@ -54,6 +55,15 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         instance = Service().create_classroom(
             teacher_id=request.user.uid,
             data=serializer.validated_data,
+        )
+        ClassroomActivityLogService().log(
+            classroom_uid=instance.uid,
+            log_level='major',
+            event_type='classroom_created',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_name=instance.name,
         )
         return Response(ClassroomResponseSerializer(instance).data, status=status.HTTP_201_CREATED)
 
@@ -147,8 +157,19 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                 section=section,
             )
             if result.get('success'):
+                resource = result['data']
+                ClassroomActivityLogService().log(
+                    classroom_uid=uid,
+                    log_level='major',
+                    event_type='document_uploaded',
+                    actor_id=request.user.uid,
+                    actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                    actor_role='teacher',
+                    target_name=getattr(resource, 'name', ''),
+                    metadata={'section': section},
+                )
                 return Response(
-                    ResourceResponseSerializer(result['data']).data,
+                    ResourceResponseSerializer(resource).data,
                     status=status.HTTP_201_CREATED,
                 )
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
@@ -168,8 +189,46 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             resource_uid=resource_uid,
         )
         if result.get('success'):
+            ClassroomActivityLogService().log(
+                classroom_uid=uid,
+                log_level='detail',
+                event_type='document_deleted',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=resource_uid,
+            )
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+    # ── Activity Log ─────────────────────────────────────────────────────────
+
+    @action(detail=True, methods=['get'], url_path='activity')
+    def activity(self, request, uid=None):
+        """
+        GET /classrooms/{uid}/activity/
+          ?level=major|detail   (default: major)
+          &limit=50
+          &before=<iso_datetime>
+        """
+        from datetime import datetime as dt
+        log_level = request.query_params.get('level', 'major')
+        limit = min(int(request.query_params.get('limit', 50)), 200)
+        before_str = request.query_params.get('before')
+        before = None
+        if before_str:
+            try:
+                before = dt.fromisoformat(before_str.replace('Z', '+00:00'))
+            except ValueError:
+                pass
+
+        logs = ClassroomActivityLogService().list(
+            classroom_uid=uid,
+            log_level=log_level if log_level in ('major', 'detail') else None,
+            limit=limit,
+            before=before,
+        )
+        return Response(logs)
 
     # ── AI Bot ────────────────────────────────────────────────────────────────
 

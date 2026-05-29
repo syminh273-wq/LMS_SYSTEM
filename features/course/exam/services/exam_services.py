@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
 from features.course.exam.repositories import ExamRepository
+from core.search_engine.typesense.indexer import LMSIndexer
 
 
 class ExamService:
@@ -113,7 +114,9 @@ class ExamService:
 
         self.validate_status(data["status"])
 
-        return self.exam_repo.create(**data)
+        exam = self.exam_repo.create(**data)
+        LMSIndexer.index_exam(exam)
+        return exam
 
     def get_exam(self, uid):
         exam = self.exam_repo.get_by_uid(uid)
@@ -142,11 +145,15 @@ class ExamService:
         if "status" in data:
             self.validate_status(data["status"])
 
-        return self.exam_repo.update(exam, **data)
+        updated = self.exam_repo.update(exam, **data)
+        LMSIndexer.index_exam(updated)
+        return updated
 
     def delete_exam(self, uid):
         exam = self.get_exam(uid)
-        return self.exam_repo.soft_delete(exam)
+        result = self.exam_repo.soft_delete(exam)
+        LMSIndexer.remove_exam(str(uid))
+        return result
 
     def list_student_exams(self, classroom_id):
         return self.exam_repo.list_published_by_classroom(classroom_id)

@@ -4,6 +4,7 @@ from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
 from core.views.ws_test_view import test_chat_view
+from core.views.search_api import SpaceSearchAPIView, SearchHealthAPIView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -22,6 +23,9 @@ urlpatterns = [
     path('api/v1/consumer/payment/', include('features.payment.urls')),
     path('api/v1/consumer/face/', include('features.face.urls')),
     path('api/v1/space/face/', include('features.face.space_urls')),
+    path('api/v1/consumer/social/', include('features.social.urls')),
     path('api/v1/public/', include('core.urls')),
+    path('api/v1/space/search/', SpaceSearchAPIView.as_view(), name='space-search'),
+    path('api/v1/space/search/health/', SearchHealthAPIView.as_view(), name='search-health'),
     path('test-chat/<str:room_name>/', test_chat_view, name='test_chat'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

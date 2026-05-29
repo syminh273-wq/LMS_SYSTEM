@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from core.views.mixins import UserScopeMixin
 from features.course.classroom.services import Service
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
+from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
 class ClassroomMemberViewSet(UserScopeMixin, ViewSet):
@@ -40,6 +41,15 @@ class ClassroomMemberViewSet(UserScopeMixin, ViewSet):
             user=request.user,
             role='student',
         )
+        ClassroomActivityLogService().log(
+            classroom_uid=classroom_uid,
+            log_level='detail',
+            event_type='member_joined',
+            actor_id=request.user.uid,
+            actor_name=member.member_name,
+            actor_role='student',
+            target_name=classroom.name,
+        )
         return Response(self._serialize_member(member), status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path=r'(?P<member_id>[^/.]+)/approve')
@@ -49,6 +59,27 @@ class ClassroomMemberViewSet(UserScopeMixin, ViewSet):
             classroom_uid=classroom_uid,
             member_id=member_id,
             approved_by_id=request.user.uid,
+        )
+        _log = ClassroomActivityLogService()
+        _log.log(
+            classroom_uid=classroom_uid,
+            log_level='major',
+            event_type='member_approved',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=member.member_id,
+            target_name=member.member_name,
+        )
+        _log.log(
+            classroom_uid=classroom_uid,
+            log_level='detail',
+            event_type='member_approved',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=member.member_id,
+            target_name=member.member_name,
         )
         return Response(self._serialize_member(member), status=status.HTTP_200_OK)
 
@@ -60,6 +91,15 @@ class ClassroomMemberViewSet(UserScopeMixin, ViewSet):
             member_id=member_id,
             rejected_by_id=request.user.uid,
         )
+        ClassroomActivityLogService().log(
+            classroom_uid=classroom_uid,
+            log_level='detail',
+            event_type='member_rejected',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=member_id,
+        )
         return Response({'message': 'Đã từ chối yêu cầu tham gia.'}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
@@ -68,6 +108,14 @@ class ClassroomMemberViewSet(UserScopeMixin, ViewSet):
         ClassroomMemberService().leave(
             classroom_uid=classroom_uid,
             member_id=request.user.uid,
+        )
+        ClassroomActivityLogService().log(
+            classroom_uid=classroom_uid,
+            log_level='detail',
+            event_type='member_left',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='student',
         )
         return Response({'message': 'Left successfully'}, status=status.HTTP_200_OK)
 
@@ -78,6 +126,15 @@ class ClassroomMemberViewSet(UserScopeMixin, ViewSet):
             classroom_uid=classroom_uid,
             member_id=member_id,
             kicked_by_id=request.user.uid,
+        )
+        ClassroomActivityLogService().log(
+            classroom_uid=classroom_uid,
+            log_level='detail',
+            event_type='member_kicked',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=member_id,
         )
         return Response({'message': 'Kicked successfully'}, status=status.HTTP_200_OK)
 

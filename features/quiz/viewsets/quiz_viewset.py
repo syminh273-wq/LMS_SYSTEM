@@ -22,6 +22,7 @@ from features.quiz.serializers.quiz_response_serializer import (
 )
 from features.quiz.services.quiz_service import QuizService
 from features.quiz.services.quiz_generation_service import QuizGenerationService, QUIZ_TYPES, _extract_pdf_text
+from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
 class QuizViewSet(BaseModelViewSet):
@@ -215,6 +216,20 @@ class QuizViewSet(BaseModelViewSet):
             classroom_id=classroom_id,
             assigned_by=request.user.uid,
             **d
+        )
+        try:
+            quiz_title = self.service.get_quiz(uid).title
+        except Exception:
+            quiz_title = ''
+        ClassroomActivityLogService().log(
+            classroom_uid=classroom_id,
+            log_level='major',
+            event_type='quiz_assigned',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=uid,
+            target_name=quiz_title,
         )
         return Response(QuizAssignmentResponseSerializer(assignment).data, status=status.HTTP_201_CREATED)
 

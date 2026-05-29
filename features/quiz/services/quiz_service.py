@@ -1,5 +1,6 @@
 from core.services.base_service import BaseService
 from core.utils.uuid import uuid7
+from core.search_engine.typesense.indexer import LMSIndexer
 from features.quiz.repositories.quiz_repository import QuizRepository
 from features.quiz.repositories.quiz_question_repository import QuizQuestionRepository
 from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
@@ -77,10 +78,11 @@ class QuizService(BaseService):
             for idx, q in enumerate(questions)
         ]
         created_questions = self.question_repo.bulk_create(question_payloads)
+        LMSIndexer.index_quiz(quiz)
         return quiz, created_questions
 
     def create_quiz_shell(self, created_by, title, description, resource_id=None):
-        return self.repository.create(
+        quiz = self.repository.create(
             uid=uuid7(),
             created_by=created_by,
             resource_id=resource_id,
@@ -89,6 +91,8 @@ class QuizService(BaseService):
             questions_count=0,
             status='draft',
         )
+        LMSIndexer.index_quiz(quiz)
+        return quiz
 
     def add_question(self, quiz, question_data: dict, index: int):
         return self.question_repo.create(
@@ -105,7 +109,9 @@ class QuizService(BaseService):
         )
 
     def finalize_quiz(self, quiz, total_questions: int):
-        return self.repository.update(quiz, questions_count=total_questions, status='published')
+        updated = self.repository.update(quiz, questions_count=total_questions, status='published')
+        LMSIndexer.index_quiz(updated)
+        return updated
 
     # ── Attempts (all scoped by classroom) ────────────────────────────────────
 
@@ -149,3 +155,4 @@ class QuizService(BaseService):
         for q in self.question_repo.get_by_quiz(quiz_uid):
             self.question_repo.delete(q)
         self.repository.delete(quiz)
+        LMSIndexer.remove_quiz(str(quiz_uid))

@@ -6,6 +6,7 @@ from features.course.meeting_room.services.meeting_room_participant_service impo
 from features.course.meeting_room.serializers.meeting_room_serializer import (
     MeetingRoomSerializer, CreateMeetingRoomRequest
 )
+from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 class MeetingRoomViewSet(viewsets.ViewSet):
     def __init__(self, **kwargs):
@@ -33,8 +34,19 @@ class MeetingRoomViewSet(viewsets.ViewSet):
     def quick_start(self, request):
         serializer = CreateMeetingRoomRequest(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         room = self.service.quick_start(request.user, serializer.validated_data)
+        if room.classroom_uid:
+            ClassroomActivityLogService().log(
+                classroom_uid=room.classroom_uid,
+                log_level='major',
+                event_type='meeting_started',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=room.uid,
+                target_name=room.title,
+            )
         return Response(MeetingRoomSerializer(room).data, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, pk=None):
@@ -85,9 +97,20 @@ class MeetingRoomViewSet(viewsets.ViewSet):
         room = self.service.find(pk)
         if not room:
             return Response(status=status.HTTP_404_NOT_FOUND)
-            
+
         if str(room.host_id) != str(request.user.uid):
             return Response({"error": "Only host can end the meeting"}, status=status.HTTP_403_FORBIDDEN)
-            
+
         room = self.service.update_status(room, 'ended')
+        if room.classroom_uid:
+            ClassroomActivityLogService().log(
+                classroom_uid=room.classroom_uid,
+                log_level='major',
+                event_type='meeting_ended',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=room.uid,
+                target_name=room.title,
+            )
         return Response(MeetingRoomSerializer(room).data)
