@@ -30,9 +30,6 @@ class QuizViewSet(BaseModelViewSet):
     generation_service = QuizGenerationService()
 
     def get_queryset(self):
-        classroom_id = self.request.query_params.get('classroom_id')
-        if classroom_id:
-            return self.service.get_by_classroom(classroom_id)
         return self.service.get_by_teacher(self.request.user.uid)
 
     # ── LIST  GET /quizzes/ ────────────────────────────────────────────────

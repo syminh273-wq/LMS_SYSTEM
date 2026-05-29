@@ -36,7 +36,7 @@ class GoogleConsumerOAuthCallbackView(APIView):
         code = request.GET.get('code')
 
         if request.GET.get('error') or not code:
-            return redirect(f'{frontend_url}/login?error=google_auth_failed')
+            return redirect(f'{frontend_url}/consumer/login?error=google_auth_failed')
 
         # Exchange code for tokens
         token_resp = http_requests.post(settings.GOOGLE_TOKEN_URL, data={
@@ -48,7 +48,7 @@ class GoogleConsumerOAuthCallbackView(APIView):
         })
 
         if not token_resp.ok:
-            return redirect(f'{frontend_url}/login?error=google_token_failed')
+            return redirect(f'{frontend_url}/consumer/login?error=google_token_failed')
 
         raw_id_token = token_resp.json().get('id_token')
 
@@ -57,7 +57,7 @@ class GoogleConsumerOAuthCallbackView(APIView):
                 raw_id_token, GoogleRequest(), settings.GOOGLE_CLIENT_ID
             )
         except ValueError:
-            return redirect(f'{frontend_url}/login?error=google_token_invalid')
+            return redirect(f'{frontend_url}/consumer/login?error=google_token_invalid')
 
         google_sub = idinfo['sub']
         email = idinfo.get('email', '')
@@ -105,13 +105,13 @@ class GoogleConsumerOAuthCallbackView(APIView):
                 )
 
         if not consumer or not consumer.is_active:
-            return redirect(f'{frontend_url}/login?error=account_disabled')
+            return redirect(f'{frontend_url}/consumer/login?error=account_disabled')
 
         refresh = RefreshToken.for_user(consumer)
         refresh['user_type'] = 'consumer'
 
         return redirect(
-            f'{frontend_url}/auth/callback'
+            f'{frontend_url}/consumer/auth/callback'
             f'?access={str(refresh.access_token)}'
             f'&refresh={str(refresh)}'
         )

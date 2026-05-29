@@ -9,24 +9,64 @@ from features.course.exam.repositories import ExamRepository
 class ExamService:
     MARKDOWN = "markdown"
     FILE_TYPES = ["pdf", "image", "file"]
-    STATUSES = ["draft", "published", "closed"]
+    STATUSES = ["draft", "published", "closed", "ongoing"]
+    EXAM_TYPES = ["assignment", "quiz"]
 
     def __init__(self):
         self.exam_repo = ExamRepository()
 
+    def validate_exam_type(self, data):
+        exam_type = data.get("exam_type", "assignment")
+        if exam_type not in self.EXAM_TYPES:
+            raise ValueError("Invalid exam_type. Must be 'assignment' or 'quiz'")
+        return exam_type
+
+    def validate_quiz_ref(self, quiz_id):
+        from features.quiz.repositories.quiz_repository import QuizRepository
+        try:
+            quiz = QuizRepository().find(quiz_id)
+        except Exception:
+            raise ValueError("Quiz not found")
+        return quiz
+
     def validate_content(self, data):
+        import json
+        exam_type = data.get("exam_type", "assignment")
+
+        if exam_type == "quiz":
+            ref_id = data.get("ref_id")
+            if not ref_id:
+                raise ValueError("ref_id (quiz) is required for quiz exam")
+            self.validate_quiz_ref(ref_id)
+            data["content_type"] = "quiz"
+            data["body"] = ""
+            data["ref_id"] = ref_id
+            data["meta"] = "{}"
+            return data
+
         content_type = data.get("content_type")
 
         if content_type == self.MARKDOWN:
-            if not data.get("content"):
-                raise ValueError("content is required when content_type is markdown")
-            data["resource_uid"] = None
+            body = data.get("body", "")
+            if not body:
+                raise ValueError("body is required when content_type is markdown")
+            data["body"] = body
+            data["ref_id"] = None
+            data["meta"] = "{}"
             return data
 
         if content_type in self.FILE_TYPES:
-            if not data.get("resource_uid"):
-                raise ValueError("resource_uid is required when content_type is file/pdf/image")
-            data["content"] = ""
+            ref_id = data.get("ref_id")
+            if not ref_id:
+                raise ValueError("ref_id (resource) is required when content_type is file/pdf/image")
+            try:
+                from features.resource.repositories import ResourceRepository
+                resource = ResourceRepository().find(ref_id)
+                data["meta"] = json.dumps({"url": resource.url, "name": resource.name}, ensure_ascii=False)
+            except Exception:
+                data["meta"] = "{}"
+            data["ref_id"] = ref_id
+            data["body"] = ""
             return data
 
         raise ValueError("Invalid content_type")
@@ -63,12 +103,13 @@ class ExamService:
         return data
 
     def create_exam(self, teacher_id, data):
+        self.validate_exam_type(data)
         data = self.validate_content(data)
         data = self.normalize_due_date(data)
         data["teacher_id"] = teacher_id
 
         if not data.get("status"):
-            data["status"] = "draft"
+            data["status"] = "published" if data.get("exam_mode") == "online" else "draft"
 
         self.validate_status(data["status"])
 
@@ -80,17 +121,22 @@ class ExamService:
             raise ValueError("Exam not found")
         return exam
 
-    def list_teacher_exams(self, teacher_id, classroom_id=None):
-        exams = self.exam_repo.list_by_teacher(teacher_id)
+    def list_teacher_exams(self, teacher_id, classroom_id=None, status=None, exam_mode=None):
         if classroom_id:
-            exams = [exam for exam in exams if str(exam.classroom_id) == str(classroom_id)]
+            exams = self.exam_repo.list_by_classroom(classroom_id, status=status, exam_mode=exam_mode)
+            exams = [e for e in exams if str(e.teacher_id) == str(teacher_id)]
+        else:
+            exams = self.exam_repo.list_by_teacher(teacher_id, status=status, exam_mode=exam_mode)
         return exams
 
     def update_exam(self, uid, data):
         exam = self.get_exam(uid)
         data = self.normalize_due_date(data)
 
-        if "content_type" in data:
+        if "exam_type" in data:
+            self.validate_exam_type(data)
+
+        if "content_type" in data or "exam_type" in data:
             data = self.validate_content(data)
 
         if "status" in data:

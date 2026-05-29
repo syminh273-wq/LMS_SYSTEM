@@ -16,18 +16,28 @@ class ExamRepository:
 
         return Exam.objects(bucket=0, uid=exam_uid, is_deleted=False).first()
 
-    def list_by_teacher(self, teacher_id):
-        return Exam.objects(teacher_id=teacher_id, is_deleted=False)
+    def list_by_teacher(self, teacher_id, status=None, exam_mode=None):
+        qs = list(Exam.objects(teacher_id=teacher_id, is_deleted=False))
+        if status:
+            statuses = status if isinstance(status, list) else [status]
+            qs = [e for e in qs if e.status in statuses]
+        if exam_mode:
+            qs = [e for e in qs if e.exam_mode == exam_mode]
+        return qs
 
-    def list_by_classroom(self, classroom_id):
-        return Exam.objects(classroom_id=classroom_id, is_deleted=False)
+    def list_by_classroom(self, classroom_id, status=None, exam_mode=None):
+        qs = list(Exam.objects(classroom_id=classroom_id, is_deleted=False))
+        if status:
+            statuses = status if isinstance(status, list) else [status]
+            qs = [e for e in qs if e.status in statuses]
+        if exam_mode:
+            qs = [e for e in qs if e.exam_mode == exam_mode]
+        return qs
 
     def list_published_by_classroom(self, classroom_id):
-        return Exam.objects(
-            classroom_id=classroom_id,
-            status="published",
-            is_deleted=False
-        )
+        # published = có thể nộp bài; ongoing = đang thi; closed = đã kết thúc
+        qs = list(Exam.objects(classroom_id=classroom_id, is_deleted=False))
+        return [e for e in qs if e.status in ('published', 'ongoing', 'closed')]
 
     def update(self, exam, **data):
         for key, value in data.items():

@@ -3,9 +3,10 @@ import json
 
 
 class ExamSubmissionRequestSerializer(serializers.Serializer):
-    content_type = serializers.ChoiceField(choices=["markdown", "pdf", "image", "file"])
+    content_type = serializers.ChoiceField(choices=["markdown", "pdf", "image", "file", "quiz"])
     content = serializers.CharField(required=False, allow_blank=True)
     resource_uid = serializers.UUIDField(required=False, allow_null=True)
+    answers = serializers.DictField(child=serializers.CharField(), required=False)
 
 
 class ExamSubmissionGradeSerializer(serializers.Serializer):
@@ -53,6 +54,7 @@ def serialize_exam_submission(submission):
         "ai_breakdown": _loads_json(getattr(submission, "ai_breakdown", ""), []),
         "ai_sources": _loads_json(getattr(submission, "ai_sources", ""), []),
         "ai_confidence": getattr(submission, "ai_confidence", None),
+        "quiz_result": _loads_json(submission.content, None) if submission.content_type == "quiz" else None,
         "created_at": submission.created_at.isoformat() if submission.created_at else None,
         "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
     }

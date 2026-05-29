@@ -21,21 +21,30 @@ class Exam(BaseTimeStampModel):
 
     description = columns.Text(default='')
 
-    content_type = columns.Text(required=True)
+    content_type = columns.Text(required=True)  # discriminator: markdown|quiz|file|pdf|image
 
-    content = columns.Text(default='')
+    body = columns.Text(default='')             # inline content (markdown text)
 
-    resource_uid = columns.UUID(required=False)
+    ref_id = columns.UUID(required=False)       # generic FK: quiz_id OR resource_uid
 
-    resource_url = columns.Text(default='')
-
-    resource_name = columns.Text(default='')
+    meta = columns.Text(default='{}')           # JSON: {url, name, size, ...}
 
     status = columns.Text(default='draft')
 
     is_deleted = columns.Boolean(default=False)
 
     due_date = columns.DateTime(required=False)
+
+    exam_type = columns.Text(default='assignment')  # 'assignment' | 'quiz'
+    max_grade = columns.Float(default=10.0)
+    camera_required = columns.Boolean(default=False)
+    exam_mode = columns.Text(default='offline')
+    duration_seconds = columns.Integer(default=0)
+
+    # Online session tracking
+    is_online_active = columns.Boolean(default=False)
+    opened_at = columns.DateTime(required=False)
+    late_threshold_seconds = columns.Integer(default=0)
 
     deleted_at = columns.DateTime(required=False)
 

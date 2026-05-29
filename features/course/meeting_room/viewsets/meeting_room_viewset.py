@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from features.course.meeting_room.services.meeting_room_service import MeetingRoomService
+from features.course.meeting_room.services.meeting_room_participant_service import MeetingRoomParticipantService
 from features.course.meeting_room.serializers.meeting_room_serializer import (
     MeetingRoomSerializer, CreateMeetingRoomRequest
 )
@@ -10,6 +11,7 @@ class MeetingRoomViewSet(viewsets.ViewSet):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.service = MeetingRoomService()
+        self.participant_service = MeetingRoomParticipantService()
 
     def list(self, request):
         classroom_uid = request.query_params.get('classroom_uid')
@@ -52,6 +54,31 @@ class MeetingRoomViewSet(viewsets.ViewSet):
         
         room = self.service.update_status(room, 'active')
         return Response(MeetingRoomSerializer(room).data)
+
+    @action(detail=True, methods=['post'])
+    def join(self, request, pk=None):
+        room = self.service.find(pk)
+        if not room:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if room.status == 'ended':
+            return Response({"error": "Meeting has ended"}, status=status.HTTP_400_BAD_REQUEST)
+
+        participant = self.participant_service.join(pk, request.user)
+        return Response({
+            "room": MeetingRoomSerializer(room).data,
+            "participant_id": str(participant.participant_id),
+            "camera_required": True,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def leave(self, request, pk=None):
+        room = self.service.find(pk)
+        if not room:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        self.participant_service.leave(pk, request.user.uid)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'])
     def end(self, request, pk=None):

@@ -14,6 +14,7 @@ A Learning Management System REST API built with Django and Apache Cassandra, de
 | Real-time | Django Channels + Daphne (WebSocket) |
 | Storage | Cloudflare R2 (`boto3`) |
 | Push Notification | Firebase Admin SDK (FCM + Realtime Database) |
+| Face Recognition | InsightFace + FastAPI microservice (`face_service/`) |
 | Dependency Management | Poetry |
 
 ---
@@ -28,6 +29,7 @@ A Learning Management System REST API built with Django and Apache Cassandra, de
 | Sharing | `features/sharing/` | Shareable links for resources |
 | Chat | `features/chat/` | Conversations and real-time messaging |
 | Notification | `core/notification/` | FCM push + Firebase Realtime Database |
+| Face Recognition | `features/face/` + `face_service/` | Exam proctoring: identity verification & camera monitoring |
 
 ---
 
@@ -83,6 +85,7 @@ LMS_BACKEND/
 - Apache Cassandra running on port `9042`
 - Cloudflare R2 bucket *(optional — falls back to local storage in development)*
 - Firebase project *(optional — required for push notifications)*
+- Docker *(optional — for running the Face Recognition service)*
 
 ---
 
@@ -119,17 +122,155 @@ python manage.py show_urls
 
 ## WebSocket
 
-Connect to the chat WebSocket at:
+| Endpoint | Description |
+|----------|-------------|
+| `ws://<host>/ws/chat/<conversation_id>/` | Real-time chat |
+| `ws://<host>/ws/rtc/<room_name>/` | WebRTC signaling |
+| `ws://<host>/ws/presence/` | Online presence / attendance |
+| `ws://<host>/ws/face/monitor/<exam_id>/` | Real-time face monitoring during exam |
+
+Pass the JWT token as a query parameter:
 
 ```
-ws://<host>/ws/chat/<conversation_id>/
+ws://<host>/ws/face/monitor/<exam_id>/?token=<access_token>
 ```
 
-Pass the JWT token via the `Authorization` header:
+---
+
+## Face Recognition (Exam Proctoring)
+
+The face recognition feature runs as a **separate microservice** (`face_service/`) using Python 3.11 and InsightFace, because InsightFace is not compatible with Python 3.13 (used by the main Django app).
+
+### Architecture
 
 ```
-Authorization: Bearer <access_token>
+Frontend (camera)
+    │
+    ├── REST  POST /api/v1/consumer/face/enroll/              ← register face (once)
+    ├── REST  GET  /api/v1/consumer/face/enroll/              ← check enrollment status
+    ├── REST  POST /api/v1/consumer/face/exams/<id>/verify/   ← one-shot verify
+    ├── WS    ws://host/ws/face/monitor/<exam_id>/            ← continuous monitoring
+    └── REST  GET  /api/v1/space/face/exams/<id>/logs/        ← teacher: view logs
+                       │
+               Django (features/face/)
+                       │ HTTP
+             Face Service (FastAPI, port 8001)
+             InsightFace buffalo_s model
 ```
+
+### Starting the Face Service
+
+**Option A — Docker (recommended):**
+
+```bash
+cd face_service
+docker build -t lms-face-service .
+docker run -p 8001:8001 lms-face-service
+```
+
+**Option B — Poetry với Python 3.11:**
+
+```bash
+cd face_service
+
+# Yêu cầu Python 3.11 đã được cài sẵn trên máy
+poetry env use python3.11
+poetry install
+
+poetry run uvicorn main:app --host 0.0.0.0 --port 8001
+```
+
+**Option C — Virtualenv thủ công với Python 3.11:**
+
+```bash
+cd face_service
+
+python3.11 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8001
+```
+
+**Option D — Conda / pyenv environment hiện tại (dùng `python -m`):**
+
+```bash
+cd face_service
+
+# Cài dependencies vào env đang active
+python -m pip install insightface onnxruntime opencv-python-headless \
+  fastapi "uvicorn[standard]" packaging
+
+# Chạy service (dùng python -m để đảm bảo đúng interpreter)
+python -m uvicorn main:app --port 8001
+```
+
+> Dùng `python -m uvicorn` thay vì `uvicorn` trực tiếp để tránh xung đột PATH khi có nhiều môi trường Python trên máy.
+
+> **Note:** The first startup downloads the InsightFace `buffalo_s` model (~85 MB) from the internet. Subsequent starts are instant.
+
+### Environment Variables
+
+Add these to your `.env`:
+
+```env
+FACE_SERVICE_URL=http://localhost:8001
+FACE_VERIFY_THRESHOLD=0.45   # cosine similarity threshold (0.0–1.0, higher = stricter)
+```
+
+### Sync Cassandra Tables
+
+After starting the Django server for the first time with this feature:
+
+```bash
+python manage.py sync_cassandra
+```
+
+This creates two new tables: `face_embeddings` and `face_verification_logs`.
+
+### Frontend Integration
+
+```javascript
+// 1. Register the student's face (done once before any exam)
+const res = await fetch('/api/v1/consumer/face/enroll/', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ image: 'data:image/jpeg;base64,...' }),
+})
+
+// 2. Open WebSocket during exam and send frames every 5–10 seconds
+const ws = new WebSocket(`ws://host/ws/face/monitor/${examId}/?token=${token}`)
+
+const sendFrame = () => {
+  const canvas = document.createElement('canvas')
+  // draw video frame to canvas ...
+  ws.send(JSON.stringify({ type: 'frame', image: canvas.toDataURL('image/jpeg') }))
+}
+setInterval(sendFrame, 5000)
+
+// 3. Handle results
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data)
+  if (msg.type === 'verification_result') {
+    console.log('Camera on:', msg.camera_open)
+    console.log('Correct person:', msg.recognized)
+    console.log('Multiple faces detected:', msg.multiple_faces)
+    console.log('Similarity score:', msg.similarity)
+  }
+  if (msg.type === 'no_enrollment') {
+    alert('Please enroll your face before starting the exam.')
+  }
+}
+```
+
+### What Gets Detected
+
+| Check | Description |
+|-------|-------------|
+| Camera open | At least one face visible in the frame |
+| Identity verified | Face matches the enrolled student (similarity ≥ threshold) |
+| Multiple faces | More than one person in front of the camera (cheating alert) |
+| Similarity score | `0.0` – `1.0`; higher = more confident match |
 
 ---
 

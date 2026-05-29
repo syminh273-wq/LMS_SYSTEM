@@ -1,2 +1,4 @@
 from .exam_repositories import ExamRepository
 from .exam_submission_repository import ExamSubmissionRepository
+from .exam_session_repository import ExamSessionRepository
+from .exam_audit_log_repository import ExamAuditLogRepository

@@ -30,6 +30,7 @@ dependencies = [
     "pypdf",
     "google-auth (>=2.53.0,<3.0.0)",
     "google-auth-oauthlib (>=1.4.0,<2.0.0)",
+    "insightface (>=1.0.1,<2.0.0)",
 ]
 
 [project.optional-dependencies]

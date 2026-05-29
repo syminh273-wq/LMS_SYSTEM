@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'features.notification',
     'features.calendar',
     'features.payment',
+    'features.face',
 ]
 
 REST_FRAMEWORK = {
@@ -221,3 +222,7 @@ MOMO_SECRET_KEY = config('MOMO_SECRET_KEY', default='K951B6PE1waDMi640xX08PD3vg6
 MOMO_ENDPOINT = config('MOMO_ENDPOINT', default='https://test-payment.momo.vn/v2/gateway/api/create')
 MOMO_REDIRECT_URL = config('MOMO_REDIRECT_URL', default='http://localhost:3000/payment/result')
 MOMO_IPN_URL = config('MOMO_IPN_URL', default='http://localhost:8000/api/v1/consumer/payment/ipn/')
+
+# Face Recognition Microservice
+FACE_SERVICE_URL = config('FACE_SERVICE_URL', default='http://localhost:8001')
+FACE_VERIFY_THRESHOLD = config('FACE_VERIFY_THRESHOLD', default=0.45, cast=float)

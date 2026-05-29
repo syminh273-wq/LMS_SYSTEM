@@ -13,6 +13,8 @@ class ClassroomMember(DjangoCassandraModel):
     joined_at = columns.DateTime(default=datetime.utcnow)
     status = columns.Text(default='approved')          # 'pending' | 'approved'
     is_deleted = columns.Boolean(default=False)
+    is_verified = columns.Boolean(default=False)
+    verified_at = columns.DateTime(required=False)
 
     __table_name__ = 'course_classroom_members'
 
