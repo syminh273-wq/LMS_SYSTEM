@@ -3,8 +3,11 @@ from features.account.consumer.models.consumer import Consumer
 
 class ConsumerAccountSerializer(serializers.Serializer):
     uid = serializers.UUIDField(read_only=True)
+    pid = serializers.CharField(read_only=True)
     username = serializers.CharField(read_only=True)
     email = serializers.EmailField()
+    first_name = serializers.CharField(required=False, allow_blank=True, default='')
+    last_name = serializers.CharField(required=False, allow_blank=True, default='')
     full_name = serializers.CharField()
     phone = serializers.CharField(required=False, allow_blank=True)
     avatar_url = serializers.SerializerMethodField()
@@ -21,10 +24,13 @@ class ConsumerAccountSerializer(serializers.Serializer):
 class ConsumerAccountCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
-    full_name = serializers.CharField(required=False, allow_blank=True, default='')
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
     phone = serializers.CharField(required=False, allow_blank=True, default='')
 
 class ConsumerAccountUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
     full_name = serializers.CharField(required=False)
     phone = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField(required=False)

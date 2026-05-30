@@ -32,7 +32,7 @@ TypesenseSchema.register('lms_classroom', {
         {'name': 'uid',         'type': 'string'},
         {'name': 'pid',         'type': 'string', 'infix': True},
         {'name': 'name',        'type': 'string', 'locale': 'vi', 'infix': True},
-        {'name': 'description', 'type': 'string', 'locale': 'vi', 'optional': True},
+        {'name': 'description', 'type': 'string', 'locale': 'vi', 'infix': True, 'optional': True},
         {'name': 'teacher_id',  'type': 'string'},
         {'name': 'max_students','type': 'int32'},
         {'name': 'status',      'type': 'string', 'facet': True},
@@ -69,8 +69,11 @@ TypesenseSchema.register('lms_consumer', {
     'fields': [
         {'name': 'id',         'type': 'string'},
         {'name': 'uid',        'type': 'string'},
+        {'name': 'pid',        'type': 'string', 'infix': True},
         {'name': 'username',   'type': 'string', 'infix': True},
         {'name': 'email',      'type': 'string', 'infix': True},
+        {'name': 'first_name', 'type': 'string', 'locale': 'vi', 'infix': True, 'optional': True},
+        {'name': 'last_name',  'type': 'string', 'locale': 'vi', 'infix': True, 'optional': True},
         {'name': 'full_name',  'type': 'string', 'locale': 'vi', 'infix': True},
         {'name': 'phone',      'type': 'string', 'optional': True, 'infix': True},
         {'name': 'role',       'type': 'string', 'facet': True},
@@ -113,4 +116,37 @@ TypesenseSchema.register('lms_quiz', {
         {'name': 'updated_at',      'type': 'int64', 'optional': True},
     ],
     'default_sorting_field': 'created_at',
+})
+
+TypesenseSchema.register('lms_resource', {
+    'name': 'lms_resource',
+    'fields': [
+        {'name': 'id',           'type': 'string'},
+        {'name': 'uid',          'type': 'string'},
+        {'name': 'name',         'type': 'string', 'locale': 'vi', 'infix': True},
+        {'name': 'file_type',    'type': 'string', 'facet': True},
+        {'name': 'url',          'type': 'string', 'index': False, 'optional': True},
+        {'name': 'size',         'type': 'int64', 'optional': True},
+        {'name': 'owner_id',     'type': 'string', 'optional': True},
+        {'name': 'owner_type',   'type': 'string', 'facet': True, 'optional': True},
+        {'name': 'is_deleted',   'type': 'bool'},
+        {'name': 'created_at',   'type': 'int64'},
+    ],
+    'default_sorting_field': 'created_at',
+})
+
+TypesenseSchema.register('lms_teacher_contact', {
+    'name': 'lms_teacher_contact',
+    'fields': [
+        {'name': 'id',             'type': 'string'},
+        {'name': 'teacher_id',     'type': 'string', 'facet': True},
+        {'name': 'consumer_uid',   'type': 'string'},
+        {'name': 'consumer_name',  'type': 'string', 'locale': 'vi', 'infix': True},
+        {'name': 'first_name',     'type': 'string', 'locale': 'vi', 'infix': True, 'optional': True},
+        {'name': 'last_name',      'type': 'string', 'locale': 'vi', 'infix': True, 'optional': True},
+        {'name': 'consumer_email', 'type': 'string', 'infix': True},
+        {'name': 'consumer_avatar','type': 'string', 'index': False, 'optional': True},
+        {'name': 'first_joined_at','type': 'int64'},
+    ],
+    'default_sorting_field': 'first_joined_at',
 })

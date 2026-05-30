@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from core.services.base_service import BaseService
 from core.storages.storage_service import storage_service
+from core.search_engine.typesense.indexer import LMSIndexer
 from features.resource.repositories.resource_repository import ResourceRepository
 
 
@@ -70,6 +71,8 @@ class ResourceService(BaseService):
             metadata=metadata or {}
         )
 
+        LMSIndexer.index_resource(resource)
+
         return {
             'success': True,
             'data': resource
@@ -98,6 +101,8 @@ class ResourceService(BaseService):
 
         if old_object_key and old_object_key != object_key:
             storage_service.delete_object(old_object_key, is_public=True)
+
+        LMSIndexer.index_resource(updated_resource)
 
         return {
             'success': True,

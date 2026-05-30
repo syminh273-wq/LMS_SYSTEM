@@ -26,7 +26,7 @@ class SpaceSearchAPIView(UserScopeMixin, APIView):
     Authenticated: Space (teacher) accounts only.
     """
 
-    SUPPORTED_TYPES = ('classroom', 'exam', 'quiz', 'consumer')
+    SUPPORTED_TYPES = ('classroom', 'exam', 'quiz', 'consumer', 'resource')
 
     _COLLECTION_CONFIG = {
         'classroom': {
@@ -41,9 +41,15 @@ class SpaceSearchAPIView(UserScopeMixin, APIView):
             'collection':  'lms_quiz',
             'query_by':    ['title', 'description'],
         },
+        # Use lms_teacher_contact so we can filter by teacher_id.
+        # lms_consumer has no teacher_id field — the relationship lives here.
         'consumer': {
-            'collection':  'lms_consumer',
-            'query_by':    ['full_name', 'email', 'username', 'phone'],
+            'collection':  'lms_teacher_contact',
+            'query_by':    ['consumer_name', 'first_name', 'last_name', 'consumer_email'],
+        },
+        'resource': {
+            'collection':  'lms_resource',
+            'query_by':    ['name'],
         },
     }
 
@@ -67,13 +73,18 @@ class SpaceSearchAPIView(UserScopeMixin, APIView):
             cfg = self._COLLECTION_CONFIG[type_key]
             filter_parts = ['is_deleted:false']
 
-            # Teacher sees only their own classrooms/exams/quizzes
-            if type_key in ('classroom', 'exam') and hasattr(request.user, 'uid'):
+            # Teacher sees only their own data
+            if type_key in ('classroom', 'exam', 'consumer') and hasattr(request.user, 'uid'):
                 filter_parts.append(f'teacher_id:{request.user.uid}')
             if type_key == 'quiz' and hasattr(request.user, 'uid'):
                 filter_parts.append(f'created_by:{request.user.uid}')
             if type_key == 'exam' and classroom_id:
                 filter_parts.append(f'classroom_id:{classroom_id}')
+            if type_key == 'resource' and hasattr(request.user, 'uid'):
+                filter_parts.append(f'owner_id:{request.user.uid}')
+            # lms_teacher_contact has no is_deleted — remove it for that collection
+            if type_key == 'consumer':
+                filter_parts = [f for f in filter_parts if f != 'is_deleted:false']
 
             try:
                 resp = svc.search(

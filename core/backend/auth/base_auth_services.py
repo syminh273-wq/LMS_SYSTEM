@@ -24,6 +24,11 @@ class BaseAuthService(BaseService):
         if 'email' in data and not data.get('username'):
             data['username'] = data['email']
 
+        if not data.get('full_name'):
+            first = data.get('first_name', '')
+            last = data.get('last_name', '')
+            data['full_name'] = f"{first} {last}".strip()
+
         return self.create(**data)
 
     def authenticate(self, username, password, login_field="email"):

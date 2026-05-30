@@ -28,17 +28,46 @@ class ClassroomMemberService:
             self._notify_teacher_pending(classroom_uid, user, name)
         except Exception as e:
             logger.warning(f"[ClassroomMember] Failed to send pending notification: {e}")
+
+        # Firebase realtime signal → teacher's UI updates badge count immediately
+        self._push_pending_signal(classroom_uid, name)
+
         return member
 
     def approve(self, classroom_uid, member_id, approved_by_id):
         from features.course.classroom.services.classroom_service import Service
+        from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
+        from features.account.consumer.repositories import ConsumerRepository
         from rest_framework.exceptions import PermissionDenied, NotFound
+
         classroom = Service().find(str(classroom_uid))
         if str(classroom.teacher_id) != str(approved_by_id):
             raise PermissionDenied("Chỉ giáo viên mới có thể duyệt thành viên.")
         member = self.repo.approve_member(classroom_uid, member_id)
         if not member:
             raise NotFound("Không tìm thấy thành viên.")
+
+        # Register student in teacher's contact list + index to Typesense (idempotent)
+        try:
+            from core.search_engine.typesense.indexer import LMSIndexer
+            consumer = ConsumerRepository().find(member_id)
+            contact = TeacherContactRepository().register(
+                teacher_id=classroom.teacher_id,
+                consumer_uid=member_id,
+                consumer_name=member.member_name,
+                consumer_email=getattr(consumer, 'email', ''),
+                consumer_avatar=member.member_avatar or '',
+                first_name=getattr(consumer, 'first_name', '') or '',
+                last_name=getattr(consumer, 'last_name', '') or '',
+            )
+            if contact:
+                LMSIndexer.index_teacher_contact(contact)
+        except Exception:
+            pass  # never block the approval flow
+
+        # Realtime Firebase event → student frontend
+        self._push_membership_event(member_id, classroom_uid, classroom.name, 'approved')
+
         return member
 
     def reject(self, classroom_uid, member_id, rejected_by_id):
@@ -48,6 +77,7 @@ class ClassroomMemberService:
         if str(classroom.teacher_id) != str(rejected_by_id):
             raise PermissionDenied("Chỉ giáo viên mới có thể từ chối thành viên.")
         self.leave(classroom_uid, member_id)
+        self._push_membership_event(member_id, classroom_uid, classroom.name, 'rejected')
 
     def get_pending_members(self, classroom_uid):
         return list(self.repo.get_pending_members(classroom_uid))
@@ -93,3 +123,32 @@ class ClassroomMemberService:
     def get_joined_classroom_uids(self, member_id):
         rows = self.repo.get_by_member(member_id)
         return [r.classroom_uid for r in rows]
+
+    def _push_pending_signal(self, classroom_uid, student_name):
+        """Overwrite a single Firebase node so teacher's UI listener fires and refetches."""
+        from datetime import datetime
+        from core.firebase.client.firebase_app import FirebaseApp
+        try:
+            FirebaseApp.set_value(
+                f"pending_requests/{classroom_uid}",
+                {"at": datetime.utcnow().isoformat(), "student_name": student_name},
+            )
+        except Exception:
+            pass
+
+    def _push_membership_event(self, consumer_uid, classroom_uid, classroom_name, status):
+        """Write a realtime event to Firebase so the student's frontend reacts immediately."""
+        from datetime import datetime
+        from core.firebase.client.firebase_app import FirebaseApp
+        try:
+            FirebaseApp.set_value(
+                f"membership_events/{consumer_uid}/{classroom_uid}",
+                {
+                    "status": status,
+                    "classroom_uid": str(classroom_uid),
+                    "classroom_name": classroom_name,
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
+            )
+        except Exception:
+            pass

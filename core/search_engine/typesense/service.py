@@ -49,30 +49,46 @@ class SearchResponse:
 class TypesenseService:
     """High-level Typesense operations for LMS."""
 
+    # Collections already verified/patched this process lifetime — skip repeat API calls
+    _ensured: set = set()
+
     def __init__(self):
         self.client = TypesenseClient()
 
     # ── Collection bootstrap ──────────────────────────────────────────────────
 
-    def initialize_collections(self) -> Dict[str, bool]:
-        results = {}
-        for name, schema in TypesenseSchema.all().items():
+    def initialize_collections(self) -> None:
+        """Create missing collections and patch schemas of existing ones."""
+        for name in TypesenseSchema.names():
             try:
-                self.client.get_collection(name)
-                results[name] = False  # already existed
+                self.ensure_collection(name)
             except Exception:
-                self.client.create_collection(schema)
-                results[name] = True  # created
-        return results
+                pass  # never block startup
 
     def ensure_collection(self, name: str) -> None:
+        """Create collection if absent; add any missing fields if it exists."""
+        if name in TypesenseService._ensured:
+            return
+
         schema = TypesenseSchema.get(name)
         if not schema:
             raise ValueError(f"No schema registered for '{name}'")
+
         try:
-            self.client.get_collection(name)
+            existing = self.client.get_collection(name)
+            # Patch schema: add fields present in schema but missing in Typesense
+            existing_names = {f['name'] for f in existing.get('fields', [])}
+            new_fields = [f for f in schema['fields'] if f['name'] not in existing_names]
+            if new_fields:
+                self.client.update_collection(name, new_fields)
         except Exception:
-            self.client.create_collection(schema)
+            # Collection doesn't exist yet — create it
+            try:
+                self.client.create_collection(schema)
+            except Exception:
+                pass
+
+        TypesenseService._ensured.add(name)
 
     # ── Indexing ──────────────────────────────────────────────────────────────
 
@@ -138,10 +154,16 @@ class TypesenseService:
         facet_by: Optional[str] = None,
     ) -> SearchResponse:
         params: Dict[str, Any] = {
-            'q':        query,
-            'query_by': ','.join(query_by),
-            'per_page': limit,
-            'page':     max(1, offset // limit + 1) if limit else 1,
+            'q':         query,
+            'query_by':  ','.join(query_by),
+            'per_page':  limit,
+            'page':      max(1, offset // limit + 1) if limit else 1,
+            'num_typos': 2,
+            'typo_tokens_threshold': 1,
+            'prefix':    True,
+            # fallback to infix (substring) when prefix returns no hits
+            # requires fields to be indexed with infix:true in schema
+            'infix':     'fallback',
         }
         if filter_by:
             params['filter_by'] = filter_by
@@ -162,8 +184,8 @@ class TypesenseService:
             results.append(SearchResult(
                 id=doc.get('id', ''),
                 collection=collection,
-                entity_id=doc.get('uid', doc.get('id', '')),
-                title=doc.get('name') or doc.get('title') or doc.get('full_name') or '',
+                entity_id=doc.get('uid') or doc.get('consumer_uid') or doc.get('id', ''),
+                title=doc.get('name') or doc.get('title') or doc.get('full_name') or doc.get('consumer_name') or '',
                 snippet=snippet,
                 score=hit.get('text_match', 0),
                 extra={k: v for k, v in doc.items() if k not in ('id', 'uid')},

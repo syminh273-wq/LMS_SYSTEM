@@ -38,6 +38,10 @@ class TypesenseClient:
     def delete_collection(self, name: str):
         return self.client.collections[name].delete()
 
+    def update_collection(self, name: str, fields: list):
+        """Add/modify fields on an existing collection (non-destructive)."""
+        return self.client.collections[name].update({'fields': fields})
+
     # ── Documents ─────────────────────────────────────────────────────────────
 
     def upsert_document(self, collection: str, document: dict):
