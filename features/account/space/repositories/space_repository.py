@@ -13,3 +13,10 @@ class Repository(BaseRepository):
 
     def get_active(self):
         return self.filter(is_active=True, is_deleted=False)
+
+    def update_profile(self, instance, **kwargs):
+        return self.update(instance, **kwargs)
+
+    def save_password(self, instance):
+        instance.save()
+        return instance

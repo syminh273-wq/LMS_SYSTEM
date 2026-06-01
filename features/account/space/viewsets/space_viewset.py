@@ -6,7 +6,13 @@ import os
 
 from core.views.api.base_viewset import BaseModelViewSet
 from core.views.mixins import UserScopeMixin
-from features.account.space.serializers import SpaceAccountSerializer, SpaceAccountCreateSerializer, SpaceAccountUpdateSerializer
+from features.account.space.serializers import (
+    SpaceAccountSerializer,
+    SpaceAccountCreateSerializer,
+    SpaceAccountUpdateSerializer,
+    SpaceAccountProfileUpdateSerializer,
+    SpaceChangePasswordSerializer,
+)
 from features.account.space.services import Service
 from features.account.space.repositories import Repository
 
@@ -32,14 +38,37 @@ class ViewSet(UserScopeMixin, BaseModelViewSet):
         """
         if not request.user or not request.user.is_authenticated:
             return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
-        return Response(SpaceAccountSerializer(instance=request.user).data)
+        service = Service()
+        space = service.get_mine(request.user)
+        return Response(SpaceAccountSerializer(instance=space).data)
 
-    @action(detail=False, methods=['get'], url_path='mine')
+    @action(detail=False, methods=['get', 'patch'], url_path='mine')
     def mine(self, request, *args, **kwargs):
         """
-        Get current space profile
+        Get or update current space profile
         """
-        return self.me(request, *args, **kwargs)
+        if request.method.lower() == 'get':
+            return self.me(request, *args, **kwargs)
+
+        serializer = SpaceAccountProfileUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        service = Service()
+        space = service.update_mine(request.user, serializer.validated_data)
+        return Response(SpaceAccountSerializer(instance=space).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='change-password')
+    def change_password(self, request, *args, **kwargs):
+        serializer = SpaceChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        service = Service()
+        service.change_password(
+            request.user,
+            serializer.validated_data['current_password'],
+            serializer.validated_data['new_password'],
+        )
+        return Response({'detail': 'Password changed successfully.'}, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
         """
