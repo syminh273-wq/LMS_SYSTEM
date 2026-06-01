@@ -14,6 +14,11 @@ class Space(AbstractAuthModel):
     description = columns.Text(default='')
     logo_url = columns.Text(default='')
     cover_url = columns.Text(default='')
+    hometown = columns.Text(default='')
+    date_of_birth = columns.Date(required=False)
+    avatar_url = columns.Text(default='')
+    learning_certificates = columns.List(columns.Text, default=[])
+    contact_information = columns.Map(columns.Text, columns.Text, default={})
     is_active = columns.Boolean(default=True)
 
     # is_deleted, deleted_at, created_at, updated_at → BaseTimeStampModel

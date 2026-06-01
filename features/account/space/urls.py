@@ -13,6 +13,8 @@ router = DefaultRouter(trailing_slash=True)
 router.register(r'spaces', ViewSet, basename='api_spaces')
 
 urlpatterns = [
+    path('mine/', ViewSet.as_view({'get': 'mine', 'patch': 'mine'}), name='space_account_mine'),
+    path('change-password/', ViewSet.as_view({'post': 'change_password'}), name='space_change_password'),
     path('register/', SpaceRegisterView.as_view(), name='space_register'),
     path('login/', SpaceLoginView.as_view(), name='space_login'),
     path('auth/google/login/', GoogleSpaceOAuthLoginView.as_view(), name='space_google_login'),

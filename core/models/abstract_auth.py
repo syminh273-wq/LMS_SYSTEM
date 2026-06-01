@@ -1,4 +1,5 @@
 from cassandra.cqlengine import columns
+from django.contrib.auth.hashers import check_password, make_password
 from core.models.cassandra import BaseTimeStampModel
 
 
@@ -20,3 +21,9 @@ class AbstractAuthModel(BaseTimeStampModel):
     @property
     def is_anonymous(self):
         return False
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
