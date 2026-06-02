@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.contrib.auth.hashers import is_password_usable
 from rest_framework import exceptions
 from core.backend.auth.base_auth_services import BaseAuthService
 from features.account.space.models import Space
@@ -53,9 +54,20 @@ class Service(BaseAuthService):
 
     def change_password(self, user, current_password: str, new_password: str):
         instance = self.get_mine(user)
+
+        if not is_password_usable(getattr(instance, 'password', '')):
+            raise exceptions.ValidationError({
+                'detail': 'Your password is managed by Google. Please use your Google account settings to manage it.'
+            })
+
         if not instance.check_password(current_password):
             raise exceptions.ValidationError({
                 'current_password': ['Current password is incorrect.']
+            })
+
+        if instance.check_password(new_password):
+            raise exceptions.ValidationError({
+                'new_password': ['New password must be different from the current password.']
             })
 
         instance.set_password(new_password)

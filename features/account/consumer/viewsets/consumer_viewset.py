@@ -4,7 +4,12 @@ from rest_framework.response import Response
 
 from core.views.api.base_viewset import BaseModelViewSet
 from core.views.mixins import UserScopeMixin
-from features.account.consumer.serializers import ConsumerAccountSerializer, ConsumerAccountCreateSerializer, ConsumerAccountUpdateSerializer
+from features.account.consumer.serializers import (
+    ConsumerAccountSerializer,
+    ConsumerAccountCreateSerializer,
+    ConsumerAccountUpdateSerializer,
+    ConsumerChangePasswordSerializer,
+)
 from features.account.consumer.services import ConsumerService
 
 
@@ -55,6 +60,18 @@ class ViewSet(UserScopeMixin, BaseModelViewSet):
         if not request.user or not request.user.is_authenticated:
             return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(ConsumerAccountSerializer(request.user).data)
+
+    @action(detail=False, methods=['post'], url_path='change-password')
+    def change_password(self, request, *args, **kwargs):
+        serializer = ConsumerChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ConsumerService().change_password(
+            request.user,
+            serializer.validated_data['current_password'],
+            serializer.validated_data['new_password'],
+        )
+        return Response({'detail': 'Password changed successfully.'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['patch'], url_path='deactivate')
     def deactivate(self, request, *args, **kwargs):
