@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.contrib.auth.password_validation import validate_password
 from features.account.consumer.models.consumer import Consumer
 
 class ConsumerAccountSerializer(serializers.Serializer):
@@ -39,3 +40,21 @@ class ConsumerAccountUpdateSerializer(serializers.Serializer):
 class ConsumerAccountLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+
+
+class ConsumerChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        new_password = attrs.get('new_password')
+        confirm_password = attrs.get('confirm_password')
+
+        if new_password != confirm_password:
+            raise serializers.ValidationError({
+                'confirm_password': ['New password and confirm password do not match.']
+            })
+
+        validate_password(new_password)
+        return attrs

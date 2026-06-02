@@ -28,3 +28,7 @@ class ConsumerRepository(BaseRepository):
 
     def get_active(self):
         return self.filter(is_active=True, is_deleted=False)
+
+    def save_password(self, instance):
+        instance.save()
+        return instance
