@@ -16,7 +16,7 @@ import tempfile
 
 import requests
 
-from core.ai.llm.services.ai_client import AIClient as OmniRouteClient
+from core.ai.llm.services.ai_client import AIClient
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PDF text extraction
@@ -210,7 +210,7 @@ class QuizGenerationService:
         content = content[:max_content_length]
 
         messages = _get_messages(quiz_type, content, num_questions, streaming=False)
-        raw = OmniRouteClient.chat_sync(messages, models=OmniRouteClient.TEXT_MODELS, timeout=90)
+        raw = AIClient.chat_sync(messages, models=AIClient.TEXT_MODELS, timeout=90)
 
         clean = re.sub(r'```(?:json)?', '', raw).strip().strip('`').strip()
         start, end = clean.find('{'), clean.rfind('}')
@@ -261,7 +261,7 @@ class QuizGenerationService:
         messages = _get_messages(quiz_type, content, num_questions, streaming=True)
 
         # raw_chunks is a generator of str chunks + final tuple
-        raw_chunks = OmniRouteClient.chat_stream(messages, models=OmniRouteClient.TEXT_MODELS, timeout=120)
+        raw_chunks = AIClient.chat_stream(messages, models=AIClient.TEXT_MODELS, timeout=120)
 
         def text_only(chunks):
             for chunk in chunks:

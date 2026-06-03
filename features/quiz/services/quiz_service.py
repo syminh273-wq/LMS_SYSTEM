@@ -4,7 +4,7 @@ from core.search_engine.typesense.indexer import LMSIndexer
 from features.quiz.repositories.quiz_repository import QuizRepository
 from features.quiz.repositories.quiz_question_repository import QuizQuestionRepository
 from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
-from features.quiz.repositories.quiz_attempt_repository import QuizAttemptRepository
+from features.quiz.repositories.quiz_log_repository import QuizLogRepository
 
 
 class QuizService(BaseService):
@@ -12,7 +12,7 @@ class QuizService(BaseService):
         self.repository = QuizRepository()
         self.question_repo = QuizQuestionRepository()
         self.assignment_repo = QuizAssignmentRepository()
-        self.attempt_repo = QuizAttemptRepository()
+        self.log_repo = QuizLogRepository()
 
     # ── Quiz queries ─────────────────────────────────────────────────────────
 
@@ -113,14 +113,14 @@ class QuizService(BaseService):
         LMSIndexer.index_quiz(updated)
         return updated
 
-    # ── Attempts (all scoped by classroom) ────────────────────────────────────
+    # ── Logs (all scoped by classroom) ────────────────────────────────────────
 
     def get_student_attempt_count(self, quiz_uid, classroom_id, student_uid) -> int:
-        return self.attempt_repo.count_by_student(quiz_uid, classroom_id, student_uid)
+        return self.log_repo.count_by_student(quiz_uid, classroom_id, student_uid)
 
     def record_attempt(self, quiz_uid, classroom_id, student_uid, attempt_number,
                        score, total_questions, score_pct, time_taken_seconds, answers: dict):
-        return self.attempt_repo.create_attempt(
+        return self.log_repo.create(
             quiz_id=quiz_uid,
             classroom_id=classroom_id,
             student_id=student_uid,
@@ -130,13 +130,15 @@ class QuizService(BaseService):
             score_pct=score_pct,
             time_taken_seconds=time_taken_seconds,
             answers=answers,
+            source="game",
+            exam_id=None,
         )
 
     def get_all_attempts(self, quiz_uid, classroom_id):
-        return self.attempt_repo.get_by_classroom(quiz_uid, classroom_id)
+        return self.log_repo.get_by_classroom(quiz_uid, classroom_id)
 
     def get_student_attempts(self, quiz_uid, classroom_id, student_uid):
-        return self.attempt_repo.get_by_student(quiz_uid, classroom_id, student_uid)
+        return self.log_repo.get_by_student(quiz_uid, classroom_id, student_uid)
 
     # ── Question update ───────────────────────────────────────────────────────
 

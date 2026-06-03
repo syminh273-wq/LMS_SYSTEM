@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'features.sharing',
     'features.resource',
     'features.chat',
+    'features.ai',
     'features.course.meeting_room',
     'features.quiz',
     'features.notification',

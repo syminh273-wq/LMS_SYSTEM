@@ -8,6 +8,13 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from core.ai.rag.services.rag_pipeline import RAGPipeline
+from core.ai.llm.services.ai_client import AIClient
+from core.ai.tools.tool_executor import LMSToolExecutor
+from core.ai.langchain.tools import build_langchain_tools
+from core.ai.langchain.agent import LMSAgent
+from features.ai.services.ai_conversation_session_service import AIConversationSessionService
+
+_ai_session_service = AIConversationSessionService()
 from core.serializers.classroom import ClassroomResponseSerializer
 from core.serializers.classroom.request import ClassroomRequestSerializer
 from core.views.api.base_viewset import BaseModelViewSet
@@ -156,8 +163,8 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                 file_obj=request.FILES['file'],
                 section=section,
             )
-            if result.get('success'):
-                resource = result['data']
+            resource = result.get('data')
+            if resource:
                 ClassroomActivityLogService().log(
                     classroom_uid=uid,
                     log_level='major',
@@ -168,10 +175,11 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                     target_name=getattr(resource, 'name', ''),
                     metadata={'section': section},
                 )
-                return Response(
-                    ResourceResponseSerializer(resource).data,
-                    status=status.HTTP_201_CREATED,
-                )
+                resp_data = ResourceResponseSerializer(resource).data
+                if not result.get('success'):
+                    # File uploaded to R2 but LanceDB indexing failed — warn the client
+                    resp_data['_warning'] = result.get('message', 'LanceDB indexing thất bại')
+                return Response(resp_data, status=status.HTTP_201_CREATED)
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
         # GET
@@ -234,20 +242,18 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     _CLASSROOM_PROMPT = (
         "Bạn là AI Trợ giảng, hỗ trợ học sinh và giáo viên hiểu sâu nội dung bài học.\n\n"
-        "Khi trả lời, hãy tuân theo các nguyên tắc sau:\n"
-        "1. Trả lời đầy đủ và có chiều sâu — giải thích để người học thực sự hiểu, không chỉ tóm tắt lướt qua.\n"
-        "2. Dẫn chứng cụ thể từ tài liệu — trích ý chính, ví dụ hoặc định nghĩa từ ngữ liệu. "
-        "Dùng câu như \"Theo tài liệu...\", \"Bài học nêu rõ rằng...\", \"Ví dụ được đưa ra là...\".\n"
-        "3. Văn phong tự nhiên, thân thiện — viết như người thầy đang giảng cho học sinh, "
-        "không cứng nhắc như sách giáo khoa. Có thể dùng ví dụ thực tế để minh họa thêm.\n"
-        "4. Cấu trúc rõ ràng — nếu có nhiều ý, chia thành đoạn văn riêng hoặc liệt kê có thứ tự.\n"
-        "5. CHỈ dựa vào tài liệu lớp học được cung cấp — tuyệt đối không dùng kiến thức bên ngoài "
-        "hay tự bịa thêm thông tin.\n"
-        "6. Nếu tài liệu không có đủ thông tin để trả lời chính xác, CHỈ nói duy nhất câu sau "
-        "và không thêm bất kỳ lời giải thích hay gợi ý nào khác: 'Tài liệu lớp học không có thông tin về vấn đề này.'\n"
-        "7. Đối với lời chào hoặc hội thoại xã giao (như 'Xin chào', 'Hi', 'Hello', 'Chào bạn',...): CHỈ chào lại ngắn gọn và hỏi xem có thể giúp gì được không. Tuyệt đối CẤM nhắc đến bất kỳ từ khóa, chủ đề, tên nhân vật hay nội dung nào có trong tài liệu (như 'Bác Hồ', 'giản dị', 'tiết kiệm',...) trong lời chào này.\n\n"
-        "Tài liệu lớp học (căn cứ trả lời):\n{context}\n\n"
-        "CHỈ trả lời bằng tiếng Việt. Tuyệt đối không trả lời bằng tiếng Anh hay bất kỳ ngôn ngữ nào khác trừ khi người dùng yêu cầu cụ thể."
+        "QUY TẮC BẮT BUỘC:\n"
+        "- Với BẤT KỲ câu hỏi nào về nội dung, tài liệu, bài học, nhân vật, sự kiện, khái niệm: "
+        "BẮT BUỘC phải gọi tool search_documents TRƯỚC, sau đó mới trả lời dựa trên kết quả.\n"
+        "- KHÔNG được tự trả lời từ kiến thức của mình. KHÔNG được nói 'không tìm thấy' mà chưa gọi tool.\n"
+        "- Chỉ bỏ qua search_documents với lời chào xã giao (Xin chào, Hi, Hello,...).\n\n"
+        "Khi trả lời dựa trên kết quả tool:\n"
+        "1. Trả lời đầy đủ và có chiều sâu — giải thích để người học thực sự hiểu.\n"
+        "2. Dẫn chứng cụ thể từ tài liệu — dùng câu như 'Theo tài liệu...', 'Bài học nêu rõ rằng...'.\n"
+        "3. Văn phong tự nhiên, thân thiện như người thầy đang giảng.\n"
+        "4. Cấu trúc rõ ràng — chia đoạn hoặc liệt kê có thứ tự nếu có nhiều ý.\n"
+        "5. Nếu kết quả search_documents trống hoặc không liên quan: CHỈ nói 'Tài liệu lớp học không có thông tin về vấn đề này.'\n\n"
+        "CHỈ trả lời bằng tiếng Việt."
     )
 
     @action(detail=True, methods=['post'], url_path='ask')
@@ -259,14 +265,25 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         section = request.data.get('section') or None
         top_k = min(int(request.data.get('top_k', 5)), 10)
 
-        pipeline = RAGPipeline()
-        filter_meta = {'classroom_id': str(uid)}
+        teacher_id = str(request.user.uid)
+        classroom_id = str(uid)
+        session_id = (request.data.get('session_id') or '').strip()
+        session_id = _ai_session_service.ensure_session(session_id, teacher_id, classroom_id)
+
+        section = request.data.get('section')
+        filter_meta = {'classroom_id': classroom_id}
         if section:
             filter_meta['section'] = section
-        
-        result = pipeline.ask(question, top_k=top_k, filter_meta=filter_meta,
-                              system_prompt=self._CLASSROOM_PROMPT)
-        return Response(result)
+
+        executor = LMSToolExecutor(teacher_id=teacher_id, filter_meta=filter_meta)
+        tools = build_langchain_tools(executor, has_classroom=True)
+        result = LMSAgent(tools, system_prompt=self._CLASSROOM_PROMPT).ask(question, session_id)
+
+        return Response({
+            'answer':     result['answer'],
+            'tool_calls': result['tool_calls'],
+            'session_id': session_id,
+        })
 
     @action(detail=True, methods=['post'], url_path='ask-stream')
     def ask_stream(self, request, uid=None):
@@ -274,29 +291,96 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         question = (request.data.get('question') or '').strip()
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
-        section = request.data.get('section') or None
-        top_k = min(int(request.data.get('top_k', 5)), 10)
 
-        pipeline = RAGPipeline()
-        filter_meta = {'classroom_id': str(uid)}
+        teacher_id = str(request.user.uid)
+        classroom_id = str(uid)
+        session_id = (request.data.get('session_id') or '').strip()
+        session_id = _ai_session_service.ensure_session(session_id, teacher_id, classroom_id)
+
+        section = request.data.get('section')
+        mode = (request.data.get('mode') or 'doc').strip()  # 'doc' | 'manage' | 'free'
+        filter_meta = {'classroom_id': classroom_id}
         if section:
             filter_meta['section'] = section
 
         def _generate():
             try:
-                for chunk in pipeline.ask_stream(question, top_k=top_k, filter_meta=filter_meta,
-                                                 system_prompt=self._CLASSROOM_PROMPT):
-                    if isinstance(chunk, tuple):
-                        signal, data = chunk
-                        if signal == '__SOURCES__':
-                            payload = json.dumps({'type': 'sources', 'data': data}, ensure_ascii=False)
-                        elif signal == '__ERROR__':
-                            payload = json.dumps({'type': 'error', 'message': str(data)}, ensure_ascii=False)
-                        else:
-                            continue
+                yield f'data: {json.dumps({"type": "session_id", "session_id": session_id})}\n\n'
+
+                if mode == 'doc':
+                    # Bypass LangChain — direct AIClient call avoids template variable parsing issues
+                    hits = RAGPipeline().search(question, top_k=3, filter_meta=filter_meta)
+                    context = "\n\n---\n\n".join(h["document"] for h in hits) if hits else ""
+                    print(f"[DOC] context={len(context)} chars, hits={len(hits)}")
+                    if context:
+                        messages = [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "Bạn là AI Trợ giảng. Trả lời câu hỏi DỰA HOÀN TOÀN vào phần TÀI LIỆU được cung cấp. "
+                                    "Nếu tài liệu không có thông tin: chỉ nói 'Tài liệu lớp học không có thông tin về vấn đề này.' "
+                                    "CHỈ trả lời bằng tiếng Việt."
+                                ),
+                            },
+                            {
+                                "role": "user",
+                                "content": f"TÀI LIỆU:\n{context}\n\nCÂU HỎI: {question}",
+                            },
+                        ]
                     else:
-                        payload = json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)
-                    yield f'data: {payload}\n\n'
+                        messages = [
+                            {
+                                "role": "system",
+                                "content": "Bạn là AI Trợ giảng. CHỈ trả lời bằng tiếng Việt.",
+                            },
+                            {
+                                "role": "user",
+                                "content": "Lớp học chưa có tài liệu nào. Hãy thông báo và gợi ý giáo viên tải tài liệu lên.",
+                            },
+                        ]
+                    print(f"[DOC] user_msg_len={len(messages[1]['content'])} chars")
+                    full_response = []
+                    for chunk in AIClient.chat_stream(messages, timeout=300):
+                        if isinstance(chunk, str):
+                            full_response.append(chunk)
+                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
+                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
+                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
+                    print(f"[DOC] response={len(full_response)} chunks, preview={''.join(full_response)[:150]!r}")
+
+                elif mode == 'manage':
+                    executor = LMSToolExecutor(teacher_id=teacher_id, filter_meta=filter_meta)
+                    tools = build_langchain_tools(executor, has_classroom=True, include_search=False)
+                    system_prompt = (
+                        "Bạn là AI quản lý lớp học. Sử dụng các công cụ để truy vấn dữ liệu lớp học "
+                        "(danh sách học sinh, thống kê bài thi, thông tin lớp...).\n"
+                        "Trả lời bằng tiếng Việt, ngắn gọn và chính xác."
+                    )
+                    agent = LMSAgent(tools, system_prompt=system_prompt)
+                    for chunk in agent.ask_stream(question, session_id):
+                        if isinstance(chunk, tuple):
+                            signal, data = chunk
+                            if signal == "__TOOL_CALLS__":
+                                payload = json.dumps({'type': 'tool_calls', 'data': data}, ensure_ascii=False)
+                            elif signal == "__ERROR__":
+                                payload = json.dumps({'type': 'error', 'message': str(data)}, ensure_ascii=False)
+                            else:
+                                continue
+                        else:
+                            payload = json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)
+                        yield f'data: {payload}\n\n'
+
+                else:  # 'free'
+                    messages = [
+                        {"role": "system", "content": "Bạn là trợ lý AI thông minh. Trả lời bằng tiếng Việt, thân thiện và hữu ích."},
+                        {"role": "user",   "content": question},
+                    ]
+                    for chunk in AIClient.chat_stream(messages, timeout=300):
+                        if isinstance(chunk, str):
+                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
+                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
+                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
+
             except Exception as exc:
                 yield f'data: {json.dumps({"type": "error", "message": str(exc)}, ensure_ascii=False)}\n\n'
             finally:

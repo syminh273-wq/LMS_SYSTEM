@@ -46,6 +46,16 @@ class ExamRepository:
         exam.save()
         return exam
 
+    def find_by_ref_id_and_classroom(self, ref_id, classroom_id):
+        """Return published/ongoing quiz-type exams linked to the given quiz ref_id in a classroom."""
+        qs = list(Exam.objects(classroom_id=classroom_id, is_deleted=False))
+        return [
+            e for e in qs
+            if str(getattr(e, "ref_id", "") or "") == str(ref_id)
+            and getattr(e, "exam_type", "") == "quiz"
+            and e.status in ("published", "ongoing")
+        ]
+
     def soft_delete(self, exam):
         exam.is_deleted = True
         exam.deleted_at = datetime.utcnow()

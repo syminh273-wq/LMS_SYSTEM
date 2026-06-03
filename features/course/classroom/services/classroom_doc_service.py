@@ -39,6 +39,14 @@ class ClassroomDocService:
 
         ext = os.path.splitext(file_obj.name)[1].lower()
         if ext in _INDEXABLE_EXTENSIONS:
+            # Remove stale chunks for any previous upload of the same filename in this classroom
+            old_count = self._pipeline.delete_document({
+                'classroom_id': str(classroom_uid),
+                'doc_name': resource.name,
+            })
+            if old_count:
+                print(f"[RAG] Removed {old_count} stale chunk(s) for '{resource.name}' before re-index")
+
             tmp_path = None
             try:
                 file_obj.seek(0)
@@ -58,8 +66,16 @@ class ClassroomDocService:
                     },
                 )
             except Exception as exc:
-                # Non-fatal: file is already saved to R2
+                import traceback
+                traceback.print_exc()
                 print(f"[ClassroomDocService] LanceDB index failed for {resource.name}: {exc}")
+                if tmp_path and os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                return {
+                    'success': False,
+                    'message': f'File đã upload lên R2 nhưng LanceDB indexing thất bại: {exc}',
+                    'data': resource,
+                }
             finally:
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)

@@ -32,3 +32,6 @@ class ConsumerRepository(BaseRepository):
     def save_password(self, instance):
         instance.save()
         return instance
+
+    def find_by_pid(self, pid: str):
+        return self.model.objects.filter(pid=pid, is_deleted=False).first()

@@ -143,9 +143,24 @@ class RAGPipeline:
         Returns list of {id, document, metadata, score}.
         """
         k = top_k or self.default_top_k
+        print(f"\n{'='*60}")
+        print(f"[RAG:search] Query     : {query!r}")
+        print(f"[RAG:search] Filter    : {filter_meta}")
+        print(f"[RAG:search] Top-K     : {k}")
+        print(f"[RAG:search] Collection: {self.collection}")
         query_vector = self._embed_query(query)
         store = self._get_store()
-        return store.query(query_vector, n_results=k, where=filter_meta)
+        hits = store.query(query_vector, n_results=k, where=filter_meta)
+        print(f"[RAG:search] Retrieved {len(hits)} chunk(s):")
+        for i, h in enumerate(hits, 1):
+            meta = h.get("metadata", {})
+            doc_name = meta.get("doc_name") or meta.get("resource_uid") or "?"
+            page = meta.get("page")
+            score = h.get("score", 0)
+            preview = h["document"][:120].replace("\n", " ")
+            print(f"  [{i}] score={score:.4f} | {doc_name}" + (f" p.{page}" if page else "") + f" | {preview!r}")
+        print(f"{'='*60}\n")
+        return hits
 
     # ─────────────────────────────────────────────────────────────────────────
     # ⑤ LLM — generate answer from retrieved context

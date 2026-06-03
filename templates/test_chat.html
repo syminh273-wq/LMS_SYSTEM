@@ -1,56 +1,385 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat Test</title>
+    <title>LMS Chat Test</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --sidebar-width: 320px;
+        }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; display: flex; background: #f0f2f5; }
+        
+        #sidebar {
+            width: var(--sidebar-width);
+            background: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        
+        #sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+        }
+        
+        #sidebar-header h3 { margin: 0 0 10px 0; color: #333; }
+        
+        #session-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .session-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .session-item:hover { background: #f8f9fa; }
+        .session-item.active { background: #e7f3ff; border-left: 4px solid var(--primary-color); }
+        .session-item .title { font-weight: bold; color: #333; margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .session-item .info { font-size: 0.8em; color: #888; display: flex; justify-content: space-between; }
+
+        #main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+        
+        #chat-header {
+            padding: 15px 25px;
+            border-bottom: 1px solid #eee;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        #chat-log {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .message { margin-bottom: 15px; max-width: 80%; padding: 10px 15px; border-radius: 8px; position: relative; word-wrap: break-word; }
+        .message.user { align-self: flex-end; background: var(--primary-color); color: white; border-bottom-right-radius: 0; }
+        .message.assistant { align-self: flex-start; background: #e9e9eb; color: #333; border-bottom-left-radius: 0; }
+        .message .sender { font-weight: bold; font-size: 0.8em; margin-bottom: 5px; display: block; }
+        
+        #input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        
+        #chat-message-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+        }
+        
+        #chat-message-input:focus { border-color: var(--primary-color); }
+        
+        #chat-message-submit {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #chat-message-submit:hover { opacity: 0.9; }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
 </head>
 <body>
-    <h2>Chat Room: <span id="room-name">{{ room_name }}</span></h2>
-    <div id="chat-log" style="border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px;"></div>
-    <input id="chat-message-input" type="text" size="100" placeholder="Type your message..."><br>
-    <input id="chat-message-submit" type="button" value="Send">
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <h3>AI Trợ Giảng</h3>
+            <input type="text" id="classroom-id-input" placeholder="Classroom UID (pk)">
+            <button onclick="loadSessions()" style="width:100%; padding:8px; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer;">Load AI Sessions</button>
+            <div style="margin-top: 10px; display: flex; gap: 5px;">
+                <button onclick="createNewSession()" style="flex:1; padding:8px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">New Session</button>
+                <button onclick="clearCurrentSession()" style="flex:1; padding:8px; background:#dc3545; color:white; border:none; border-radius:4px; cursor:pointer;">Clear</button>
+            </div>
+        </div>
+        <div id="session-list">
+            <div style="padding: 20px; color: #888; text-align: center;">Enter Classroom UID to load sessions</div>
+        </div>
+    </div>
+    
+    <div id="main-chat">
+        <div id="chat-header">
+            <div>
+                <h2 style="margin:0; font-size: 1.2em;" id="active-room-title">AI Assistant</h2>
+                <small id="active-session-id" style="color: #888; font-family: monospace;">No active session</small>
+            </div>
+            <div id="status-badge" style="padding: 5px 10px; border-radius: 15px; font-size: 0.8em; background: #eee; color: #666;">Ready</div>
+        </div>
+        
+        <div id="chat-log">
+            <!-- Messages will appear here -->
+        </div>
+        
+        <div id="input-container">
+            <input id="chat-message-input" type="text" placeholder="Type your question to AI...">
+            <button id="chat-message-submit">Send (AI)</button>
+        </div>
+    </div>
 
     <script>
-        const roomName = "{{ room_name }}";
-        const chatSocket = new WebSocket(
-            'ws://' + window.location.host + '/ws/chat/' + roomName + '/'
-        );
+        let currentSessionId = "";
+        let currentClassroomUid = "";
+        let isStreaming = false;
 
-        chatSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            const chatLog = document.querySelector('#chat-log');
-            const messageElement = document.createElement('div');
+        function updateStatus(status, color, bgColor) {
+            const badge = document.getElementById('status-badge');
+            badge.innerText = status;
+            badge.style.color = color;
+            badge.style.background = bgColor;
+        }
+
+        async function selectSession(sessionId, classroomUid) {
+            currentSessionId = sessionId;
+            currentClassroomUid = classroomUid;
             
-            if (data.type === 'chat_message') {
-                messageElement.innerHTML = `<strong>${data.sender || 'Anonymous'}:</strong> ${data.message}`;
-            } else if (data.type === 'error') {
-                messageElement.style.color = 'red';
-                messageElement.innerText = `Error: ${data.message}`;
+            document.getElementById('active-session-id').innerText = sessionId;
+            document.getElementById('chat-log').innerHTML = '';
+            
+            // Highlight in list
+            document.querySelectorAll('.session-item').forEach(el => {
+                if (el.dataset.sid === sessionId) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
+            await loadHistory(sessionId, classroomUid);
+        }
+
+        async function loadHistory(sessionId, classroomUid) {
+            try {
+                updateStatus('Loading history...', '#856404', '#ffeeba');
+                const response = await fetch(`/api/v1/consumer/course/classrooms/${classroomUid}/ai-session/history/?session_id=${sessionId}`);
+                if (!response.ok) throw new Error("Failed to load history");
+                const data = await response.json();
+                
+                const chatLog = document.getElementById('chat-log');
+                chatLog.innerHTML = '';
+                
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(m => {
+                        appendMessage(m.role === 'user' ? 'Me' : 'AI Assistant', m.content, m.role);
+                    });
+                } else {
+                    appendMessage('System', 'No messages in this session yet.', 'assistant');
+                }
+                updateStatus('Ready', '#155724', '#d4edda');
+            } catch (err) {
+                console.error(err);
+                updateStatus('Error', '#721c24', '#f8d7da');
+            }
+        }
+
+        function appendMessage(sender, text, type, isError = false) {
+            const chatLog = document.querySelector('#chat-log');
+            let msgDiv = chatLog.querySelector('.message.streaming');
+            
+            if (msgDiv && type === 'assistant' && !isStreaming) {
+                msgDiv.classList.remove('streaming');
+            }
+
+            if (!msgDiv || type === 'user' || !isStreaming) {
+                msgDiv = document.createElement('div');
+                msgDiv.className = `message ${type === 'user' ? 'user' : 'assistant'}`;
+                if (isStreaming && type === 'assistant') msgDiv.classList.add('streaming');
+                if (isError) msgDiv.style.color = 'red';
+                msgDiv.innerHTML = `<span class="sender">${sender}</span> <span class="content">${text}</span>`;
+                chatLog.appendChild(msgDiv);
+            } else {
+                msgDiv.querySelector('.content').innerHTML = text;
             }
             
-            chatLog.appendChild(messageElement);
             chatLog.scrollTop = chatLog.scrollHeight;
-        };
+            return msgDiv;
+        }
 
-        chatSocket.onclose = function(e) {
-            console.error('Chat socket closed unexpectedly');
-        };
+        async function loadSessions() {
+            const classroomUid = document.getElementById('classroom-id-input').value;
+            if (!classroomUid) {
+                alert("Please enter Classroom UID");
+                return;
+            }
+            currentClassroomUid = classroomUid;
+            
+            try {
+                const response = await fetch(`/api/v1/consumer/course/classrooms/${classroomUid}/ai-sessions/`);
+                if (!response.ok) throw new Error("Failed to fetch sessions");
+                const sessions = await response.json();
+                
+                const sessionList = document.getElementById('session-list');
+                sessionList.innerHTML = '';
+                
+                if (!sessions || sessions.length === 0) {
+                    sessionList.innerHTML = '<div style="padding:20px; color:#888; text-align: center;">No AI sessions found</div>';
+                    return;
+                }
+                
+                sessions.forEach(s => {
+                    const div = document.createElement('div');
+                    div.className = 'session-item';
+                    div.dataset.sid = s.session_id;
+                    if (s.session_id === currentSessionId) div.classList.add('active');
+                    div.onclick = () => selectSession(s.session_id, classroomUid);
+                    
+                    div.innerHTML = `
+                        <div class="title">${s.title || 'Untitled Session'}</div>
+                        <div class="info">
+                            <span>ID: ${s.session_id.substring(0,8)}...</span>
+                            <span>${s.updated_at ? new Date(s.updated_at).toLocaleDateString() : 'N/A'}</span>
+                        </div>
+                    `;
+                    sessionList.appendChild(div);
+                });
 
-        document.querySelector('#chat-message-input').focus();
+                // Auto select first session if none active
+                if (!currentSessionId && sessions.length > 0) {
+                    selectSession(sessions[0].session_id, classroomUid);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error: " + err.message);
+            }
+        }
+
+        async function createNewSession() {
+            if (!currentClassroomUid) {
+                alert("Load sessions first to set classroom context");
+                return;
+            }
+            try {
+                const response = await fetch(`/api/v1/consumer/course/classrooms/${currentClassroomUid}/ai-session/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+                currentSessionId = data.session_id;
+                await loadSessions();
+                await selectSession(currentSessionId, currentClassroomUid);
+            } catch (err) {
+                alert("Failed to create session");
+            }
+        }
+
+        async function clearCurrentSession() {
+            if (!currentSessionId || !currentClassroomUid) return;
+            if (!confirm("Clear this session and start fresh?")) return;
+            
+            try {
+                const response = await fetch(`/api/v1/consumer/course/classrooms/${currentClassroomUid}/ai-session/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({session_id: currentSessionId})
+                });
+                const data = await response.json();
+                currentSessionId = data.session_id;
+                await loadSessions();
+                await selectSession(currentSessionId, currentClassroomUid);
+            } catch (err) {
+                alert("Failed to clear session");
+            }
+        }
+
         document.querySelector('#chat-message-input').onkeyup = function(e) {
-            if (e.keyCode === 13) {  // enter, return
+            if (e.keyCode === 13) {
                 document.querySelector('#chat-message-submit').click();
             }
         };
 
-        document.querySelector('#chat-message-submit').onclick = function(e) {
+        document.querySelector('#chat-message-submit').onclick = async function(e) {
+            if (!currentClassroomUid) {
+                alert("Enter Classroom UID first!");
+                return;
+            }
             const messageInputDom = document.querySelector('#chat-message-input');
-            const message = messageInputDom.value;
-            chatSocket.send(JSON.stringify({
-                'type': 'chat_message',
-                'message': message,
-                'sender': 'User_' + Math.floor(Math.random() * 1000)
-            }));
+            const message = messageInputDom.value.trim();
+            if (!message || isStreaming) return;
+
+            appendMessage('Me', message, 'user');
             messageInputDom.value = '';
+            
+            isStreaming = true;
+            updateStatus('Thinking...', '#856404', '#ffeeba');
+            
+            try {
+                const response = await fetch(`/api/v1/consumer/course/classrooms/${currentClassroomUid}/ask-stream/`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        question: message,
+                        session_id: currentSessionId
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = "";
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.substring(6).trim();
+                            if (dataStr === '[DONE]') break;
+                            try {
+                                const data = JSON.parse(dataStr);
+                                if (data.type === 'session_id') {
+                                    if (!currentSessionId) {
+                                        currentSessionId = data.session_id;
+                                        document.getElementById('active-session-id').innerText = currentSessionId;
+                                        loadSessions(); // Refresh list to show the auto-created session
+                                    }
+                                } else if (data.type === 'chunk') {
+                                    fullText += data.text;
+                                    appendMessage('AI Assistant', fullText, 'assistant');
+                                } else if (data.type === 'error') {
+                                    appendMessage('Error', data.message, 'assistant', true);
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            } catch (err) {
+                appendMessage('Error', "Failed to connect to AI", 'assistant', true);
+            } finally {
+                isStreaming = false;
+                updateStatus('Ready', '#155724', '#d4edda');
+            }
         };
     </script>
 </body>

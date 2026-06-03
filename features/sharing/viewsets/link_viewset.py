@@ -22,10 +22,6 @@ class LinkViewSet(BaseModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         service = LinkService()
         instance = service.find(kwargs['uid'])
-        
-        # Lazy load QR Code
-        service.get_or_create_qr_code(instance)
-        
         return Response(self.get_serializer(instance).data)
 
     def create(self, request, *args, **kwargs):
@@ -47,8 +43,11 @@ class LinkViewSet(BaseModelViewSet):
         service.delete(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=['get'], url_path='resolve/(?P<code>[^/.]+)')
-    def resolve(self, request, code=None):
+    @action(detail=False, methods=['get'], url_path='resolve')
+    def resolve(self, request):
+        code = request.query_params.get('code') or request.query_params.get('uid')
+        if not code:
+            return Response({'error': 'Missing code parameter'}, status=status.HTTP_400_BAD_REQUEST)
         service = LinkService()
         link = service.get_by_code(code)
         if not link:
@@ -61,9 +60,6 @@ class LinkViewSet(BaseModelViewSet):
         # Increment used count
         service.update(link, used_count=link.used_count + 1)
 
-        # Lazy load QR Code
-        service.get_or_create_qr_code(link)
-        
         return Response(self.get_serializer(link).data)
 
     @action(detail=True, methods=['get'])

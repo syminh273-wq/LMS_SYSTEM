@@ -67,7 +67,7 @@ class QuizAssignmentResponseSerializer(serializers.Serializer):
     passing_score_pct  = serializers.IntegerField(default=50)
 
 
-class QuizAttemptResponseSerializer(serializers.Serializer):
+class QuizLogResponseSerializer(serializers.Serializer):
     uid                = serializers.UUIDField(read_only=True)
     quiz_id            = serializers.UUIDField(read_only=True)
     classroom_id       = serializers.UUIDField(read_only=True)
@@ -78,3 +78,6 @@ class QuizAttemptResponseSerializer(serializers.Serializer):
     score_pct          = serializers.IntegerField()
     time_taken_seconds = serializers.IntegerField()
     submitted_at       = serializers.DateTimeField(read_only=True)
+
+
+QuizAttemptResponseSerializer = QuizLogResponseSerializer  # backward compat

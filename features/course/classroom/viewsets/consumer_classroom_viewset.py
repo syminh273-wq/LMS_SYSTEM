@@ -8,14 +8,21 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from core.ai.rag.services.rag_pipeline import RAGPipeline
+from core.ai.llm.services.ai_client import AIClient
+from core.ai.tools.tool_executor import LMSToolExecutor
+from core.ai.langchain.tools import build_langchain_tools
+from core.ai.langchain.agent import LMSAgent
 from core.serializers.classroom import ClassroomResponseSerializer
 from core.views.api.pagination import StandardResultsSetPagination
 from core.views.mixins import UserScopeMixin
+from features.ai.services.ai_conversation_session_service import AIConversationSessionService
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.classroom.services import Service
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
+
+_ai_session_service = AIConversationSessionService()
 
 
 class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
@@ -73,8 +80,12 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return Response({'error': 'Mã lớp không hợp lệ hoặc lớp không còn hoạt động.'}, status=status.HTTP_404_NOT_FOUND)
 
         member = ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
+        member_status = getattr(member, 'status', 'pending')
         return Response(
-            {'membership_status': getattr(member, 'status', 'pending')},
+            {
+                'membership_status': member_status,
+                'message': 'Đã gửi lời mời tham gia lớp này' if member_status == 'pending' else 'Tham gia lớp thành công',
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -90,21 +101,19 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
     # ── AI Bot ────────────────────────────────────────────────────────────────
 
     _CLASSROOM_PROMPT = (
-        "Bạn là AI Trợ giảng, hỗ trợ học sinh và giáo viên hiểu sâu nội dung bài học.\n\n"
-        "Khi trả lời, hãy tuân theo các nguyên tắc sau:\n"
-        "1. Trả lời đầy đủ và có chiều sâu — giải thích để người học thực sự hiểu, không chỉ tóm tắt lướt qua.\n"
-        "2. Dẫn chứng cụ thể từ tài liệu — trích ý chính, ví dụ hoặc định nghĩa từ ngữ liệu. "
-        "Dùng câu như \"Theo tài liệu...\", \"Bài học nêu rõ rằng...\", \"Ví dụ được đưa ra là...\".\n"
-        "3. Văn phong tự nhiên, thân thiện — viết như người thầy đang giảng cho học sinh, "
-        "không cứng nhắc như sách giáo khoa. Có thể dùng ví dụ thực tế để minh họa thêm.\n"
-        "4. Cấu trúc rõ ràng — nếu có nhiều ý, chia thành đoạn văn riêng hoặc liệt kê có thứ tự.\n"
-        "5. CHỈ dựa vào tài liệu lớp học được cung cấp — tuyệt đối không dùng kiến thức bên ngoài "
-        "hay tự bịa thêm thông tin.\n"
-        "6. Nếu tài liệu không có đủ thông tin để trả lời chính xác, CHỈ nói duy nhất câu sau "
-        "và không thêm bất kỳ lời giải thích hay gợi ý nào khác: 'Tài liệu lớp học không có thông tin về vấn đề này.'\n"
-        "7. Đối với lời chào hoặc hội thoại xã giao (như 'Xin chào', 'Hi', 'Hello', 'Chào bạn',...): CHỈ chào lại ngắn gọn và hỏi xem có thể giúp gì được không. Tuyệt đối CẤM nhắc đến bất kỳ từ khóa, chủ đề, tên nhân vật hay nội dung nào có trong tài liệu (như 'Bác Hồ', 'giản dị', 'tiết kiệm',...) trong lời chào này.\n\n"
-        "Tài liệu lớp học (căn cứ trả lời):\n{context}\n\n"
-        "CHỈ trả lời bằng tiếng Việt. Tuyệt đối không trả lời bằng tiếng Anh hay bất kỳ ngôn ngữ nào khác trừ khi người dùng yêu cầu cụ thể."
+        "Bạn là AI Trợ giảng, hỗ trợ học sinh hiểu sâu nội dung bài học.\n\n"
+        "QUY TẮC BẮT BUỘC:\n"
+        "- Với BẤT KỲ câu hỏi nào về nội dung, tài liệu, bài học, nhân vật, sự kiện, khái niệm: "
+        "BẮT BUỘC phải gọi tool search_documents TRƯỚC, sau đó mới trả lời dựa trên kết quả.\n"
+        "- KHÔNG được tự trả lời từ kiến thức của mình. KHÔNG được nói 'không tìm thấy' mà chưa gọi tool.\n"
+        "- Chỉ bỏ qua search_documents với lời chào xã giao (Xin chào, Hi, Hello,...).\n\n"
+        "Khi trả lời dựa trên kết quả tool:\n"
+        "1. Trả lời đầy đủ và có chiều sâu — giải thích để người học thực sự hiểu.\n"
+        "2. Dẫn chứng cụ thể từ tài liệu — dùng câu như 'Theo tài liệu...', 'Bài học nêu rõ rằng...'.\n"
+        "3. Văn phong tự nhiên, thân thiện như người thầy đang giảng.\n"
+        "4. Cấu trúc rõ ràng — chia đoạn hoặc liệt kê có thứ tự nếu có nhiều ý.\n"
+        "5. Nếu kết quả search_documents trống hoặc không liên quan: CHỈ nói 'Tài liệu lớp học không có thông tin về vấn đề này.'\n\n"
+        "CHỈ trả lời bằng tiếng Việt."
     )
 
     def _check_member(self, classroom_uid, user_uid):
@@ -121,17 +130,26 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         question = (request.data.get('question') or '').strip()
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
-        section = request.data.get('section') or None
-        top_k = min(int(request.data.get('top_k', 5)), 10)
 
-        pipeline = RAGPipeline()
-        filter_meta = {'classroom_id': str(pk)}
+        user_id = str(request.user.uid)
+        classroom_id = str(pk)
+        session_id = (request.data.get('session_id') or '').strip()
+        session_id = _ai_session_service.ensure_session(session_id, user_id, classroom_id)
+
+        section = request.data.get('section')
+        filter_meta = {'classroom_id': classroom_id}
         if section:
             filter_meta['section'] = section
-        
-        result = pipeline.ask(question, top_k=top_k, filter_meta=filter_meta,
-                              system_prompt=self._CLASSROOM_PROMPT)
-        return Response(result)
+
+        executor = LMSToolExecutor(teacher_id=user_id, filter_meta=filter_meta)
+        tools = build_langchain_tools(executor, has_classroom=False)
+        result = LMSAgent(tools, system_prompt=self._CLASSROOM_PROMPT).ask(question, session_id)
+
+        return Response({
+            'answer':     result['answer'],
+            'tool_calls': result['tool_calls'],
+            'session_id': session_id,
+        })
 
     @action(detail=True, methods=['post'], url_path='ask-stream')
     def ask_stream(self, request, pk=None):
@@ -141,29 +159,68 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         question = (request.data.get('question') or '').strip()
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
-        section = request.data.get('section') or None
-        top_k = min(int(request.data.get('top_k', 5)), 10)
 
-        pipeline = RAGPipeline()
-        filter_meta = {'classroom_id': str(pk)}
+        user_id = str(request.user.uid)
+        classroom_id = str(pk)
+        session_id = (request.data.get('session_id') or '').strip()
+        session_id = _ai_session_service.ensure_session(session_id, user_id, classroom_id)
+
+        section = request.data.get('section')
+        mode = (request.data.get('mode') or 'doc').strip()
+        filter_meta = {'classroom_id': classroom_id}
         if section:
             filter_meta['section'] = section
 
         def _generate():
             try:
-                for chunk in pipeline.ask_stream(question, top_k=top_k, filter_meta=filter_meta,
-                                                 system_prompt=self._CLASSROOM_PROMPT):
-                    if isinstance(chunk, tuple):
-                        signal, data = chunk
-                        if signal == '__SOURCES__':
-                            payload = json.dumps({'type': 'sources', 'data': data}, ensure_ascii=False)
-                        elif signal == '__ERROR__':
-                            payload = json.dumps({'type': 'error', 'message': str(data)}, ensure_ascii=False)
-                        else:
-                            continue
+                yield f'data: {json.dumps({"type": "session_id", "session_id": session_id})}\n\n'
+
+                if mode == 'doc':
+                    hits = RAGPipeline().search(question, top_k=3, filter_meta=filter_meta)
+                    context = "\n\n---\n\n".join(h["document"] for h in hits) if hits else ""
+                    if context:
+                        messages = [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "Bạn là AI Trợ giảng. Trả lời câu hỏi DỰA HOÀN TOÀN vào phần TÀI LIỆU được cung cấp. "
+                                    "Nếu tài liệu không có thông tin: chỉ nói 'Tài liệu lớp học không có thông tin về vấn đề này.' "
+                                    "CHỈ trả lời bằng tiếng Việt."
+                                ),
+                            },
+                            {
+                                "role": "user",
+                                "content": f"TÀI LIỆU:\n{context}\n\nCÂU HỎI: {question}",
+                            },
+                        ]
                     else:
-                        payload = json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)
-                    yield f'data: {payload}\n\n'
+                        messages = [
+                            {
+                                "role": "system",
+                                "content": "Bạn là AI Trợ giảng. CHỈ trả lời bằng tiếng Việt.",
+                            },
+                            {
+                                "role": "user",
+                                "content": "Lớp học chưa có tài liệu nào. Hãy thông báo và gợi ý liên hệ giáo viên.",
+                            },
+                        ]
+                    for chunk in AIClient.chat_stream(messages, timeout=300):
+                        if isinstance(chunk, str):
+                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
+                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
+                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
+
+                else:  # 'free'
+                    messages = [
+                        {"role": "system", "content": "Bạn là trợ lý AI thông minh. Trả lời bằng tiếng Việt, thân thiện và hữu ích."},
+                        {"role": "user",   "content": question},
+                    ]
+                    for chunk in AIClient.chat_stream(messages, timeout=300):
+                        if isinstance(chunk, str):
+                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
+                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
+                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
+
             except Exception as exc:
                 yield f'data: {json.dumps({"type": "error", "message": str(exc)}, ensure_ascii=False)}\n\n'
             finally:
@@ -181,5 +238,68 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
-        docs = ClassroomDocService().list_docs(classroom_uid=str(pk))
+        
+        section = request.query_params.get('section')
+        docs = ClassroomDocService().list_docs(classroom_uid=str(pk), section=section)
         return Response(ResourceResponseSerializer(docs, many=True).data)
+
+    @action(detail=True, methods=['get'], url_path='active-session')
+    def active_session(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/active-session/
+        Tự động tiếp tục session gần nhất hoặc tạo mới, trả về cả ID và lịch sử tin nhắn.
+        """
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+
+        session_id = _ai_session_service.ensure_session(None, request.user.uid, str(pk))
+        messages = _ai_session_service.get_display_messages(session_id)
+        
+        return Response({
+            'session_id': session_id,
+            'messages': messages
+        })
+
+    @action(detail=True, methods=['post'], url_path='ai-session')
+    def ai_session(self, request, pk=None):
+        """POST /api/v1/consumer/course/classrooms/{uid}/ai-session/
+
+        No body           → create new session
+        { session_id }    → clear old session + create new
+        Returns { session_id }
+        """
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+
+        old_sid = (request.data.get('session_id') or '').strip()
+        if old_sid and _ai_session_service.session_exists(old_sid):
+            new_sid = _ai_session_service.clear_session(
+                old_sid, user_id=request.user.uid, classroom_id=str(pk)
+            )
+        else:
+            new_sid = _ai_session_service.create_session(
+                user_id=request.user.uid, classroom_id=str(pk)
+            )
+        return Response({'session_id': new_sid})
+
+    @action(detail=True, methods=['get'], url_path='ai-sessions')
+    def ai_sessions(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/ai-sessions/
+        List all sessions for this user in this classroom.
+        """
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        sessions = _ai_session_service.list_sessions(
+            user_id=request.user.uid, classroom_id=str(pk)
+        )
+        return Response(sessions)
+
+    @action(detail=True, methods=['get'], url_path='ai-session/history')
+    def ai_session_history(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/ai-session/history/?session_id=xxx"""
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        session_id = (request.query_params.get('session_id') or '').strip()
+        if not session_id or not _ai_session_service.session_exists(session_id):
+            return Response({'error': 'Session không hợp lệ.'}, status=status.HTTP_404_NOT_FOUND)
+        messages = _ai_session_service.get_display_messages(session_id)
+        return Response({'session_id': session_id, 'messages': messages})

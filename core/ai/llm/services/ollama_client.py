@@ -4,7 +4,7 @@ OllamaClient — AI calls via local Ollama (http://localhost:11434).
 Requires Ollama running locally. Set OLLAMA_BASE_URL / OLLAMA_MODEL /
 OLLAMA_EMBED_MODEL in your .env to customise.
 
-Same interface as OmniRouteClient so they are interchangeable via AIClient.
+Used via AIClient — do not import directly.
 """
 
 import json
@@ -17,13 +17,14 @@ _BASE_URL           = config("OLLAMA_BASE_URL",    default="http://localhost:114
 _CHAT_URL           = f"{_BASE_URL}/api/chat"
 _EMBED_URL          = f"{_BASE_URL}/api/embed"
 
-_DEFAULT_MODEL        = config("OLLAMA_MODEL",        default="llama3")
+_DEFAULT_MODEL        = config("OLLAMA_MODEL",        default="qwen2.5:3b")
+_DEFAULT_TOOL_MODEL   = config("OLLAMA_TOOL_MODEL",   default="qwen2.5:3b")  # must support tool calling
 _DEFAULT_EMBED_MODEL  = config("OLLAMA_EMBED_MODEL",  default="nomic-embed-text")
 _DEFAULT_VISION_MODEL = config("OLLAMA_VISION_MODEL", default="llava")
 
 
 class OllamaClient:
-    """Stateless Ollama client. Same interface as OmniRouteClient."""
+    """Stateless Ollama client."""
 
     TEXT_MODELS: List[str]      = [_DEFAULT_MODEL]
     VISION_MODELS: List[str]    = [_DEFAULT_VISION_MODEL]
@@ -49,7 +50,8 @@ class OllamaClient:
                 print(f"[Ollama] sync → {model}")
                 resp = requests.post(
                     _CHAT_URL,
-                    json={"model": model, "messages": messages, "stream": False},
+                    json={"model": model, "messages": messages, "stream": False,
+                          "options": {"temperature": 0, "num_ctx": 8192}},
                     timeout=timeout,
                 )
                 if resp.status_code == 200:
@@ -70,6 +72,7 @@ class OllamaClient:
     def chat_stream(
         cls,
         messages: List[dict],
+        tools: List[dict] = None,
         models: List[str] = None,
         timeout: int = 300,
     ) -> Generator[Union[str, tuple], None, None]:
@@ -80,9 +83,14 @@ class OllamaClient:
         for model in models:
             try:
                 print(f"[Ollama] stream → {model}")
+                payload = {"model": model, "messages": messages, "stream": True,
+                           "options": {"temperature": 0, "num_ctx": 8192}}
+                if tools:
+                    payload["tools"] = tools
+
                 resp = requests.post(
                     _CHAT_URL,
-                    json={"model": model, "messages": messages, "stream": True},
+                    json=payload,
                     stream=True,
                     timeout=timeout,
                 )
@@ -93,10 +101,19 @@ class OllamaClient:
                             continue
                         try:
                             data = json.loads(raw.decode("utf-8"))
-                            chunk = data.get("message", {}).get("content", "")
+                            msg = data.get("message", {})
+                            
+                            # Content chunk
+                            chunk = msg.get("content", "")
                             if chunk:
                                 buffer.append(chunk)
                                 yield chunk
+                            
+                            # Tool calls (usually in the final chunk or specifically marked)
+                            tcs = msg.get("tool_calls")
+                            if tcs:
+                                yield ("__TOOL_CALLS__", tcs)
+
                             if data.get("done"):
                                 break
                         except Exception:
@@ -114,7 +131,6 @@ class OllamaClient:
 
         yield ("__ERROR__", last_error)
 
-    # ── Embeddings ───────────────────────────────────────────────────────────
 
     @classmethod
     def embed_texts(
@@ -137,3 +153,46 @@ class OllamaClient:
     @classmethod
     def embed_query(cls, text: str, model: str = None, timeout: int = 120) -> List[float]:
         return cls.embed_texts([text], model=model, timeout=timeout)[0]
+
+    # ── Tool calling ─────────────────────────────────────────────────────────
+
+    @classmethod
+    def chat_with_tools(
+        cls,
+        messages: List[dict],
+        tools: List[dict] = None,
+        models: List[str] = None,
+        timeout: int = 120,
+    ) -> dict:
+        """
+        Call Ollama with tool definitions. Ollama supports OpenAI-compatible
+        tools format since v0.2.8.
+        Returns {"content": str|None, "tool_calls": list|None}.
+        Uses OLLAMA_TOOL_MODEL (default: llama3.1) which supports tool calling.
+        """
+        if models is None:
+            models = [_DEFAULT_TOOL_MODEL]
+
+        last_error = ""
+        for model in models:
+            try:
+                print(f"[Ollama] tool_call → {model}")
+                payload: dict = {"model": model, "messages": messages, "stream": False,
+                                 "options": {"temperature": 0, "num_ctx": 8192}}
+                if tools:
+                    payload["tools"] = tools
+                resp = requests.post(_CHAT_URL, json=payload, timeout=timeout)
+                if resp.status_code == 200:
+                    msg = resp.json().get("message", {})
+                    print(f"[Ollama] tool_call OK — {model}")
+                    return {
+                        "content": msg.get("content"),
+                        "tool_calls": msg.get("tool_calls"),
+                    }
+                last_error = f"{model} → HTTP {resp.status_code}: {resp.text[:200]}"
+                print(f"[Ollama] {last_error}")
+            except Exception as exc:
+                last_error = f"{model} → {exc}"
+                print(f"[Ollama] {last_error}")
+
+        raise RuntimeError(f"All models failed. Last: {last_error}")

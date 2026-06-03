@@ -124,6 +124,30 @@ class ConsumerQuizViewSet(ViewSet):
             answers={str(k): str(v) for k, v in answers.items()},
         )
 
+        # If this quiz is linked to a quiz-type exam in the same classroom,
+        # auto-create an ExamSubmission so the grade is recorded on the exam.
+        try:
+            from features.course.exam.repositories import ExamRepository
+            from features.course.exam.services import ExamSubmissionService
+            linked_exams = ExamRepository().find_by_ref_id_and_classroom(pk, classroom_id)
+            if linked_exams:
+                exam_sub_service = ExamSubmissionService()
+                for exam in linked_exams:
+                    try:
+                        exam_sub_service.submit_exam(
+                            exam_id=exam.uid,
+                            student_id=request.user.uid,
+                            data={
+                                "submission_type": "online_quiz",
+                                "answers": {str(k): str(v) for k, v in answers.items()},
+                                "time_taken_seconds": time_taken_seconds,
+                            },
+                        )
+                    except ValueError:
+                        pass  # already submitted or other domain error — don't break quiz response
+        except Exception:
+            pass  # never break the quiz game response due to exam linkage
+
         max_attempts = (assignment.max_attempts or 0) if assignment else 0
         attempts_remaining = (max_attempts - attempt_number) if max_attempts > 0 else None
 

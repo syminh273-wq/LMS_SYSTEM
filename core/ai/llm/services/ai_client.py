@@ -1,36 +1,23 @@
 """
-AIClient — unified AI gateway that switches backend based on AI_MODE env var.
+AIClient — unified AI gateway backed by local Ollama.
 
-AI_MODE=omni    → OmniRouteClient  (local OpenAI-compatible proxy, default)
-AI_MODE=ollama  → OllamaClient     (local Ollama at localhost:11434)
-
-Set AI_MODE in your .env. All other code should import AIClient instead of
-a specific backend so switching providers needs only one env change.
+Set OLLAMA_BASE_URL / OLLAMA_MODEL / OLLAMA_EMBED_MODEL in your .env to customise.
 
 Usage:
     from core.ai.llm import AIClient
 
     answer  = AIClient.chat_sync(messages)
     vectors = AIClient.embed_texts(["hello", "world"])
+    result  = AIClient.chat_with_tools(messages, tools=[...])
 """
 
 from typing import Generator, List, Union
 
-from decouple import config
-
-_AI_MODE = config("AI_MODE", default="omni").lower()
-
-if _AI_MODE == "ollama":
-    from core.ai.llm.services.ollama_client import OllamaClient as _Backend
-else:
-    from core.ai.llm.services.omni_route_client import OmniRouteClient as _Backend
+from core.ai.llm.services.ollama_client import OllamaClient as _Backend
 
 
 class AIClient:
-    """
-    Facade that delegates to OmniRouteClient or OllamaClient based on AI_MODE.
-    Switch backends by changing AI_MODE in .env — no code changes needed.
-    """
+    """Thin facade over OllamaClient."""
 
     TEXT_MODELS: List[str]      = _Backend.TEXT_MODELS
     VISION_MODELS: List[str]    = _Backend.VISION_MODELS
@@ -51,10 +38,11 @@ class AIClient:
     def chat_stream(
         cls,
         messages: List[dict],
+        tools: List[dict] = None,
         models: List[str] = None,
         timeout: int = 300,
     ) -> Generator[Union[str, tuple], None, None]:
-        return _Backend.chat_stream(messages, models=models, timeout=timeout)
+        return _Backend.chat_stream(messages, tools=tools, models=models, timeout=timeout)
 
     @classmethod
     def embed_texts(
@@ -68,3 +56,16 @@ class AIClient:
     @classmethod
     def embed_query(cls, text: str, model: str = None, timeout: int = 120) -> List[float]:
         return _Backend.embed_query(text, model=model, timeout=timeout)
+
+    @classmethod
+    def chat_with_tools(
+        cls,
+        messages: List[dict],
+        tools: List[dict] = None,
+        models: List[str] = None,
+        timeout: int = 120,
+    ) -> dict:
+        """
+        Call LLM with tool definitions. Returns {"content": str|None, "tool_calls": list|None}.
+        """
+        return _Backend.chat_with_tools(messages, tools=tools, models=models, timeout=timeout)

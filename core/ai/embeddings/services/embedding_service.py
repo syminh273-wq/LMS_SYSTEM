@@ -1,13 +1,10 @@
 """
 Embedding backends for LMS_BACKEND.
 
-OmniRouteEmbeddings — calls mistral-embed via OmniRoute (requires network proxy).
-OllamaEmbeddings    — calls nomic-embed-text via local Ollama.
-HashEmbeddings      — local n-gram hash, 1024 dims, zero deps, never rate-limited.
+OllamaEmbeddings — calls nomic-embed-text via local Ollama (default).
+HashEmbeddings   — local n-gram hash, 1024 dims, zero deps, never rate-limited.
 
-get_embedding_service() returns the backend selected by AI_MODE env var:
-  AI_MODE=omni   → OmniRouteEmbeddings  (default)
-  AI_MODE=ollama → OllamaEmbeddings
+get_embedding_service() returns OllamaEmbeddings by default.
 """
 
 import hashlib
@@ -17,45 +14,8 @@ import requests
 from decouple import config
 from langchain_core.embeddings import Embeddings
 
-_AI_MODE = config("AI_MODE", default="omni").lower()
 
-
-# ── OmniRoute ────────────────────────────────────────────────────────────────
-
-class OmniRouteEmbeddings(Embeddings):
-    """LangChain-compatible embeddings via OmniRoute (mistral-embed)."""
-
-    def __init__(self, model: str = "mistral/mistral-embed", api_url: str = None):
-        self.model = model
-        self.api_url = api_url or (
-            config("OMINIROUTE_BASE_URL", default="http://localhost:20128/v1") + "/embeddings"
-        )
-
-    def _headers(self) -> dict:
-        return {
-            "Authorization": f"Bearer {config('OMINIROUTE_API_KEY', default='')}",
-            "Content-Type": "application/json",
-        }
-
-    def _call(self, texts: List[str]) -> List[List[float]]:
-        resp = requests.post(
-            self.api_url,
-            json={"input": texts, "model": self.model},
-            headers=self._headers(),
-            timeout=60,
-        )
-        if resp.status_code == 200:
-            return [item["embedding"] for item in resp.json()["data"]]
-        raise RuntimeError(f"OmniRoute embed ({resp.status_code}): {resp.text}")
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return self._call(texts)
-
-    def embed_query(self, text: str) -> List[float]:
-        return self._call([text])[0]
-
-
-# ── Ollama ───────────────────────────────────────────────────────────────────
+# ── Ollama ────────────────────────────────────────────────────────────────────
 
 class OllamaEmbeddings(Embeddings):
     """LangChain-compatible embeddings via local Ollama /api/embed."""
@@ -121,11 +81,8 @@ _instance: Embeddings = None
 
 
 def get_embedding_service() -> Embeddings:
-    """Return the embedding service selected by AI_MODE."""
+    """Return the singleton OllamaEmbeddings instance."""
     global _instance
     if _instance is None:
-        if _AI_MODE == "ollama":
-            _instance = OllamaEmbeddings()
-        else:
-            _instance = OmniRouteEmbeddings()
+        _instance = OllamaEmbeddings()
     return _instance
