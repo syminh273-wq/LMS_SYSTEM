@@ -14,10 +14,14 @@ urlpatterns = [
     path('<str:uid>/docs/<str:resource_uid>/',
          _classroom.as_view({'delete': 'docs_delete'}),
          name='classroom-docs-delete'),
-    # POST /classrooms/<uid>/ask-stream/  — SSE streaming AI bot
+    # POST /classrooms/<uid>/ask-stream/  — SSE streaming AI bot (supports audio param for STT)
     path('<str:uid>/ask-stream/',
          _classroom.as_view({'post': 'ask_stream'}),
          name='classroom-ask-stream'),
+    # POST /classrooms/<uid>/tts/  — Text-to-Speech, returns MP3
+    path('<str:uid>/tts/',
+         _classroom.as_view({'post': 'tts'}),
+         name='classroom-tts'),
     # Nested member routes: /classrooms/<classroom_uid>/members/
     path('<str:classroom_uid>/members/',
          _member.as_view({'get': 'list'}),

@@ -1,7 +1,7 @@
 import json
 import uuid
 
-from django.http import StreamingHttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -9,6 +9,8 @@ from rest_framework.response import Response
 
 from core.ai.rag.services.rag_pipeline import RAGPipeline
 from core.ai.llm.services.ai_client import AIClient
+from core.ai.stt import WhisperClient
+from core.ai.tts import TTSClient
 from core.ai.tools.tool_executor import LMSToolExecutor
 from core.ai.langchain.tools import build_langchain_tools
 from core.ai.langchain.agent import LMSAgent
@@ -287,8 +289,20 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask-stream')
     def ask_stream(self, request, uid=None):
-        """POST /classrooms/{uid}/ask-stream/ — SSE streaming RAG Q&A."""
-        question = (request.data.get('question') or '').strip()
+        """POST /classrooms/{uid}/ask-stream/ — SSE streaming RAG Q&A.
+
+        Supports optional `audio` file (multipart). If provided, STT transcribes
+        it first and uses the result as `question`.
+        """
+        audio_file = request.FILES.get('audio')
+        if audio_file:
+            try:
+                question = WhisperClient.transcribe_file(audio_file)
+            except Exception as exc:
+                return Response({'error': f'Không thể nhận dạng giọng nói: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            question = (request.data.get('question') or '').strip()
+
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -305,7 +319,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
         def _generate():
             try:
-                yield f'data: {json.dumps({"type": "session_id", "session_id": session_id})}\n\n'
+                yield f'data: {json.dumps({"type": "session_id", "session_id": session_id, "transcript": question}, ensure_ascii=False)}\n\n'
 
                 if mode == 'doc':
                     # Bypass LangChain — direct AIClient call avoids template variable parsing issues
@@ -390,3 +404,17 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         resp['Cache-Control'] = 'no-cache'
         resp['X-Accel-Buffering'] = 'no'
         return resp
+
+    @action(detail=True, methods=['post'], url_path='tts')
+    def tts(self, request, uid=None):
+        """POST /classrooms/{uid}/tts/ — convert text answer to MP3 audio."""
+        text = (request.data.get('text') or '').strip()
+        if not text:
+            return Response({'error': 'text không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            mp3_bytes = TTSClient.synthesize(text)
+        except Exception as exc:
+            return Response({'error': f'TTS thất bại: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return HttpResponse(mp3_bytes, content_type='audio/mpeg')
