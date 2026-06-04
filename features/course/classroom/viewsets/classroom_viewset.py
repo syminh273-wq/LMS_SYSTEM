@@ -1,3 +1,4 @@
+import base64
 import json
 import uuid
 
@@ -318,6 +319,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             filter_meta['section'] = section
 
         def _generate():
+            full_response = []
             try:
                 yield f'data: {json.dumps({"type": "session_id", "session_id": session_id, "transcript": question}, ensure_ascii=False)}\n\n'
 
@@ -325,7 +327,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                     # Bypass LangChain — direct AIClient call avoids template variable parsing issues
                     hits = RAGPipeline().search(question, top_k=3, filter_meta=filter_meta)
                     context = "\n\n---\n\n".join(h["document"] for h in hits) if hits else ""
-                    print(f"[DOC] context={len(context)} chars, hits={len(hits)}")
                     if context:
                         messages = [
                             {
@@ -352,15 +353,12 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                                 "content": "Lớp học chưa có tài liệu nào. Hãy thông báo và gợi ý giáo viên tải tài liệu lên.",
                             },
                         ]
-                    print(f"[DOC] user_msg_len={len(messages[1]['content'])} chars")
-                    full_response = []
                     for chunk in AIClient.chat_stream(messages, timeout=300):
                         if isinstance(chunk, str):
                             full_response.append(chunk)
                             yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
                         elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
                             yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
-                    print(f"[DOC] response={len(full_response)} chunks, preview={''.join(full_response)[:150]!r}")
 
                 elif mode == 'manage':
                     executor = LMSToolExecutor(teacher_id=teacher_id, filter_meta=filter_meta)
@@ -381,6 +379,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                             else:
                                 continue
                         else:
+                            full_response.append(chunk)
                             payload = json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)
                         yield f'data: {payload}\n\n'
 
@@ -391,9 +390,21 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                     ]
                     for chunk in AIClient.chat_stream(messages, timeout=300):
                         if isinstance(chunk, str):
+                            full_response.append(chunk)
                             yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
                         elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
                             yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
+
+                # --- NEW: TTS Support ---
+                full_text = "".join(full_response).strip()
+                if full_text:
+                    try:
+                        import base64
+                        audio_bytes = TTSClient.synthesize(full_text)
+                        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                        yield f'data: {json.dumps({"type": "audio", "audio": audio_b64}, ensure_ascii=False)}\n\n'
+                    except Exception as e:
+                        print(f"[TTS] Error: {e}")
 
             except Exception as exc:
                 yield f'data: {json.dumps({"type": "error", "message": str(exc)}, ensure_ascii=False)}\n\n'
@@ -418,3 +429,50 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             return Response({'error': f'TTS thất bại: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return HttpResponse(mp3_bytes, content_type='audio/mpeg')
+
+    @action(detail=True, methods=['get'], url_path='active-session')
+    def active_session(self, request, uid=None):
+        """GET /classrooms/{uid}/active-session/
+        Automatically continue the most recent session or create a new one.
+        """
+        session_id = _ai_session_service.ensure_session(None, request.user.uid, str(uid))
+        messages = _ai_session_service.get_display_messages(session_id)
+        return Response({
+            'session_id': session_id,
+            'messages': messages
+        })
+
+    @action(detail=True, methods=['post'], url_path='ai-session')
+    def ai_session(self, request, uid=None):
+        """POST /classrooms/{uid}/ai-session/
+        Create new session or clear existing one.
+        """
+        old_sid = (request.data.get('session_id') or '').strip()
+        if old_sid and _ai_session_service.session_exists(old_sid):
+            new_sid = _ai_session_service.clear_session(
+                old_sid, user_id=request.user.uid, classroom_id=str(uid)
+            )
+        else:
+            new_sid = _ai_session_service.create_session(
+                user_id=request.user.uid, classroom_id=str(uid)
+            )
+        return Response({'session_id': new_sid})
+
+    @action(detail=True, methods=['get'], url_path='ai-sessions')
+    def ai_sessions(self, request, uid=None):
+        """GET /classrooms/{uid}/ai-sessions/
+        List all AI sessions for this teacher in this classroom.
+        """
+        sessions = _ai_session_service.list_sessions(
+            user_id=request.user.uid, classroom_id=str(uid)
+        )
+        return Response(sessions)
+
+    @action(detail=True, methods=['get'], url_path='ai-session/history')
+    def ai_session_history(self, request, uid=None):
+        """GET /classrooms/{uid}/ai-session/history/?session_id=xxx"""
+        session_id = (request.query_params.get('session_id') or '').strip()
+        if not session_id or not _ai_session_service.session_exists(session_id):
+            return Response({'error': 'Session không hợp lệ.'}, status=status.HTTP_404_NOT_FOUND)
+        messages = _ai_session_service.get_display_messages(session_id)
+        return Response({'session_id': session_id, 'messages': messages})
