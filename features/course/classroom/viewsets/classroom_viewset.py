@@ -121,7 +121,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                 'action': 'join',
                 'metadata': {'name': classroom.name}
             })
-
+        
         # Lazy load QR
         link_service.get_or_create_qr_code(link)
 
