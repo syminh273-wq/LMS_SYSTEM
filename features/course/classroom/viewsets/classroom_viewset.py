@@ -8,13 +8,6 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from core.ai.rag.services.rag_pipeline import RAGPipeline
-from core.ai.llm.services.ai_client import AIClient
-from core.ai.stt import WhisperClient
-from core.ai.tts import TTSClient
-from core.ai.tools.tool_executor import LMSToolExecutor
-from core.ai.langchain.tools import build_langchain_tools
-from core.ai.langchain.agent import LMSAgent
 from features.ai.services.ai_conversation_session_service import AIConversationSessionService
 
 _ai_session_service = AIConversationSessionService()
@@ -25,7 +18,7 @@ from core.views.mixins import UserScopeMixin
 from features.account.space.models.space import Space
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
-from features.course.classroom.services import Service
+from features.course.classroom.services import Service, ClassroomAIService
 from features.course.classroom.services.classroom_doc_service import ClassroomDocService
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
@@ -265,22 +258,25 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         question = (request.data.get('question') or '').strip()
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
-        section = request.data.get('section') or None
-        top_k = min(int(request.data.get('top_k', 5)), 10)
 
-        teacher_id = str(request.user.uid)
-        classroom_id = str(uid)
-        session_id = (request.data.get('session_id') or '').strip()
-        session_id = _ai_session_service.ensure_session(session_id, teacher_id, classroom_id)
+        ai_service = ClassroomAIService()
+        session_id = ai_service.get_session_id(
+            request.data.get('session_id'), request.user.uid, uid
+        )
 
+        filter_meta = {'classroom_id': str(uid)}
         section = request.data.get('section')
-        filter_meta = {'classroom_id': classroom_id}
         if section:
             filter_meta['section'] = section
 
-        executor = LMSToolExecutor(teacher_id=teacher_id, filter_meta=filter_meta)
-        tools = build_langchain_tools(executor, has_classroom=True)
-        result = LMSAgent(tools, system_prompt=self._CLASSROOM_PROMPT).ask(question, session_id)
+        result = ai_service.ask(
+            question=question,
+            session_id=session_id,
+            user_id=request.user.uid,
+            classroom_id=uid,
+            filter_meta=filter_meta,
+            system_prompt=self._CLASSROOM_PROMPT
+        )
 
         return Response({
             'answer':     result['answer'],
@@ -290,15 +286,14 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask-stream')
     def ask_stream(self, request, uid=None):
-        """POST /classrooms/{uid}/ask-stream/ — SSE streaming RAG Q&A.
+        """POST /classrooms/{uid}/ask-stream/ — SSE streaming RAG Q&A."""
+        ai_service = ClassroomAIService()
 
-        Supports optional `audio` file (multipart). If provided, STT transcribes
-        it first and uses the result as `question`.
-        """
+        # Handle Audio STT
         audio_file = request.FILES.get('audio')
         if audio_file:
             try:
-                question = WhisperClient.transcribe_file(audio_file)
+                question = ai_service.transcribe_audio(audio_file)
             except Exception as exc:
                 return Response({'error': f'Không thể nhận dạng giọng nói: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
         else:
@@ -307,111 +302,24 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
 
-        teacher_id = str(request.user.uid)
-        classroom_id = str(uid)
-        session_id = (request.data.get('session_id') or '').strip()
-        session_id = _ai_session_service.ensure_session(session_id, teacher_id, classroom_id)
+        session_id = ai_service.get_session_id(
+            request.data.get('session_id'), request.user.uid, uid
+        )
 
+        mode = (request.data.get('mode') or 'doc').strip()
         section = request.data.get('section')
-        mode = (request.data.get('mode') or 'doc').strip()  # 'doc' | 'manage' | 'free'
-        filter_meta = {'classroom_id': classroom_id}
-        if section:
-            filter_meta['section'] = section
 
-        def _generate():
-            full_response = []
-            try:
-                yield f'data: {json.dumps({"type": "session_id", "session_id": session_id, "transcript": question}, ensure_ascii=False)}\n\n'
-
-                if mode == 'doc':
-                    # Bypass LangChain — direct AIClient call avoids template variable parsing issues
-                    hits = RAGPipeline().search(question, top_k=3, filter_meta=filter_meta)
-                    context = "\n\n---\n\n".join(h["document"] for h in hits) if hits else ""
-                    if context:
-                        messages = [
-                            {
-                                "role": "system",
-                                "content": (
-                                    "Bạn là AI Trợ giảng. Trả lời câu hỏi DỰA HOÀN TOÀN vào phần TÀI LIỆU được cung cấp. "
-                                    "Nếu tài liệu không có thông tin: chỉ nói 'Tài liệu lớp học không có thông tin về vấn đề này.' "
-                                    "CHỈ trả lời bằng tiếng Việt."
-                                ),
-                            },
-                            {
-                                "role": "user",
-                                "content": f"TÀI LIỆU:\n{context}\n\nCÂU HỎI: {question}",
-                            },
-                        ]
-                    else:
-                        messages = [
-                            {
-                                "role": "system",
-                                "content": "Bạn là AI Trợ giảng. CHỈ trả lời bằng tiếng Việt.",
-                            },
-                            {
-                                "role": "user",
-                                "content": "Lớp học chưa có tài liệu nào. Hãy thông báo và gợi ý giáo viên tải tài liệu lên.",
-                            },
-                        ]
-                    for chunk in AIClient.chat_stream(messages, timeout=300):
-                        if isinstance(chunk, str):
-                            full_response.append(chunk)
-                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
-                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
-                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
-
-                elif mode == 'manage':
-                    executor = LMSToolExecutor(teacher_id=teacher_id, filter_meta=filter_meta)
-                    tools = build_langchain_tools(executor, has_classroom=True, include_search=False)
-                    system_prompt = (
-                        "Bạn là AI quản lý lớp học. Sử dụng các công cụ để truy vấn dữ liệu lớp học "
-                        "(danh sách học sinh, thống kê bài thi, thông tin lớp...).\n"
-                        "Trả lời bằng tiếng Việt, ngắn gọn và chính xác."
-                    )
-                    agent = LMSAgent(tools, system_prompt=system_prompt)
-                    for chunk in agent.ask_stream(question, session_id):
-                        if isinstance(chunk, tuple):
-                            signal, data = chunk
-                            if signal == "__TOOL_CALLS__":
-                                payload = json.dumps({'type': 'tool_calls', 'data': data}, ensure_ascii=False)
-                            elif signal == "__ERROR__":
-                                payload = json.dumps({'type': 'error', 'message': str(data)}, ensure_ascii=False)
-                            else:
-                                continue
-                        else:
-                            full_response.append(chunk)
-                            payload = json.dumps({'type': 'chunk', 'text': chunk}, ensure_ascii=False)
-                        yield f'data: {payload}\n\n'
-
-                else:  # 'free'
-                    messages = [
-                        {"role": "system", "content": "Bạn là trợ lý AI thông minh. Trả lời bằng tiếng Việt, thân thiện và hữu ích."},
-                        {"role": "user",   "content": question},
-                    ]
-                    for chunk in AIClient.chat_stream(messages, timeout=300):
-                        if isinstance(chunk, str):
-                            full_response.append(chunk)
-                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
-                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
-                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
-
-                # --- NEW: TTS Support ---
-                full_text = "".join(full_response).strip()
-                if full_text:
-                    try:
-                        import base64
-                        audio_bytes = TTSClient.synthesize(full_text)
-                        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-                        yield f'data: {json.dumps({"type": "audio", "audio": audio_b64}, ensure_ascii=False)}\n\n'
-                    except Exception as e:
-                        print(f"[TTS] Error: {e}")
-
-            except Exception as exc:
-                yield f'data: {json.dumps({"type": "error", "message": str(exc)}, ensure_ascii=False)}\n\n'
-            finally:
-                yield 'data: [DONE]\n\n'
-
-        resp = StreamingHttpResponse(_generate(), content_type='text/event-stream; charset=utf-8')
+        resp = StreamingHttpResponse(
+            ai_service.ask_stream(
+                question=question,
+                session_id=session_id,
+                user_id=request.user.uid,
+                classroom_id=uid,
+                mode=mode,
+                section=section
+            ),
+            content_type='text/event-stream; charset=utf-8'
+        )
         resp['Cache-Control'] = 'no-cache'
         resp['X-Accel-Buffering'] = 'no'
         return resp
@@ -424,7 +332,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             return Response({'error': 'text không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            mp3_bytes = TTSClient.synthesize(text)
+            mp3_bytes = ClassroomAIService().synthesize_text(text)
         except Exception as exc:
             return Response({'error': f'TTS thất bại: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
