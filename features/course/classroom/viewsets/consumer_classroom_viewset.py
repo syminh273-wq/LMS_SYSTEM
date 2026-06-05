@@ -19,7 +19,7 @@ from features.ai.services.ai_conversation_session_service import AIConversationS
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
-from features.course.classroom.services import Service
+from features.course.classroom.services import Service, ClassroomAIService
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 
 _ai_session_service = AIConversationSessionService()
@@ -37,7 +37,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         classrooms = []
         for uid in uids:
             try:
-                classrooms.append(service.find(str(uid)))
+                classroom = service.find(str(uid))
+                if getattr(classroom, 'status', 'active') == 'private':
+                    continue
+                classrooms.append(classroom)
             except Exception:
                 continue
         paginator = self.pagination_class()
@@ -65,6 +68,11 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             )
 
         instance = Service().find(pk)
+        if getattr(instance, 'status', 'active') == 'private':
+            return Response({'error': 'Lớp học này không khả dụng.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
+        if ClassroomBlacklistService().is_blocked(instance.uid, instance.teacher_id, request.user.uid):
+            return Response({'error': 'Bạn đã bị chặn khỏi lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         return Response(ClassroomResponseSerializer(instance).data)
 
     @action(detail=False, methods=['post'], url_path='join')
@@ -75,9 +83,13 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return Response({'error': 'Mã lớp không được để trống.'}, status=status.HTTP_400_BAD_REQUEST)
 
         from features.course.classroom.repositories import Repository
+        from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
         classroom = Repository().filter(pid=code).first()
-        if not classroom or getattr(classroom, 'is_deleted', False) or classroom.status != 'active':
+        if not classroom or getattr(classroom, 'is_deleted', False) or classroom.status not in ('active',):
             return Response({'error': 'Mã lớp không hợp lệ hoặc lớp không còn hoạt động.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if ClassroomBlacklistService().is_blocked(classroom.uid, classroom.teacher_id, request.user.uid):
+            return Response({'error': 'Bạn đã bị chặn khỏi lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
 
         member = ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
         member_status = getattr(member, 'status', 'pending')
@@ -153,80 +165,45 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask-stream')
     def ask_stream(self, request, pk=None):
-        """POST /api/v1/consumer/course/classrooms/{uid}/ask-stream/"""
+        """POST /api/v1/consumer/course/classrooms/{uid}/ask-stream/ — SSE streaming RAG Q&A."""
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
-        question = (request.data.get('question') or '').strip()
+        
+        ai_service = ClassroomAIService()
+        
+        # Handle Audio STT
+        audio_file = request.FILES.get('audio')
+        if audio_file:
+            try:
+                question = ai_service.transcribe_audio(audio_file)
+            except Exception as exc:
+                return Response({'error': f'Không thể nhận dạng giọng nói: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            question = (request.data.get('question') or '').strip()
+
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
 
         user_id = str(request.user.uid)
         classroom_id = str(pk)
-        session_id = (request.data.get('session_id') or '').strip()
-        session_id = _ai_session_service.ensure_session(session_id, user_id, classroom_id)
+        session_id = ai_service.get_session_id(
+            request.data.get('session_id'), user_id, classroom_id
+        )
 
-        section = request.data.get('section')
         mode = (request.data.get('mode') or 'doc').strip()
-        filter_meta = {'classroom_id': classroom_id}
-        if section:
-            filter_meta['section'] = section
+        section = request.data.get('section')
 
-        def _generate():
-            try:
-                yield f'data: {json.dumps({"type": "session_id", "session_id": session_id})}\n\n'
-
-                if mode == 'doc':
-                    hits = RAGPipeline().search(question, top_k=3, filter_meta=filter_meta)
-                    context = "\n\n---\n\n".join(h["document"] for h in hits) if hits else ""
-                    if context:
-                        messages = [
-                            {
-                                "role": "system",
-                                "content": (
-                                    "Bạn là AI Trợ giảng. Trả lời câu hỏi DỰA HOÀN TOÀN vào phần TÀI LIỆU được cung cấp. "
-                                    "Nếu tài liệu không có thông tin: chỉ nói 'Tài liệu lớp học không có thông tin về vấn đề này.' "
-                                    "CHỈ trả lời bằng tiếng Việt."
-                                ),
-                            },
-                            {
-                                "role": "user",
-                                "content": f"TÀI LIỆU:\n{context}\n\nCÂU HỎI: {question}",
-                            },
-                        ]
-                    else:
-                        messages = [
-                            {
-                                "role": "system",
-                                "content": "Bạn là AI Trợ giảng. CHỈ trả lời bằng tiếng Việt.",
-                            },
-                            {
-                                "role": "user",
-                                "content": "Lớp học chưa có tài liệu nào. Hãy thông báo và gợi ý liên hệ giáo viên.",
-                            },
-                        ]
-                    for chunk in AIClient.chat_stream(messages, timeout=300):
-                        if isinstance(chunk, str):
-                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
-                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
-                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
-
-                else:  # 'free'
-                    messages = [
-                        {"role": "system", "content": "Bạn là trợ lý AI thông minh. Trả lời bằng tiếng Việt, thân thiện và hữu ích."},
-                        {"role": "user",   "content": question},
-                    ]
-                    for chunk in AIClient.chat_stream(messages, timeout=300):
-                        if isinstance(chunk, str):
-                            yield f'data: {json.dumps({"type": "chunk", "text": chunk}, ensure_ascii=False)}\n\n'
-                        elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
-                            yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
-
-            except Exception as exc:
-                yield f'data: {json.dumps({"type": "error", "message": str(exc)}, ensure_ascii=False)}\n\n'
-            finally:
-                yield 'data: [DONE]\n\n'
-
-        resp = StreamingHttpResponse(_generate(), content_type='text/event-stream; charset=utf-8')
+        resp = StreamingHttpResponse(
+            ai_service.ask_stream(
+                question=question,
+                session_id=session_id,
+                user_id=request.user.uid,
+                classroom_id=pk,
+                mode=mode,
+                section=section
+            ),
+            content_type='text/event-stream; charset=utf-8'
+        )
         resp['Cache-Control'] = 'no-cache'
         resp['X-Accel-Buffering'] = 'no'
         return resp

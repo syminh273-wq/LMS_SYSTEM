@@ -8,10 +8,12 @@ from core.ai.tools.tool_executor import LMSToolExecutor
 from core.ai.langchain.tools import build_langchain_tools
 from core.ai.langchain.agent import LMSAgent
 from features.ai.services.ai_conversation_session_service import AIConversationSessionService
+from features.account.user_setting.services.user_setting_service import UserSettingService
 
 class ClassroomAIService:
     def __init__(self):
         self.session_service = AIConversationSessionService()
+        self.setting_service = UserSettingService()
 
     def transcribe_audio(self, audio_file):
         """Transcribe audio file to text using Whisper."""
@@ -19,9 +21,12 @@ class ClassroomAIService:
             return None
         return WhisperClient.transcribe_file(audio_file)
 
-    def synthesize_text(self, text):
-        """Synthesize text to MP3 bytes using TTS."""
-        return TTSClient.synthesize(text)
+    def synthesize_text(self, text, user_id=None):
+        """Synthesize text to MP3 bytes using TTS with user settings."""
+        voice = None
+        if user_id:
+            voice = self.setting_service.get_setting(user_id, 'voice_name')
+        return TTSClient.synthesize(text, voice=voice)
 
     def get_session_id(self, session_id, user_id, classroom_id):
         """Ensure a valid session ID exists."""
@@ -39,10 +44,15 @@ class ClassroomAIService:
         if section:
             filter_meta['section'] = section
 
+        # Get voice settings
+        is_voice_enabled = self.setting_service.get_setting(user_id, 'is_voice_enabled', 'false').lower() == 'true'
+        voice_name = self.setting_service.get_setting(user_id, 'voice_name')
+
         yield f'data: {json.dumps({"type": "session_id", "session_id": session_id, "transcript": question}, ensure_ascii=False)}\n\n'
 
         full_response = []
         try:
+            # ... existing mode handling ...
             if mode == 'doc':
                 for chunk in self._handle_doc_mode(question, filter_meta):
                     if isinstance(chunk, str):
@@ -74,12 +84,13 @@ class ClassroomAIService:
                     elif isinstance(chunk, tuple) and chunk[0] == "__ERROR__":
                         yield f'data: {json.dumps({"type": "error", "message": str(chunk[1])}, ensure_ascii=False)}\n\n'
 
-            # TTS Support
-            full_text = "".join(full_response).strip()
-            if full_text:
-                audio_chunk = self._generate_tts_chunk(full_text)
-                if audio_chunk:
-                    yield audio_chunk
+            # TTS Support - Check if enabled
+            if is_voice_enabled:
+                full_text = "".join(full_response).strip()
+                if full_text:
+                    audio_chunk = self._generate_tts_chunk(full_text, voice=voice_name)
+                    if audio_chunk:
+                        yield audio_chunk
 
         except Exception as exc:
             yield f'data: {json.dumps({"type": "error", "message": str(exc)}, ensure_ascii=False)}\n\n'
@@ -136,9 +147,9 @@ class ClassroomAIService:
         ]
         return AIClient.chat_stream(messages, timeout=300)
 
-    def _generate_tts_chunk(self, text):
+    def _generate_tts_chunk(self, text, voice=None):
         try:
-            audio_bytes = TTSClient.synthesize(text)
+            audio_bytes = TTSClient.synthesize(text, voice=voice)
             audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
             return f'data: {json.dumps({"type": "audio", "audio": audio_b64}, ensure_ascii=False)}\n\n'
         except Exception as e:

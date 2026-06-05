@@ -1,6 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from features.course.classroom.viewsets import ClassroomViewSet, ClassroomMemberViewSet
+from features.course.classroom.viewsets.classroom_blacklist_viewset import (
+    ClassroomBlacklistView,
+    ClassroomBlacklistDetailView,
+)
 
 router = DefaultRouter()
 router.register(r'', ClassroomViewSet, basename='classroom')
@@ -44,4 +48,11 @@ urlpatterns = [
     path('<str:classroom_uid>/members/<str:member_id>/submissions/',
          _member.as_view({'get': 'student_submissions'}),
          name='classroom-members-submissions'),
+    # Blacklist routes: /classrooms/<uid>/blacklist/
+    path('<str:uid>/blacklist/',
+         ClassroomBlacklistView.as_view(),
+         name='classroom-blacklist'),
+    path('<str:uid>/blacklist/<str:consumer_uid>/',
+         ClassroomBlacklistDetailView.as_view(),
+         name='classroom-blacklist-detail'),
 ]

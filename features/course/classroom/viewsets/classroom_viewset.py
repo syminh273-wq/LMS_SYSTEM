@@ -332,7 +332,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             return Response({'error': 'text không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            mp3_bytes = ClassroomAIService().synthesize_text(text)
+            mp3_bytes = ClassroomAIService().synthesize_text(text, user_id=request.user.uid)
         except Exception as exc:
             return Response({'error': f'TTS thất bại: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

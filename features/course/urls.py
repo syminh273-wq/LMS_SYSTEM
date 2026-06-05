@@ -5,6 +5,10 @@ from features.course.classroom.views.teacher_student_views import (
     TeacherStudentDetailView,
     TeacherStudentSearchView,
 )
+from features.course.classroom.viewsets.classroom_blacklist_viewset import (
+    GlobalBlacklistView,
+    GlobalBlacklistDetailView,
+)
 
 urlpatterns = [
     path(
@@ -19,4 +23,7 @@ urlpatterns = [
     path('students/search/', TeacherStudentSearchView.as_view(), name='teacher-students-search'),
     path('students/', TeacherStudentListView.as_view(), name='teacher-students-list'),
     path('students/<str:consumer_uid>/', TeacherStudentDetailView.as_view(), name='teacher-student-detail'),
+    # Global blacklist (teacher-scoped, all classrooms)
+    path('blacklist/', GlobalBlacklistView.as_view(), name='global-blacklist'),
+    path('blacklist/<str:consumer_uid>/', GlobalBlacklistDetailView.as_view(), name='global-blacklist-detail'),
 ]

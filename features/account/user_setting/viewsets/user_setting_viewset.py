@@ -8,53 +8,53 @@ from rest_framework.permissions import IsAuthenticated
 from features.account.space.models.space import Space
 from core.ai.tts.edge_tts_client import TTSClient
 from core.storages.storage_service import storage_service
-from ..services.voice_setting_service import UserVoiceSettingService
-from ..serializers.voice_setting_serializer import (
-    UserVoiceSettingSerializer, 
+from ..services.user_setting_service import UserSettingService
+from ..serializers.user_setting_serializer import (
+    UserSettingSerializer,
+    UserBulkSettingsSerializer,
     AvailableVoiceSerializer,
     PreviewVoiceRequestSerializer
 )
 from ..constants import VoiceNames, UserTypes
 
-class UserVoiceSettingViewSet(viewsets.ViewSet):
+class UserSettingViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
-    service = UserVoiceSettingService()
+    service = UserSettingService()
 
     def _get_user_type(self, user):
         return UserTypes.SPACE if isinstance(user, Space) else UserTypes.CONSUMER
 
     def list(self, request):
-        """Get current user voice settings"""
-        user_type = self._get_user_type(request.user)
-        setting = self.service.get_or_create_default(request.user.uid, user_type)
-        serializer = UserVoiceSettingSerializer(setting)
-        return Response(serializer.data)
+        """Get all current user settings"""
+        settings = self.service.get_all_settings(request.user.uid)
+        return Response(settings)
 
-    def patch(self, request):
-        """Update current user voice settings (root endpoint)"""
+    def create(self, request):
+        """Update/Create multiple settings at once"""
         user_type = self._get_user_type(request.user)
-        serializer = UserVoiceSettingSerializer(data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
+        
+        # Flexibility: support both {"settings": {...}} and {...} directly
+        settings_data = request.data.get('settings')
+        if settings_data is None:
+            # If "settings" key is missing, treat the whole body as settings
+            settings_data = request.data
 
-        setting = self.service.update_settings(
+        if not isinstance(settings_data, dict):
+            return Response(
+                {"error": "Dữ liệu settings phải là một object (dictionary)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        self.service.update_bulk_settings(
             request.user.uid,
             user_type,
-            **serializer.validated_data
+            settings_data
         )
-        return Response(UserVoiceSettingSerializer(setting).data)
+        return Response(self.service.get_all_settings(request.user.uid))
 
-    def partial_update(self, request, pk=None):
-        """Update current user voice settings"""
-        user_type = self._get_user_type(request.user)
-        serializer = UserVoiceSettingSerializer(data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        
-        setting = self.service.update_settings(
-            request.user.uid, 
-            user_type, 
-            **serializer.validated_data
-        )
-        return Response(UserVoiceSettingSerializer(setting).data)
+    def patch(self, request):
+        """Partial update of settings"""
+        return self.create(request)
 
     @action(detail=False, methods=['get'], url_path='available-voices')
     def available_voices(self, request):
@@ -73,12 +73,10 @@ class UserVoiceSettingViewSet(viewsets.ViewSet):
         text = serializer.validated_data['text']
         
         try:
-            # 1. Synthesize
             audio_bytes = TTSClient.synthesize(text, voice=voice_name)
             if not audio_bytes:
                 return Response({"error": "Failed to synthesize audio"}, status=status.HTTP_400_BAD_REQUEST)
                 
-            # 2. Upload to R2 (Public bucket for preview)
             file_name = f"previews/voice_{voice_name}_{uuid.uuid4().hex[:8]}.mp3"
             upload_result = storage_service.upload_fileobj(
                 io.BytesIO(audio_bytes),

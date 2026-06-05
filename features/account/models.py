@@ -1,5 +1,5 @@
 from features.account.consumer.models import Consumer, StudentProfileSettings, TeacherSetting
 from features.account.space.models import Space
-from features.account.voice_setting.models.voice_setting import UserVoiceSetting
+from features.account.user_setting.models.user_setting import UserSetting
 
-__all__ = ['Consumer', 'StudentProfileSettings', 'TeacherSetting', 'Space', 'UserVoiceSetting']
+__all__ = ['Consumer', 'StudentProfileSettings', 'TeacherSetting', 'Space', 'UserSetting']
