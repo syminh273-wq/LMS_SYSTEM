@@ -60,10 +60,14 @@ def _fetch_content(url: str, timeout: int = 30) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 _NDJSON_FORMAT_RULE = (
-    "CRITICAL — output format is NDJSON (one JSON object per line, nothing else):\n"
-    'Line 1: {"title": "...", "description": "..."}\n'
-    'Line 2+: {"question": "...", "options": {"a":"...","b":"...","c":"...","d":"..."}, "correct": "a|b|c|d", "explanation": "..."}\n'
-    "No markdown. No extra whitespace between lines. No wrapper array. Start immediately."
+    "OUTPUT FORMAT RULES (MUST FOLLOW EXACTLY):\n"
+    "- Print ONLY raw JSON lines. Zero prose, zero markdown, zero extra text.\n"
+    "- Line 1 MUST be: {\"title\":\"<quiz title>\",\"description\":\"<one sentence description>\"}\n"
+    "- Each question MUST be: {\"question\":\"<question text>\",\"a\":\"<option A>\",\"b\":\"<option B>\",\"c\":\"<option C>\",\"d\":\"<option D>\",\"correct\":\"<letter a or b or c or d>\",\"explanation\":\"<why the correct answer is right>\"}\n"
+    "- The field \"correct\" MUST contain exactly one lowercase letter: a, b, c, or d.\n"
+    "- The field \"explanation\" MUST explain why the correct answer is correct.\n"
+    "- Each JSON object on ONE line only. No line breaks inside JSON values.\n"
+    "- Start immediately with the title line. Do not write anything before or after."
 )
 
 _SYNC_FORMAT_RULE = (
@@ -77,19 +81,15 @@ _SYNC_FORMAT_RULE = (
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _build_system(persona: str, task_type: str, rules: list, format_rule: str, num_questions: int) -> dict:
-    return {
-        "role": "system",
-        "content": json.dumps({
-            "persona": persona,
-            "language_rule": "Always write in Vietnamese. Even if the document is in English, translate the concepts into natural, accurate Vietnamese for the quiz.",
-            "task": {
-                "type": task_type,
-                "quantity": f"Exactly {num_questions} questions",
-            },
-            "rules": rules,
-            "output_format": format_rule,
-        }, ensure_ascii=False),
-    }
+    rules_text = "\n".join(f"- {r}" for r in rules)
+    content = (
+        f"You are: {persona}\n"
+        f"Language: Vietnamese ONLY. Translate all content to Vietnamese.\n"
+        f"Task: {task_type}. Generate exactly {num_questions} questions.\n"
+        f"Rules:\n{rules_text}\n\n"
+        f"{format_rule}"
+    )
+    return {"role": "system", "content": content}
 
 
 _RULES = {
@@ -159,31 +159,55 @@ def _get_messages(quiz_type: str, content: str, num_questions: int, streaming: b
 
 def _iter_ndjson(chunks):
     """
-    Consume text chunks from the AI stream.
-    Yields parsed dicts as each complete newline-delimited JSON line arrives.
+    Extract complete JSON objects from a text stream using brace-depth tracking.
+    Handles both single-line NDJSON and multi-line JSON objects.
+    Ignores all non-JSON text (extra words, markdown, etc.) between objects.
     """
-    buf = ''
+    obj_buf = ''
+    depth = 0
+    in_string = False
+    escape_next = False
+
     for chunk in chunks:
         if not isinstance(chunk, str):
             continue
-        buf += chunk
-        while '\n' in buf:
-            line, buf = buf.split('\n', 1)
-            line = line.strip()
-            if not line:
+        for char in chunk:
+            if escape_next:
+                escape_next = False
+                if depth > 0:
+                    obj_buf += char
                 continue
-            try:
-                yield json.loads(line)
-            except json.JSONDecodeError:
-                pass   # incomplete line or junk — keep buffering
-
-    # flush remaining buffer (last line with no trailing newline)
-    line = buf.strip()
-    if line:
-        try:
-            yield json.loads(line)
-        except json.JSONDecodeError:
-            pass
+            if char == '\\' and in_string:
+                escape_next = True
+                if depth > 0:
+                    obj_buf += char
+                continue
+            if char == '"':
+                in_string = not in_string
+                if depth > 0:
+                    obj_buf += char
+                continue
+            if in_string:
+                if depth > 0:
+                    obj_buf += char
+                continue
+            # Outside strings
+            if char == '{':
+                depth += 1
+                obj_buf += char
+            elif char == '}':
+                if depth > 0:
+                    depth -= 1
+                    obj_buf += char
+                    if depth == 0:
+                        try:
+                            yield json.loads(obj_buf)
+                        except json.JSONDecodeError:
+                            pass
+                        obj_buf = ''
+            elif depth > 0:
+                obj_buf += char
+            # depth == 0: ignore commas, whitespace, "NDJSON" text, etc.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -218,6 +242,11 @@ class QuizGenerationService:
             raise ValueError("AI did not return valid JSON")
         data = json.loads(clean[start:end + 1])
 
+        for q in data.get('questions', []):
+            if 'options' in q:
+                q['options'] = {k.lower(): v for k, v in q['options'].items()}
+            if 'correct' in q:
+                q['correct'] = q['correct'].lower().strip()
         valid = [
             q for q in data.get('questions', [])
             if all(k in q for k in ('question', 'options', 'correct', 'explanation'))
@@ -266,42 +295,61 @@ class QuizGenerationService:
         def text_only(chunks):
             for chunk in chunks:
                 if isinstance(chunk, tuple):
-                    break   # ('__FULL__', ...) or ('__ERROR__', ...)
+                    break
                 yield chunk
 
         meta_sent = False
         question_index = 0
+        all_objs = list(_iter_ndjson(text_only(raw_chunks)))
 
-        for obj in _iter_ndjson(text_only(raw_chunks)):
-            # First object = quiz metadata
+        for obj in all_objs:
+            # First object = quiz metadata only if it has title but no question key
             if not meta_sent:
-                yield {
-                    "type": "meta",
-                    "title": obj.get("title", "Untitled Quiz"),
-                    "description": obj.get("description", ""),
-                }
-                meta_sent = True
-                continue
+                if 'title' in obj and 'question' not in obj:
+                    yield {
+                        "type": "meta",
+                        "title": obj.get("title", "Untitled Quiz"),
+                        "description": obj.get("description", ""),
+                    }
+                    meta_sent = True
+                    continue
+                else:
+                    # Model skipped metadata — emit default and fall through to process as question
+                    yield {"type": "meta", "title": "Untitled Quiz", "description": ""}
+                    meta_sent = True
+                    # intentionally no continue — process this obj as a question below
 
             # Subsequent objects = questions
             if question_index >= num_questions:
                 break
             q = obj
-            if not all(k in q for k in ('question', 'options', 'correct')):
+            # Normalize: accept nested options OR flat a/b/c/d at top level
+            raw_opts = q.get('options') or {
+                'a': q.get('a', '') or q.get('A', ''),
+                'b': q.get('b', '') or q.get('B', ''),
+                'c': q.get('c', '') or q.get('C', ''),
+                'd': q.get('d', '') or q.get('D', ''),
+            }
+            # Lowercase all option keys (model may return 'A','B','C','D')
+            opts = {k.lower(): v for k, v in raw_opts.items()}
+            question_text = q.get('question') or q.get('q', '')
+            correct = (q.get('correct') or q.get('ans', '') or 'a').lower().strip()
+            if correct not in ('a', 'b', 'c', 'd'):
+                correct = 'a'
+            explanation = q.get('explanation') or q.get('why', '') or ''
+
+            if not question_text:
                 continue
-            opts = q.get('options', {})
-            if not all(k in opts for k in ('a', 'b', 'c', 'd')):
-                continue
-            if q.get('correct') not in ('a', 'b', 'c', 'd'):
+            if not all(opts.get(k) for k in ('a', 'b', 'c', 'd')):
                 continue
 
             yield {
                 "type": "question",
                 "index": question_index,
-                "question": q['question'],
+                "question": question_text,
                 "options": opts,
-                "correct": q['correct'],
-                "explanation": q.get('explanation', ''),
+                "correct": correct,
+                "explanation": explanation,
             }
             question_index += 1
 

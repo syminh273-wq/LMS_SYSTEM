@@ -14,6 +14,9 @@ from features.account.consumer.viewsets.student_profile_viewset import (
     StudentProfileSettingsView,
     PublicStudentProfileView,
 )
+from features.account.consumer.views.consumer_forgot_password_view import ConsumerForgotPasswordView
+from features.account.consumer.views.consumer_verify_otp_view import ConsumerVerifyOTPView
+from features.account.consumer.views.consumer_reset_password_view import ConsumerResetPasswordView
 
 router = DefaultRouter(trailing_slash=True)
 router.register(r'consumers', ViewSet, basename='api_consumers')
@@ -29,4 +32,7 @@ urlpatterns = [
     path('profile/<str:consumer_uid>/public/', PublicStudentProfileView.as_view(), name='profile-public'),
     path('search/', ConsumerSearchAPIView.as_view(), name='consumer-search'),
     path('by-pid/<str:pid>/', ConsumerByPidView.as_view(), name='consumer-by-pid'),
+    path('forgot-password/', ConsumerForgotPasswordView.as_view(), name='consumer-forgot-password'),
+    path('verify-otp/', ConsumerVerifyOTPView.as_view(), name='consumer-verify-otp'),
+    path('reset-password/', ConsumerResetPasswordView.as_view(), name='consumer-reset-password'),
 ]

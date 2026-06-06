@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'core.search_engine',
     'features.social',
     'features.account',
+    'features.account.otp',
     'features.course.classroom',
     'features.course.exam',
     'features.sharing',
