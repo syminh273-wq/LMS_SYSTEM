@@ -11,6 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core.models.social_account import SocialAccount
 from features.account.space.repositories.space_repository import Repository as SpaceRepository
 
+
 class GoogleSpaceOAuthLoginView(APIView):
     authentication_classes = []
     permission_classes = []
@@ -34,8 +35,14 @@ class GoogleSpaceOAuthCallbackView(APIView):
     def get(self, request):
         frontend_url = settings.FRONTEND_SPACE_URL
         code = request.GET.get('code')
+        error_param = request.GET.get('error')
 
-        if request.GET.get('error') or not code:
+        if error_param:
+            # 'interaction_required' / 'login_required' thường đến từ prompt=none khi session Google đã hết
+            safe_error = 'google_auth_failed' if error_param in ('access_denied', 'interaction_required') else 'google_auth_failed'
+            return redirect(f'{frontend_url}/space/login?error={safe_error}')
+
+        if not code:
             return redirect(f'{frontend_url}/space/login?error=google_auth_failed')
 
         token_resp = http_requests.post(settings.GOOGLE_TOKEN_URL, data={
@@ -60,6 +67,8 @@ class GoogleSpaceOAuthCallbackView(APIView):
 
         google_sub = idinfo['sub']
         email = idinfo.get('email', '')
+        full_name = idinfo.get('name', '')
+        logo_url = idinfo.get('picture', '')
 
         repo = SpaceRepository()
 
@@ -67,15 +76,11 @@ class GoogleSpaceOAuthCallbackView(APIView):
             provider='google', provider_id=google_sub
         ).first()
 
-        full_name = idinfo.get('name', '')
-        logo_url = idinfo.get('picture', '')
-
         if social and social.user_type == 'space':
             space = repo.filter(uid=social.user_uid, is_deleted=False).first()
         else:
             space = repo.filter(email=email, is_deleted=False).first()
             if not space:
-                # Tạo space mới qua Google — chưa có password, set sau
                 from django.contrib.auth.hashers import make_password
                 space = repo.create(
                     email=email,

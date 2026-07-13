@@ -10,6 +10,7 @@ from features.account.consumer.views.google_oauth_view import (
     GoogleConsumerOAuthLoginView,
     GoogleConsumerOAuthCallbackView,
 )
+from features.account.consumer.views.consumer_token_refresh_view import ConsumerAccountTokenRefreshView
 from features.account.consumer.viewsets.student_profile_viewset import (
     StudentProfileSettingsView,
     PublicStudentProfileView,
@@ -28,6 +29,7 @@ urlpatterns = [
     path('update-profile/', ConsumerUpdateView.as_view(), name='api_update_profile'),
     path('auth/google/login/', GoogleConsumerOAuthLoginView.as_view(), name='consumer_google_login'),
     path('auth/google/callback/', GoogleConsumerOAuthCallbackView.as_view(), name='consumer_google_callback'),
+    path('token/refresh/', ConsumerAccountTokenRefreshView.as_view(), name='consumer_token_refresh'),
     path('profile-settings/', StudentProfileSettingsView.as_view(), name='profile-settings'),
     path('profile/<str:consumer_uid>/public/', PublicStudentProfileView.as_view(), name='profile-public'),
     path('search/', ConsumerSearchAPIView.as_view(), name='consumer-search'),
