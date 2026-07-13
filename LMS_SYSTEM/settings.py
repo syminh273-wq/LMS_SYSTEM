@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django_filters',
     'django_cassandra_engine',
     'corsheaders',
+    'django_rq',
 
     # Local apps
     'core',
@@ -111,6 +112,35 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
+}
+
+# ── RQ (django-rq) for background quiz generation ────────────────────────────
+REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
+REDIS_PORT = config('REDIS_PORT', default='6379')
+REDIS_PASSWORD = config('REDIS_PASSWORD', default='')
+
+RQ_QUEUES = {
+    'default': {
+        'HOST': REDIS_HOST,
+        'PORT': REDIS_PORT,
+        'DB': 10,
+        'PASSWORD': REDIS_PASSWORD if REDIS_PASSWORD else None,
+        'DEFAULT_TIMEOUT': 300,
+    },
+    'high': {
+        'HOST': REDIS_HOST,
+        'PORT': REDIS_PORT,
+        'DB': 10,
+        'PASSWORD': REDIS_PASSWORD if REDIS_PASSWORD else None,
+        'DEFAULT_TIMEOUT': 300,
+    },
+}
+
+# Avoid SIGSEGV in work-horse subprocesses caused by native libs
+# (lancedb/pyarrow/numpy/firebase) loaded at process start.
+# SimpleWorker runs jobs in the main worker process — no fork.
+RQ = {
+    'WORKER_CLASS': 'rq.worker.SimpleWorker',
 }
 
 TEMPLATES = [

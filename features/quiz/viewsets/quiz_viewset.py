@@ -1,9 +1,12 @@
 import json
+import uuid
 
+import django_rq
 from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rq.job import Job, JobStatus
 
 from core.views.api.base_viewset import BaseModelViewSet
 from features.quiz.serializers.quiz_request_serializer import (
@@ -22,6 +25,11 @@ from features.quiz.serializers.quiz_response_serializer import (
 )
 from features.quiz.services.quiz_service import QuizService
 from features.quiz.services.quiz_generation_service import QuizGenerationService, QUIZ_TYPES, _extract_pdf_text
+from features.quiz.tasks.generate_quiz_task import generate_quiz_task
+from features.quiz.tasks.serializers import (
+    QuizGenerateTaskResponseSerializer,
+    QuizTaskStatusResponseSerializer,
+)
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
@@ -288,3 +296,97 @@ class QuizViewSet(BaseModelViewSet):
     def destroy(self, request, *args, **kwargs):
         self.service.delete_quiz(kwargs['uid'])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── GENERATE TASK  POST /quizzes/generate-task/ ──────────────────────────
+    @action(detail=False, methods=['post'], url_path='generate-task')
+    def generate_task(self, request):
+        req_serializer = QuizGenerateRequestSerializer(data=request.data)
+        req_serializer.is_valid(raise_exception=True)
+        params = req_serializer.validated_data
+
+        resource_id = params.get('resource_id')
+        content = params.get('content')
+        quiz_type = params.get('quiz_type', 'multiple_choice')
+        num_questions = params.get('num_questions', 10)
+        max_content_length = params.get('max_content_length', 12000)
+
+        uploaded_file = request.FILES.get('file')
+        if uploaded_file and not content and not resource_id:
+            try:
+                content = _extract_pdf_text(uploaded_file.read())
+            except Exception as exc:
+                return Response(
+                    {'detail': f'Không thể đọc file PDF: {exc}'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if not content and not resource_id:
+            return Response(
+                {'detail': "Provide 'content', 'resource_id', or upload a 'file'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        resource_url = None
+        if resource_id and not content:
+            from features.resource.repositories.resource_repository import ResourceRepository
+            resource = ResourceRepository().find(resource_id)
+            resource_url = resource.url
+
+        queue = django_rq.get_queue('default')
+        job = queue.enqueue(
+            generate_quiz_task,
+            teacher_uid=str(request.user.uid),
+            content=content,
+            resource_url=resource_url,
+            quiz_type=quiz_type,
+            num_questions=num_questions,
+            max_content_length=max_content_length,
+            job_id=str(uuid.uuid4()),
+            job_timeout=300,
+        )
+
+        data = QuizGenerateTaskResponseSerializer({
+            'task_id': job.id,
+            'status': 'queued',
+        }).data
+        return Response(data, status=status.HTTP_202_ACCEPTED)
+
+    # ── TASK STATUS  GET /quizzes/tasks/<task_id>/ ──────────────────────────
+    @action(detail=False, methods=['get'], url_path=r'tasks/(?P<task_id>[^/.]+)')
+    def task_status(self, request, task_id=None):
+        queue = django_rq.get_queue('default')
+        try:
+            job = Job.fetch(task_id, connection=queue.connection)
+        except Exception:
+            return Response(
+                {'detail': f'Task "{task_id}" not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        rq_status = job.get_status()
+        status_map = {
+            JobStatus.QUEUED: 'queued',
+            JobStatus.STARTED: 'running',
+            JobStatus.FINISHED: 'successful',
+            JobStatus.FAILED: 'failed',
+            JobStatus.DEFERRED: 'queued',
+            JobStatus.SCHEDULED: 'queued',
+            JobStatus.STOPPED: 'failed',
+            JobStatus.CANCELED: 'failed',
+        }
+        mapped = status_map.get(rq_status, 'queued')
+
+        result = None
+        error = None
+        if mapped == 'successful' and job.result is not None:
+            result = job.result
+        if mapped == 'failed':
+            error = job.exc_info or 'Task failed without exception info.'
+
+        data = QuizTaskStatusResponseSerializer({
+            'task_id': task_id,
+            'status': mapped,
+            'result': result,
+            'error': error,
+        }).data
+        return Response(data)

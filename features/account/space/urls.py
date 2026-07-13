@@ -7,6 +7,7 @@ from features.account.space.views.google_oauth_view import (
     GoogleSpaceOAuthLoginView,
     GoogleSpaceOAuthCallbackView,
 )
+from features.account.space.views.space_token_refresh_view import SpaceAccountTokenRefreshView
 from features.account.consumer.views.teacher_settings_view import TeacherSettingsView
 from features.account.space.views.space_forgot_password_view import SpaceForgotPasswordView
 from features.account.space.views.space_verify_otp_view import SpaceVerifyOTPView
@@ -22,6 +23,7 @@ urlpatterns = [
     path('login/', SpaceLoginView.as_view(), name='space_login'),
     path('auth/google/login/', GoogleSpaceOAuthLoginView.as_view(), name='space_google_login'),
     path('auth/google/callback/', GoogleSpaceOAuthCallbackView.as_view(), name='space_google_callback'),
+    path('token/refresh/', SpaceAccountTokenRefreshView.as_view(), name='space_token_refresh'),
     path('settings/', TeacherSettingsView.as_view(), name='teacher_settings'),
     path('forgot-password/', SpaceForgotPasswordView.as_view(), name='space-forgot-password'),
     path('verify-otp/', SpaceVerifyOTPView.as_view(), name='space-verify-otp'),
