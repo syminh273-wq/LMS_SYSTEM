@@ -114,6 +114,9 @@ python manage.py runserver
 
 # 7. View all registered API endpoints
 python manage.py show_urls
+
+# 8. Start the RQ worker (for background jobs / queues)
+python manage.py rqworker default
 ```
 
 ---

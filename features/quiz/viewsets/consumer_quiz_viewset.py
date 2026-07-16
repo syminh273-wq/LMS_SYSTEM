@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,6 +12,8 @@ from features.quiz.serializers.quiz_response_serializer import (
     QuizAttemptResponseSerializer,
 )
 from features.quiz.services.quiz_service import QuizService
+
+logger = logging.getLogger(__name__)
 
 
 class ConsumerQuizViewSet(ViewSet):
@@ -119,7 +123,7 @@ class ConsumerQuizViewSet(ViewSet):
             attempt_number=attempt_number,
             score=correct_count,
             total_questions=total,
-            score_pct=int(score_pct),
+            score_pct=round(score_pct),
             time_taken_seconds=time_taken_seconds,
             answers={str(k): str(v) for k, v in answers.items()},
         )
@@ -145,20 +149,26 @@ class ConsumerQuizViewSet(ViewSet):
                         )
                     except ValueError:
                         pass  # already submitted or other domain error — don't break quiz response
-        except Exception:
-            pass  # never break the quiz game response due to exam linkage
+        except Exception as exc:
+            logger.warning(
+                f"[Exam] Exam-linkage side-effect failed for quiz={pk} classroom={classroom_id}: {exc}"
+            )
 
         # If the just-submitted quiz completes a QuizCollection for this student
         # in this classroom, auto-issue the collection's certificate (idempotent).
+        newly_issued_certs = []
         try:
             from features.quiz_collection.services import CertificateIssuanceService
-            CertificateIssuanceService().check_and_issue(
+            newly_issued_certs = CertificateIssuanceService().check_and_issue(
                 student_id=request.user.uid,
                 classroom_id=classroom_id,
                 just_submitted_quiz_id=pk,
             )
-        except Exception:
-            pass  # never break the quiz game response due to certificate issuance
+        except Exception as exc:
+            logger.exception(
+                f"[Certificate] check_and_issue failed student={request.user.uid} "
+                f"quiz={pk} classroom={classroom_id}: {exc}"
+            )
 
         max_attempts = (assignment.max_attempts or 0) if assignment else 0
         attempts_remaining = (max_attempts - attempt_number) if max_attempts > 0 else None
@@ -168,6 +178,24 @@ class ConsumerQuizViewSet(ViewSet):
             for r in results:
                 r.pop('explanation', None)
                 r.pop('correct_answer', None)
+
+        certificate_issued_payload = []
+        if newly_issued_certs:
+            try:
+                from features.quiz_collection.services import CertificateIssuanceService
+                from features.quiz_collection.serializers.issued_certificate_response_serializer import (
+                    IssuedCertificateResponseSerializer,
+                )
+                enriched = CertificateIssuanceService().enrich_issued_certificates(
+                    newly_issued_certs
+                )
+                certificate_issued_payload = IssuedCertificateResponseSerializer(
+                    enriched, many=True
+                ).data
+            except Exception as exc:
+                logger.exception(
+                    f"[Certificate] Failed to enrich/serialize newly issued certs: {exc}"
+                )
 
         return Response({
             'total': total,
@@ -180,4 +208,5 @@ class ConsumerQuizViewSet(ViewSet):
             'attempts_remaining': attempts_remaining,
             'results': results,
             'show_explanation': show_exp,
+            'certificate_issued': certificate_issued_payload,
         })

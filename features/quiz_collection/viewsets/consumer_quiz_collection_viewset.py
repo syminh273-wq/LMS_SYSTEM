@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, NotFound
@@ -17,6 +19,8 @@ from features.quiz_collection.services import (
     CertificateIssuanceService,
 )
 from features.quiz_collection.repositories import IssuedCertificateRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ConsumerQuizCollectionViewSet(ViewSet):
@@ -64,14 +68,36 @@ class ConsumerQuizCollectionViewSet(ViewSet):
             return Response({'detail': 'classroom_id is required.'}, status=400)
         if not self.service.assignment_repo.find_assignment(pk, classroom_id):
             raise NotFound('Collection not assigned to this classroom.')
+
         issued = self.issued_repo.find_for_collection_classroom_student(
             pk, classroom_id, request.user.uid
         )
+
+        if not issued:
+            try:
+                self.issuance_service.check_and_issue(
+                    student_id=request.user.uid,
+                    classroom_id=classroom_id,
+                    just_submitted_quiz_id=None,
+                )
+            except Exception as exc:
+                logger.exception(
+                    f"[Certificate] Lazy issuance via certificate endpoint failed "
+                    f"student={request.user.uid} collection={pk} classroom={classroom_id}: {exc}"
+                )
+
+            issued = self.issued_repo.find_for_collection_classroom_student(
+                pk, classroom_id, request.user.uid
+            )
+
         if not issued:
             raise NotFound('No certificate has been issued yet.')
-        return Response(IssuedCertificateResponseSerializer(issued).data)
+
+        enriched = self.issuance_service.enrich_issued_certificate(issued)
+        return Response(IssuedCertificateResponseSerializer(enriched).data)
 
     @action(detail=False, methods=['get'], url_path='my-certificates')
     def my_certificates(self, request):
         certs = self.issued_repo.get_by_student(request.user.uid)
-        return Response(IssuedCertificateResponseSerializer(certs, many=True).data)
+        enriched = self.issuance_service.enrich_issued_certificates(certs)
+        return Response(IssuedCertificateResponseSerializer(enriched, many=True).data)
