@@ -18,17 +18,31 @@ _CHAT_URL           = f"{_BASE_URL}/api/chat"
 _EMBED_URL          = f"{_BASE_URL}/api/embed"
 
 _DEFAULT_MODEL        = config("OLLAMA_MODEL",        default="qwen2.5:3b")
-_DEFAULT_TOOL_MODEL   = config("OLLAMA_TOOL_MODEL",   default="qwen2.5:3b")  # must support tool calling
+_DEFAULT_FALLBACK_MODELS = [
+    m.strip() for m in config(
+        "OLLAMA_FALLBACK_MODELS",
+        default="qwen2.5:7b,qwen2.5:14b,llama3.1:8b,mistral:7b",
+    ).split(",") if m.strip()
+]
+_DEFAULT_TOOL_MODEL   = config("OLLAMA_TOOL_MODEL",   default="qwen2.5:3b")
 _DEFAULT_EMBED_MODEL  = config("OLLAMA_EMBED_MODEL",  default="nomic-embed-text")
 _DEFAULT_VISION_MODEL = config("OLLAMA_VISION_MODEL", default="llava")
+
+
+def _build_text_model_chain() -> List[str]:
+    chain = [_DEFAULT_MODEL]
+    for m in _DEFAULT_FALLBACK_MODELS:
+        if m and m != _DEFAULT_MODEL and m not in chain:
+            chain.append(m)
+    return chain
 
 
 class OllamaClient:
     """Stateless Ollama client."""
 
-    TEXT_MODELS: List[str]      = [_DEFAULT_MODEL]
+    TEXT_MODELS: List[str]      = _build_text_model_chain()
     VISION_MODELS: List[str]    = [_DEFAULT_VISION_MODEL]
-    TEXT_ID_MODELS: List[str]   = [_DEFAULT_MODEL]
+    TEXT_ID_MODELS: List[str]   = _build_text_model_chain()
     VISION_ID_MODELS: List[str] = [_DEFAULT_VISION_MODEL]
     EMBED_MODEL: str            = _DEFAULT_EMBED_MODEL
 
@@ -59,6 +73,49 @@ class OllamaClient:
                     if content:
                         print(f"[Ollama] sync OK — {model}")
                         return content.strip()
+                last_error = f"{model} → HTTP {resp.status_code}: {resp.text[:200]}"
+            except Exception as exc:
+                last_error = f"{model} → {exc}"
+                print(f"[Ollama] {last_error}")
+
+        raise RuntimeError(f"All models failed. Last: {last_error}")
+
+    @classmethod
+    def chat_sync_with_fallback(
+        cls,
+        messages: List[dict],
+        validator=None,
+        models: List[str] = None,
+        timeout: int = 120,
+    ) -> str:
+        """
+        Like chat_sync but if `validator(raw_text)` returns False,
+        retry with the next model in the chain. Stops as soon as one
+        model returns content that passes the validator.
+        """
+        if models is None:
+            models = cls.TEXT_MODELS
+
+        last_error = ""
+        for idx, model in enumerate(models):
+            try:
+                print(f"[Ollama] sync_fb → {model} ({idx + 1}/{len(models)})")
+                resp = requests.post(
+                    _CHAT_URL,
+                    json={"model": model, "messages": messages, "stream": False,
+                          "options": {"temperature": 0, "num_ctx": 8192}},
+                    timeout=timeout,
+                )
+                if resp.status_code == 200:
+                    content = resp.json().get("message", {}).get("content", "")
+                    if content:
+                        content = content.strip()
+                        if validator is None or validator(content):
+                            print(f"[Ollama] sync_fb OK — {model}")
+                            return content
+                        print(f"[Ollama] sync_fb {model} failed validator, trying next")
+                        last_error = f"{model} → validator rejected output"
+                        continue
                 last_error = f"{model} → HTTP {resp.status_code}: {resp.text[:200]}"
             except Exception as exc:
                 last_error = f"{model} → {exc}"

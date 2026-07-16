@@ -35,6 +35,18 @@ class AIClient:
         return _Backend.chat_sync(messages, models=models, timeout=timeout)
 
     @classmethod
+    def chat_sync_with_fallback(
+        cls,
+        messages: List[dict],
+        validator=None,
+        models: List[str] = None,
+        timeout: int = 120,
+    ) -> str:
+        return _Backend.chat_sync_with_fallback(
+            messages, validator=validator, models=models, timeout=timeout
+        )
+
+    @classmethod
     def chat_stream(
         cls,
         messages: List[dict],

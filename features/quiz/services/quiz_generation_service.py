@@ -10,6 +10,7 @@ PDF URLs are extracted properly using pypdf — not treated as raw text.
 """
 import io
 import json
+import logging
 import os
 import re
 import tempfile
@@ -17,6 +18,8 @@ import tempfile
 import requests
 
 from core.ai.llm.services.ai_client import AIClient
+
+logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PDF text extraction
@@ -219,6 +222,142 @@ class QuizGenerationService:
     # ── Sync (legacy) ────────────────────────────────────────────────────────
 
     @classmethod
+    def _normalize_correct(cls, raw) -> str:
+        """Normalize any answer-letter shape to 'a'/'b'/'c'/'d'."""
+        if raw is None:
+            return 'a'
+        s = str(raw).strip().lower()
+        mapping = {
+            'a': 'a', '1': 'a', '①': 'a',
+            'b': 'b', '2': 'b', '②': 'b',
+            'c': 'c', '3': 'c', '③': 'c',
+            'd': 'd', '4': 'd', '④': 'd',
+        }
+        return mapping.get(s, s[:1] if s[:1] in 'abcd' else 'a')
+
+    @classmethod
+    def _looks_like_questions_json(cls, raw: str) -> bool:
+        """Cheap pre-check: does the raw text contain a plausible questions array?"""
+        if not raw:
+            return False
+        low = raw.lower()
+        has_q = '"question"' in low or '"q"' in low
+        has_correct = '"correct"' in low or '"answer"' in low or '"ans"' in low
+        return has_q and has_correct
+
+    @classmethod
+    def _parse_quiz_payload(cls, raw: str, num_questions: int) -> dict:
+        """
+        Parse AI raw text into a normalized quiz dict.
+        Tolerant: strips code fences, finds first '{' and last '}', normalizes options.
+        Also handles NDJSON output (one JSON object per line) — common with
+        small local models (qwen2.5:3b) that ignore the "single object" rule.
+        Returns dict with at least {'title': str, 'description': str, 'questions': list}.
+        Raises ValueError if no usable questions can be extracted.
+        """
+        if not raw or not raw.strip():
+            raise ValueError("Empty AI response")
+
+        clean = re.sub(r'```(?:json)?', '', raw).strip().strip('`').strip()
+        start, end = clean.find('{'), clean.rfind('}')
+        if start == -1 or end == -1 or end <= start:
+            raise ValueError("AI did not return valid JSON (no braces found)")
+
+        # Try strict JSON first
+        data = None
+        try:
+            data = json.loads(clean[start:end + 1])
+        except json.JSONDecodeError:
+            # Fallback: try NDJSON (one object per line) — small models often emit this
+            objs = []
+            for line in clean.splitlines():
+                line = line.strip().rstrip(',')
+                if not line or not line.startswith('{'):
+                    continue
+                try:
+                    objs.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+            if objs:
+                title_obj = next((o for o in objs if 'title' in o and 'question' not in o), None)
+                question_objs = [o for o in objs if 'question' in o or 'q' in o]
+                if not question_objs and not title_obj:
+                    question_objs = objs
+                data = {
+                    'title': (title_obj or {}).get('title', 'Untitled Quiz'),
+                    'description': (title_obj or {}).get('description', ''),
+                    'questions': question_objs,
+                }
+
+        if data is None:
+            raise ValueError("AI returned invalid JSON")
+
+        if not isinstance(data, dict):
+            raise ValueError("AI JSON root is not an object")
+
+        title = (data.get('title') or '').strip() or 'Untitled Quiz'
+        description = (data.get('description') or '').strip()
+
+        raw_questions = data.get('questions') or data.get('items') or []
+        if not isinstance(raw_questions, list):
+            # Model may emit questions as a JSON string or single dict
+            if isinstance(raw_questions, str):
+                try:
+                    raw_questions = json.loads(raw_questions)
+                except json.JSONDecodeError:
+                    raw_questions = []
+            elif isinstance(raw_questions, dict):
+                raw_questions = [raw_questions]
+            else:
+                raw_questions = []
+
+        valid = []
+        for q in raw_questions:
+            if not isinstance(q, dict):
+                continue
+
+            # Normalize options: accept nested dict OR flat a/b/c/d
+            opts_raw = q.get('options')
+            if isinstance(opts_raw, dict):
+                opts = {str(k).lower(): str(v) for k, v in opts_raw.items() if v}
+            else:
+                opts = {}
+                for letter in ('a', 'b', 'c', 'd'):
+                    v = q.get(letter) or q.get(letter.upper())
+                    if v:
+                        opts[letter] = str(v)
+            opts = {k: v for k, v in opts.items() if k in ('a', 'b', 'c', 'd') and v}
+
+            if not all(k in opts for k in ('a', 'b', 'c', 'd')):
+                continue
+
+            question_text = (q.get('question') or q.get('q') or '').strip()
+            if not question_text:
+                continue
+
+            correct_raw = q.get('correct') or q.get('answer') or q.get('ans')
+            correct = cls._normalize_correct(correct_raw)
+            if correct not in ('a', 'b', 'c', 'd'):
+                correct = 'a'
+
+            explanation = (q.get('explanation') or q.get('why') or '').strip()
+
+            valid.append({
+                'question': question_text,
+                'options': {'a': opts['a'], 'b': opts['b'], 'c': opts['c'], 'd': opts['d']},
+                'correct': correct,
+                'explanation': explanation,
+            })
+
+            if len(valid) >= num_questions:
+                break
+
+        if not valid:
+            raise ValueError("AI returned no valid questions")
+
+        return {'title': title, 'description': description, 'questions': valid}
+
+    @classmethod
     def generate(
         cls,
         content: str = None,
@@ -234,29 +373,30 @@ class QuizGenerationService:
         content = content[:max_content_length]
 
         messages = _get_messages(quiz_type, content, num_questions, streaming=False)
-        raw = AIClient.chat_sync(messages, models=AIClient.TEXT_MODELS, timeout=90)
 
-        clean = re.sub(r'```(?:json)?', '', raw).strip().strip('`').strip()
-        start, end = clean.find('{'), clean.rfind('}')
-        if start == -1:
-            raise ValueError("AI did not return valid JSON")
-        data = json.loads(clean[start:end + 1])
+        def validator(raw: str) -> bool:
+            try:
+                parsed = cls._parse_quiz_payload(raw, num_questions)
+                return len(parsed['questions']) > 0
+            except ValueError:
+                return False
 
-        for q in data.get('questions', []):
-            if 'options' in q:
-                q['options'] = {k.lower(): v for k, v in q['options'].items()}
-            if 'correct' in q:
-                q['correct'] = q['correct'].lower().strip()
-        valid = [
-            q for q in data.get('questions', [])
-            if all(k in q for k in ('question', 'options', 'correct', 'explanation'))
-            and all(k in q['options'] for k in ('a', 'b', 'c', 'd'))
-            and q['correct'] in ('a', 'b', 'c', 'd')
-        ]
-        data['questions'] = valid[:num_questions]
-        if not data['questions']:
-            raise ValueError("AI returned no valid questions")
-        return data
+        try:
+            raw = AIClient.chat_sync_with_fallback(
+                messages,
+                validator=validator,
+                models=AIClient.TEXT_MODELS,
+                timeout=90,
+            )
+        except RuntimeError as exc:
+            logger.error("[QuizGen] All models failed: %s", exc)
+            raise
+
+        try:
+            return cls._parse_quiz_payload(raw, num_questions)
+        except ValueError:
+            logger.error("[QuizGen] Final parse failed. Raw AI output:\n%s", raw)
+            raise
 
     # ── Streaming ─────────────────────────────────────────────────────────────
 
@@ -330,12 +470,9 @@ class QuizGenerationService:
                 'c': q.get('c', '') or q.get('C', ''),
                 'd': q.get('d', '') or q.get('D', ''),
             }
-            # Lowercase all option keys (model may return 'A','B','C','D')
-            opts = {k.lower(): v for k, v in raw_opts.items()}
-            question_text = q.get('question') or q.get('q', '')
-            correct = (q.get('correct') or q.get('ans', '') or 'a').lower().strip()
-            if correct not in ('a', 'b', 'c', 'd'):
-                correct = 'a'
+            opts = {k.lower(): v for k, v in raw_opts.items() if v}
+            question_text = (q.get('question') or q.get('q', '') or '').strip()
+            correct = cls._normalize_correct(q.get('correct') or q.get('ans'))
             explanation = q.get('explanation') or q.get('why', '') or ''
 
             if not question_text:

@@ -344,6 +344,16 @@ class QuizViewSet(BaseModelViewSet):
             job_id=str(uuid.uuid4()),
             job_timeout=300,
         )
+        job.meta['teacher_uid'] = str(request.user.uid)
+        job.meta['kind'] = 'generate'
+        job.meta['title'] = params.get('title') or 'Tạo Quiz bằng AI'
+        job.meta['total_steps'] = num_questions
+        job.meta['current_step'] = 0
+        job.meta['progress'] = 0
+        job.meta['quiz_uid'] = None
+        job.meta['error_message'] = None
+        job.meta['created_at'] = job.enqueued_at.isoformat() if job.enqueued_at else None
+        job.save_meta()
 
         data = QuizGenerateTaskResponseSerializer({
             'task_id': job.id,
@@ -352,6 +362,68 @@ class QuizViewSet(BaseModelViewSet):
         return Response(data, status=status.HTTP_202_ACCEPTED)
 
     # ── TASK STATUS  GET /quizzes/tasks/<task_id>/ ──────────────────────────
+    RQ_STATUS_MAP = {
+        JobStatus.QUEUED: 'queued',
+        JobStatus.STARTED: 'running',
+        JobStatus.FINISHED: 'successful',
+        JobStatus.FAILED: 'failed',
+        JobStatus.DEFERRED: 'queued',
+        JobStatus.SCHEDULED: 'queued',
+        JobStatus.STOPPED: 'failed',
+        JobStatus.CANCELED: 'failed',
+    }
+
+    def _build_task_item(self, job):
+        from features.quiz.tasks.serializers import QuizTaskListItemSerializer
+        meta = job.meta or {}
+        rq_status = job.get_status()
+        mapped = self.RQ_STATUS_MAP.get(rq_status, 'queued')
+        frontend_status = 'completed' if mapped == 'successful' else mapped
+
+        quiz_uid = meta.get('quiz_uid')
+        error_message = meta.get('error_message')
+
+        if frontend_status == 'completed' and not quiz_uid:
+            result = job.result
+            if isinstance(result, dict):
+                quiz_uid = result.get('quiz_uid') or quiz_uid
+
+        if frontend_status == 'failed' and not error_message:
+            exc = job.exc_info
+            if exc:
+                lines = [l.strip() for l in exc.strip().splitlines() if l.strip()]
+                error_message = lines[-1] if lines else 'Task failed without exception info.'
+            else:
+                error_message = 'Task failed without exception info.'
+
+        if frontend_status == 'completed':
+            progress = 100
+            current_step = meta.get('total_steps') or 0
+        elif frontend_status == 'failed':
+            progress = meta.get('progress') or 0
+            current_step = meta.get('current_step') or 0
+        else:
+            progress = meta.get('progress') or 0
+            current_step = meta.get('current_step') or 0
+
+        enqueued = job.enqueued_at
+        started = job.started_at
+        ended = job.ended_at
+        return QuizTaskListItemSerializer({
+            'id': job.id,
+            'kind': meta.get('kind') or 'generate',
+            'title': meta.get('title') or 'Tạo Quiz bằng AI',
+            'status': frontend_status,
+            'progress': progress,
+            'current_step': current_step,
+            'total_steps': meta.get('total_steps') or 0,
+            'quiz_uid': quiz_uid,
+            'error_message': error_message,
+            'created_at': meta.get('created_at') or (enqueued.isoformat() if enqueued else ''),
+            'updated_at': (ended or started or enqueued).isoformat() if (ended or started or enqueued) else '',
+            'completed_at': ended.isoformat() if (ended and frontend_status in ('completed', 'failed')) else None,
+        }).data
+
     @action(detail=False, methods=['get'], url_path=r'tasks/(?P<task_id>[^/.]+)')
     def task_status(self, request, task_id=None):
         queue = django_rq.get_queue('default')
@@ -363,18 +435,7 @@ class QuizViewSet(BaseModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        rq_status = job.get_status()
-        status_map = {
-            JobStatus.QUEUED: 'queued',
-            JobStatus.STARTED: 'running',
-            JobStatus.FINISHED: 'successful',
-            JobStatus.FAILED: 'failed',
-            JobStatus.DEFERRED: 'queued',
-            JobStatus.SCHEDULED: 'queued',
-            JobStatus.STOPPED: 'failed',
-            JobStatus.CANCELED: 'failed',
-        }
-        mapped = status_map.get(rq_status, 'queued')
+        mapped = self.RQ_STATUS_MAP.get(job.get_status(), 'queued')
 
         result = None
         error = None
@@ -390,3 +451,52 @@ class QuizViewSet(BaseModelViewSet):
             'error': error,
         }).data
         return Response(data)
+
+    # ── LIST TASKS  GET /quizzes/tasks/ ──────────────────────────────────────
+    @action(detail=False, methods=['get'], url_path='tasks')
+    def list_tasks(self, request):
+        queue = django_rq.get_queue('default')
+        teacher_uid = str(request.user.uid)
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            status_filter = {s.strip() for s in status_filter.split(',') if s.strip()}
+
+        job_ids = list(queue.job_ids)
+        started_registry = queue.started_job_registry
+        finished_registry = queue.finished_job_registry
+        failed_registry = queue.failed_job_registry
+        deferred_registry = queue.deferred_job_registry
+        scheduled_registry = queue.scheduled_job_registry
+        canceled_registry = queue.canceled_job_registry
+
+        all_ids = set(job_ids)
+        for reg in (started_registry, finished_registry, failed_registry,
+                    deferred_registry, scheduled_registry, canceled_registry):
+            try:
+                all_ids.update(reg.get_job_ids())
+            except Exception:
+                continue
+
+        items = []
+        for jid in all_ids:
+            try:
+                job = Job.fetch(jid, connection=queue.connection)
+            except Exception:
+                continue
+            meta = job.meta or {}
+
+            owner_uid = meta.get('teacher_uid')
+            if not owner_uid:
+                args = job.args or ()
+                if args and isinstance(args[0], str) and len(args[0]) >= 8:
+                    owner_uid = args[0]
+            if owner_uid != teacher_uid:
+                continue
+
+            item = self._build_task_item(job)
+            if status_filter and item['status'] not in status_filter:
+                continue
+            items.append(item)
+
+        items.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+        return Response(items)
