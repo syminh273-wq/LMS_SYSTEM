@@ -35,6 +35,7 @@ class CertificateViewSet(ViewSet):
             name=d['name'],
             description=d.get('description', ''),
             template_url=d.get('template_url'),
+            template_image=request.FILES.get('template_image'),
         )
         return Response(
             CertificateResponseSerializer(cert).data,
@@ -47,7 +48,14 @@ class CertificateViewSet(ViewSet):
             raise PermissionDenied('You do not have permission to update this certificate.')
         serializer = CertificateUpdateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        updated = self.service.update(cert, **serializer.validated_data)
+        data = dict(serializer.validated_data)
+        if 'template_url' in data and data['template_url'] == '':
+            data['template_url'] = None
+        updated = self.service.update(
+            cert,
+            template_image=request.FILES.get('template_image'),
+            **data,
+        )
         return Response(CertificateResponseSerializer(updated).data)
 
     def destroy(self, request, pk=None):
