@@ -148,6 +148,18 @@ class ConsumerQuizViewSet(ViewSet):
         except Exception:
             pass  # never break the quiz game response due to exam linkage
 
+        # If the just-submitted quiz completes a QuizCollection for this student
+        # in this classroom, auto-issue the collection's certificate (idempotent).
+        try:
+            from features.quiz_collection.services import CertificateIssuanceService
+            CertificateIssuanceService().check_and_issue(
+                student_id=request.user.uid,
+                classroom_id=classroom_id,
+                just_submitted_quiz_id=pk,
+            )
+        except Exception:
+            pass  # never break the quiz game response due to certificate issuance
+
         max_attempts = (assignment.max_attempts or 0) if assignment else 0
         attempts_remaining = (max_attempts - attempt_number) if max_attempts > 0 else None
 

@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'features.calendar',
     'features.payment',
     'features.face',
+    'features.quiz_collection',
 ]
 
 REST_FRAMEWORK = {
