@@ -21,7 +21,7 @@ urlpatterns = [
     path('api/v1/space/quiz-collection/', include('features.quiz_collection.urls')),
     path('api/v1/consumer/quiz-collection/', include('features.quiz_collection.consumer_urls')),
     path('api/v1/space/certificate/', include('features.quiz_collection.certificate_urls')),
-    path('api/v1/notification/', include('features.notification.urls')),
+    path('api/v1/notifications/', include('features.notification.urls')),
     path('api/v1/space/calendar/', include('features.calendar.urls')),
     path('api/v1/consumer/calendar/', include('features.calendar.consumer_urls')),
     path('api/v1/consumer/payment/', include('features.payment.urls')),

@@ -68,6 +68,23 @@ class ClassroomMemberService:
         # Realtime Firebase event → student frontend
         self._push_membership_event(member_id, classroom_uid, classroom.name, 'approved')
 
+        # Persistent notification for student (bell icon + history)
+        try:
+            from features.notification.services.notification_service import NotificationService
+            NotificationService().send_notification(
+                target_uid=member_id,
+                notify_type='classroom_approved',
+                title='Yêu cầu được chấp nhận',
+                content=f'Bạn đã được duyệt vào lớp "{classroom.name}"',
+                metadata={
+                    'classroom_uid': str(classroom.uid),
+                    'classroom_name': classroom.name,
+                    'status': 'approved',
+                },
+            )
+        except Exception as e:
+            logger.warning(f"[ClassroomMember] Failed to send approval notification: {e}")
+
         return member
 
     def reject(self, classroom_uid, member_id, rejected_by_id):
@@ -78,6 +95,22 @@ class ClassroomMemberService:
             raise PermissionDenied("Chỉ giáo viên mới có thể từ chối thành viên.")
         self.leave(classroom_uid, member_id)
         self._push_membership_event(member_id, classroom_uid, classroom.name, 'rejected')
+
+        try:
+            from features.notification.services.notification_service import NotificationService
+            NotificationService().send_notification(
+                target_uid=member_id,
+                notify_type='classroom_rejected',
+                title='Yêu cầu bị từ chối',
+                content=f'Yêu cầu tham gia lớp "{classroom.name}" đã bị từ chối',
+                metadata={
+                    'classroom_uid': str(classroom.uid),
+                    'classroom_name': classroom.name,
+                    'status': 'rejected',
+                },
+            )
+        except Exception as e:
+            logger.warning(f"[ClassroomMember] Failed to send rejection notification: {e}")
 
     def get_pending_members(self, classroom_uid):
         return list(self.repo.get_pending_members(classroom_uid))

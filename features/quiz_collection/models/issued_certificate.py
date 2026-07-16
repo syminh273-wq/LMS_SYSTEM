@@ -1,12 +1,12 @@
 from datetime import datetime
 
 from cassandra.cqlengine import columns
-from django_cassandra_engine.models import DjangoCassandraModel
 
+from core.models.cassandra import BaseTimeStampModel
 from core.utils.uuid import uuid7
 
 
-class IssuedCertificate(DjangoCassandraModel):
+class IssuedCertificate(BaseTimeStampModel):
     """
     A certificate actually issued to a student after completing a collection
     inside a specific classroom. One row per (collection, classroom, student).
