@@ -86,6 +86,56 @@ def main():
                 print(f"  ! {col}: {exc}")
                 raise
 
+    # 3) Create resource_doc_reading_progress
+    print("Creating table resource_doc_reading_progress ...")
+    session.execute("""
+        CREATE TABLE IF NOT EXISTS resource_doc_reading_progress (
+            classroom_id uuid,
+            student_id uuid,
+            resource_uid uuid,
+            read_progress int,
+            is_completed boolean,
+            completed_at timestamp,
+            last_opened_at timestamp,
+            created_at timestamp,
+            updated_at timestamp,
+            is_deleted boolean,
+            deleted_at timestamp,
+            PRIMARY KEY (classroom_id, student_id, resource_uid)
+        ) WITH CLUSTERING ORDER BY (student_id DESC, resource_uid DESC)
+    """)
+    print("  OK")
+
+    # 4) Create resource_doc_notes
+    print("Creating table resource_doc_notes ...")
+    session.execute("""
+        CREATE TABLE IF NOT EXISTS resource_doc_notes (
+            resource_uid uuid,
+            uid uuid,
+            classroom_id uuid,
+            student_id uuid,
+            content text,
+            page int,
+            x_pct float,
+            y_pct float,
+            progress_at float,
+            color text,
+            created_at timestamp,
+            updated_at timestamp,
+            is_deleted boolean,
+            deleted_at timestamp,
+            PRIMARY KEY (resource_uid, uid)
+        ) WITH CLUSTERING ORDER BY (uid DESC)
+    """)
+    print("  OK")
+
+    print("Creating secondary index on resource_doc_notes.student_id ...")
+    session.execute("CREATE INDEX IF NOT EXISTS resource_doc_notes_student_id_idx ON resource_doc_notes (student_id)")
+    print("  OK")
+    print("Creating secondary index on resource_doc_notes.classroom_id ...")
+    session.execute("CREATE INDEX IF NOT EXISTS resource_doc_notes_classroom_id_idx ON resource_doc_notes (classroom_id)")
+    print("  OK")
+
     print("Done.")
     cluster.shutdown()
 

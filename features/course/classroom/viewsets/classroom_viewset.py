@@ -311,6 +311,25 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         folder = folder_service.repository.find(folder_uid)
         return Response(ResourceFolderResponseSerializer(folder).data)
 
+    # ── Teacher: view student progress + notes ────────────────────────────────
+
+    @action(detail=True, methods=['get'], url_path=r'docs/(?P<resource_uid>[^/.]+)/students-progress')
+    def doc_students_progress(self, request, uid=None, resource_uid=None):
+        """GET /api/v1/space/course/classrooms/{uid}/docs/{resource_uid}/students-progress/"""
+        if not isinstance(request.user, Space):
+            raise PermissionDenied("Only teachers can view student progress.")
+        from features.course.classroom.services.doc_progress_helpers import list_progress_for_resource_all_students
+        return Response(list_progress_for_resource_all_students(str(uid), resource_uid))
+
+    @action(detail=True, methods=['get'], url_path=r'docs/(?P<resource_uid>[^/.]+)/student-notes')
+    def doc_student_notes(self, request, uid=None, resource_uid=None):
+        """GET /api/v1/space/course/classrooms/{uid}/docs/{resource_uid}/student-notes/?student_id=..."""
+        if not isinstance(request.user, Space):
+            raise PermissionDenied("Only teachers can view student notes.")
+        student_id = request.query_params.get('student_id')
+        from features.course.classroom.services.doc_progress_helpers import list_notes_for_resource
+        return Response(list_notes_for_resource(resource_uid, student_id=student_id))
+
     def docs_delete(self, request, uid=None, resource_uid=None):
         """DELETE /classrooms/{uid}/docs/{resource_uid}/"""
         if not isinstance(request.user, Space):
