@@ -44,7 +44,7 @@ class ResourceService(BaseService):
 
         return None
 
-    def upload_resource(self, file_obj, owner_id=None, owner_type=None, metadata=None):
+    def upload_resource(self, file_obj, owner_id=None, owner_type=None, metadata=None, folder_id=None, order_index=0):
         """
         Upload a file to R2 and save its metadata to Cassandra.
         """
@@ -68,6 +68,8 @@ class ResourceService(BaseService):
             size=file_obj.size,
             owner_id=owner_id,
             owner_type=owner_type,
+            folder_id=folder_id,
+            order_index=order_index,
             metadata=metadata or {}
         )
 

@@ -134,12 +134,15 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         """
         POST /classrooms/{uid}/docs/  — upload a document and index it in LanceDB.
           Form fields:
-            file     (required) — PDF, TXT, or MD
-            section  (optional) — category label, e.g. "week1", "lecture", …
+            file       (required) — PDF, TXT, or MD
+            section    (optional) — category label, e.g. "week1", "lecture", …
+            folder_id  (optional) — UUID of the destination folder
+            order_index (optional) — int position within folder
 
         GET  /classrooms/{uid}/docs/  — list all documents for this classroom.
           Query params:
-            section  (optional) — filter by section label
+            section    (optional) — filter by section label
+            folder_id  (optional) — filter by folder (omit/empty = root)
         """
         doc_service = ClassroomDocService()
 
@@ -154,10 +157,17 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                 )
 
             section = request.data.get('section', '')
+            folder_id = request.data.get('folder_id') or None
+            try:
+                order_index = int(request.data.get('order_index', 0))
+            except (TypeError, ValueError):
+                order_index = 0
             result = doc_service.upload_and_index(
                 classroom_uid=str(uid),
                 file_obj=request.FILES['file'],
                 section=section,
+                folder_id=folder_id,
+                order_index=order_index,
             )
             resource = result.get('data')
             if resource:
@@ -169,19 +179,137 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                     actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
                     actor_role='teacher',
                     target_name=getattr(resource, 'name', ''),
-                    metadata={'section': section},
+                    metadata={'section': section, 'folder_id': str(folder_id) if folder_id else ''},
                 )
                 resp_data = ResourceResponseSerializer(resource).data
                 if not result.get('success'):
-                    # File uploaded to R2 but LanceDB indexing failed — warn the client
                     resp_data['_warning'] = result.get('message', 'LanceDB indexing thất bại')
                 return Response(resp_data, status=status.HTTP_201_CREATED)
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
         # GET
         section = request.query_params.get('section')
-        docs = doc_service.list_docs(classroom_uid=str(uid), section=section)
+        folder_id = request.query_params.get('folder_id') or None
+        if folder_id or 'folder_id' in request.query_params:
+            docs = doc_service.list_folder(classroom_uid=str(uid), folder_id=folder_id)
+        else:
+            docs = doc_service.list_docs(classroom_uid=str(uid), section=section)
         return Response(ResourceResponseSerializer(docs, many=True).data)
+
+    @action(detail=True, methods=['get'], url_path='docs/tree')
+    def docs_tree(self, request, uid=None):
+        """GET /classrooms/{uid}/docs/tree/ — folders + root-level docs."""
+        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+        tree = ClassroomDocService().list_tree(classroom_uid=str(uid))
+        return Response({
+            'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
+            'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
+        })
+
+    @action(detail=True, methods=['post'], url_path='docs/reorder')
+    def docs_reorder(self, request, uid=None):
+        """POST /classrooms/{uid}/docs/reorder/ — bulk update folder_id + order_index.
+
+        Body: { items: [{ uid, folder_id?, order_index? }, ...] }
+        """
+        items = request.data.get('items') or []
+        if not isinstance(items, list):
+            return Response({'success': False, 'message': 'items must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+        result = ClassroomDocService().reorder(classroom_uid=str(uid), items=items)
+        return Response(result)
+
+    @action(detail=True, methods=['get', 'post'], url_path='folders')
+    def folders(self, request, uid=None):
+        """GET  /classrooms/{uid}/folders/        — list folders (tree).
+           POST /classrooms/{uid}/folders/        — create folder.
+        """
+        from features.resource.serializers.resource_folder_serializer import (
+            ResourceFolderCreateRequestSerializer,
+            ResourceFolderResponseSerializer,
+        )
+
+        if not isinstance(request.user, Space):
+            raise PermissionDenied("Only teachers can manage folders.")
+
+        folder_service = ClassroomDocService()._folder_service
+        classroom_uuid = uuid.UUID(str(uid))
+
+        if request.method == 'POST':
+            serializer = ResourceFolderCreateRequestSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            folder = folder_service.create_folder(
+                classroom_id=classroom_uuid,
+                teacher_id=request.user.uid,
+                name=data['name'],
+                parent_folder_id=data.get('parent_folder_id'),
+                order_index=data.get('order_index', 0),
+                color=data.get('color'),
+            )
+            ClassroomActivityLogService().log(
+                classroom_uid=uid,
+                log_level='detail',
+                event_type='folder_created',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=str(folder.uid),
+                target_name=folder.name,
+            )
+            return Response(ResourceFolderResponseSerializer(folder).data, status=status.HTTP_201_CREATED)
+
+        folders = folder_service.list_tree(classroom_uuid)
+        return Response(ResourceFolderResponseSerializer(folders, many=True).data)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path='folders/(?P<folder_uid>[^/.]+)')
+    def folder_detail(self, request, uid=None, folder_uid=None):
+        """PATCH/DELETE /classrooms/{uid}/folders/{folder_uid}/"""
+        from features.resource.serializers.resource_folder_serializer import (
+            ResourceFolderResponseSerializer,
+            ResourceFolderUpdateRequestSerializer,
+        )
+
+        if not isinstance(request.user, Space):
+            raise PermissionDenied("Only teachers can manage folders.")
+
+        folder_service = ClassroomDocService()._folder_service
+        try:
+            folder = folder_service.repository.find(folder_uid)
+        except Exception as exc:
+            return Response({'success': False, 'message': str(exc)}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'DELETE':
+            folder_service.delete_folder(folder)
+            ClassroomActivityLogService().log(
+                classroom_uid=uid,
+                log_level='major',
+                event_type='folder_deleted',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=str(folder.uid),
+                target_name=folder.name,
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = ResourceFolderUpdateRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        if 'name' in data:
+            folder_service.rename_folder(folder, data['name'])
+        if 'parent_folder_id' in data:
+            try:
+                folder_service.move_folder(folder, data['parent_folder_id'])
+            except ValueError as exc:
+                return Response({'success': False, 'message': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if 'order_index' in data:
+            folder_service.repository.update(folder, order_index=int(data['order_index']))
+        if 'color' in data:
+            folder_service.repository.update(folder, color=data['color'])
+
+        folder = folder_service.repository.find(folder_uid)
+        return Response(ResourceFolderResponseSerializer(folder).data)
 
     def docs_delete(self, request, uid=None, resource_uid=None):
         """DELETE /classrooms/{uid}/docs/{resource_uid}/"""

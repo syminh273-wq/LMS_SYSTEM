@@ -215,10 +215,30 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
-        
+
         section = request.query_params.get('section')
-        docs = ClassroomDocService().list_docs(classroom_uid=str(pk), section=section)
+        folder_id = request.query_params.get('folder_id') or None
+        doc_service = ClassroomDocService()
+        if folder_id or 'folder_id' in request.query_params:
+            docs = doc_service.list_folder(classroom_uid=str(pk), folder_id=folder_id)
+        else:
+            docs = doc_service.list_docs(classroom_uid=str(pk), section=section)
         return Response(ResourceResponseSerializer(docs, many=True).data)
+
+    @action(detail=True, methods=['get'], url_path='docs/tree')
+    def docs_tree(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/docs/tree/ — read-only mirror."""
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.course.classroom.services.classroom_doc_service import ClassroomDocService
+        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+        from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
+
+        tree = ClassroomDocService().list_tree(classroom_uid=str(pk))
+        return Response({
+            'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
+            'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
+        })
 
     @action(detail=True, methods=['get'], url_path='active-session')
     def active_session(self, request, pk=None):

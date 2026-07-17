@@ -3,7 +3,9 @@ import tempfile
 import uuid as _uuid
 
 from core.ai.rag.services.rag_pipeline import RAGPipeline
+from features.resource.repositories.resource_folder_repository import ResourceFolderRepository
 from features.resource.repositories.resource_repository import ResourceRepository
+from features.resource.services.resource_folder_service import ResourceFolderService
 from features.resource.services.resource_service import ResourceService
 
 # File types that can be parsed + indexed in LanceDB
@@ -16,21 +18,26 @@ class ClassroomDocService:
     def __init__(self):
         self._resource_service = ResourceService()
         self._resource_repo = ResourceRepository()
+        self._folder_service = ResourceFolderService()
+        self._folder_repo = ResourceFolderRepository()
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def upload_and_index(self, classroom_uid: str, file_obj, section: str = ''):
+    def upload_and_index(self, classroom_uid: str, file_obj, section: str = '', folder_id=None, order_index=0):
         """
         Upload a document to R2 (tagged as classroom resource) and index
         its text content in the per-classroom LanceDB collection.
         """
         owner_id = _uuid.UUID(str(classroom_uid))
+        folder_uuid = _uuid.UUID(str(folder_id)) if folder_id else None
 
         result = self._resource_service.upload_resource(
             file_obj=file_obj,
             owner_id=owner_id,
             owner_type='classroom',
             metadata={'section': section},
+            folder_id=folder_uuid,
+            order_index=order_index,
         )
         if not result['success']:
             return result
@@ -39,7 +46,6 @@ class ClassroomDocService:
 
         ext = os.path.splitext(file_obj.name)[1].lower()
         if ext in _INDEXABLE_EXTENSIONS:
-            # Remove stale chunks for any previous upload of the same filename in this classroom
             old_count = self._pipeline.delete_document({
                 'classroom_id': str(classroom_uid),
                 'doc_name': resource.name,
@@ -63,6 +69,7 @@ class ClassroomDocService:
                         'doc_name': resource.name,
                         'doc_url': resource.url,
                         'section': section,
+                        'folder_id': str(folder_uuid) if folder_uuid else '',
                     },
                 )
             except Exception as exc:
@@ -93,6 +100,40 @@ class ClassroomDocService:
         if section is not None:
             qs = [r for r in qs if r.metadata.get('section') == section]
         return qs
+
+    def list_folder(self, classroom_uid: str, folder_id=None):
+        """Return docs in a given folder (None = root)."""
+        owner_id = _uuid.UUID(str(classroom_uid))
+        folder_uuid = _uuid.UUID(str(folder_id)) if folder_id else None
+        return self._resource_repo.get_by_owner_and_folder(owner_id, folder_uuid)
+
+    def list_tree(self, classroom_uid: str):
+        """Return {folders: [...], docs_root: [...]} for the classroom."""
+        owner_id = _uuid.UUID(str(classroom_uid))
+        folders = self._folder_service.list_tree(owner_id)
+        root_docs = self._resource_repo.get_by_owner_and_folder(owner_id, None)
+        return {
+            'folders': folders,
+            'docs_root': root_docs,
+        }
+
+    def reorder(self, classroom_uid: str, items):
+        """items: list of {uid, folder_id?, order_index?}.
+        Verifies each item belongs to this classroom before update."""
+        owner_id = _uuid.UUID(str(classroom_uid))
+        for item in items:
+            try:
+                resource = self._resource_service.find(item['uid'])
+            except Exception:
+                continue
+            if resource.owner_id != owner_id or resource.owner_type != 'classroom':
+                continue
+            update_kwargs = {'order_index': int(item.get('order_index', 0))}
+            if 'folder_id' in item:
+                f = item['folder_id']
+                update_kwargs['folder_id'] = _uuid.UUID(str(f)) if f else None
+            self._resource_service.repository.update(resource, **update_kwargs)
+        return {'success': True}
 
     def delete_doc(self, classroom_uid: str, resource_uid: str):
         """Soft-delete a document and remove its LanceDB chunks."""
