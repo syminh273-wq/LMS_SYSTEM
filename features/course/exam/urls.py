@@ -12,4 +12,8 @@ urlpatterns = [
     path('submissions/<uuid:submission_uid>/', SpaceExamViewSet.as_view({'get': 'get_submission'})),
     path('submissions/<uuid:submission_uid>/grade/', SpaceExamViewSet.as_view({'patch': 'grade_submission'})),
     path('submissions/<uuid:submission_uid>/ai-grade/', SpaceExamViewSet.as_view({'post': 'ai_grade_submission'})),
+    path('submissions/<uuid:submission_uid>/audit-log/overview/', SpaceExamViewSet.as_view({'get': 'audit_log_overview'})),
+    path('submissions/<uuid:submission_uid>/audit-log/details/', SpaceExamViewSet.as_view({'get': 'audit_log_details'})),
+    path('submissions/<uuid:submission_uid>/audit-log/answers/', SpaceExamViewSet.as_view({'get': 'audit_log_answers'})),
+    path('submissions/<uuid:submission_uid>/effectiveness/', SpaceExamViewSet.as_view({'patch': 'set_effectiveness'})),
 ]

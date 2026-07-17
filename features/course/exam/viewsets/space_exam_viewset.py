@@ -1,4 +1,5 @@
 import json as _json
+from datetime import datetime as _dt_epoch
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -8,8 +9,11 @@ from features.course.exam.serializers import (
     ExamSubmissionAIGradeSerializer,
     ExamSubmissionGradeSerializer,
     serialize_exam_submission,
+    serialize_audit_log_entry,
+    summarize_audit_logs,
 )
 from features.course.exam.services import ExamService, ExamSubmissionService, ExamSessionService
+from features.course.exam.repositories import ExamAuditLogRepository, ExamRepository
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
@@ -41,6 +45,8 @@ def _serialize_exam(exam):
         "exam_mode": exam.exam_mode,
         "duration_seconds": exam.duration_seconds if exam.duration_seconds else 0,
         "due_date": exam.due_date.isoformat() if exam.due_date else None,
+        "max_visibility_breaks": getattr(exam, "max_visibility_breaks", 0) or 0,
+        "max_face_warnings": getattr(exam, "max_face_warnings", 0) or 0,
         "created_at": exam.created_at.isoformat() if exam.created_at else None,
         "updated_at": exam.updated_at.isoformat() if exam.updated_at else None,
     }
@@ -97,6 +103,8 @@ class SpaceExamViewSet(ViewSet):
         self.exam_service = ExamService()
         self.submission_service = ExamSubmissionService()
         self.session_service = ExamSessionService()
+        self.audit_repo = ExamAuditLogRepository()
+        self.exam_repo = ExamRepository()
 
     # ── EXAM CRUD ─────────────────────────────────────────────────────────────
 
@@ -233,6 +241,7 @@ class SpaceExamViewSet(ViewSet):
             late_threshold = int(request.data.get("late_threshold_seconds", 0))
             duration = request.data.get("duration_seconds")
             camera_required = request.data.get("camera_required")
+            max_face_warnings = request.data.get("max_face_warnings")
 
             if duration is not None:
                 duration = int(duration)
@@ -248,6 +257,7 @@ class SpaceExamViewSet(ViewSet):
                 late_threshold_seconds=late_threshold,
                 duration_seconds=duration,
                 camera_required=camera_required,
+                max_face_warnings=max_face_warnings,
             )
             ClassroomActivityLogService().log(
                 classroom_uid=exam.classroom_id,
@@ -307,3 +317,173 @@ class SpaceExamViewSet(ViewSet):
             data=serializer.validated_data,
         )
         return Response(_serialize_ai_grade_batch(results))
+
+    # ── AUDIT LOG (submission-scoped) ─────────────────────────────────────────
+
+    def _resolve_submission_for_teacher(self, submission_uid, teacher_id):
+        submission = self.submission_service.get_submission(submission_uid)
+        exam = self.exam_service.get_exam(submission.exam_id)
+        if str(exam.teacher_id) != str(teacher_id):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not own this exam")
+        return submission, exam
+
+    def audit_log_overview(self, request, submission_uid=None):
+        try:
+            submission, exam = self._resolve_submission_for_teacher(
+                submission_uid, request.user.uid
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            logs = self.audit_repo.list_by_student(exam.uid, submission.student_id)
+        except Exception:
+            logs = []
+
+        try:
+            from features.course.exam.repositories import ExamSessionRepository
+            session = ExamSessionRepository().get_by_student(exam.uid, submission.student_id)
+        except Exception:
+            session = None
+
+        return Response({
+            "submission": serialize_exam_submission(submission),
+            "exam": {
+                "uid": str(exam.uid),
+                "title": exam.title,
+                "max_visibility_breaks": int(getattr(exam, "max_visibility_breaks", 0) or 0),
+                "max_face_warnings": int(getattr(exam, "max_face_warnings", 0) or 0),
+            },
+            "counters": {
+                "visibility_breaks": {
+                    "count": int(getattr(session, "visibility_breaks_count", 0) or 0) if session else 0,
+                    "max":   int(getattr(exam, "max_visibility_breaks", 0) or 0),
+                    "rule":  "visibility_breaks",
+                },
+                "face_warnings": {
+                    "count": int(getattr(session, "face_warnings_count", 0) or 0) if session else 0,
+                    "max":   int(getattr(exam, "max_face_warnings", 0) or 0),
+                    "rule":  "face_warnings",
+                },
+            },
+            "force_submitted":    bool(getattr(submission, "force_submitted", False)),
+            "force_submit_reason": getattr(submission, "force_submit_reason", "") or "",
+            "force_submitted_at": submission.force_submitted_at.isoformat()
+                if getattr(submission, "force_submitted_at", None) else None,
+            "is_effective":       bool(getattr(submission, "is_effective", False)),
+            "totals":             summarize_audit_logs(logs),
+        })
+
+    def audit_log_details(self, request, submission_uid=None):
+        try:
+            submission, exam = self._resolve_submission_for_teacher(
+                submission_uid, request.user.uid
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            logs = self.audit_repo.list_by_student(exam.uid, submission.student_id)
+        except Exception as exc:
+            return Response({"error": f"Failed to load audit log: {exc}"}, status=500)
+
+        logs_sorted = sorted(logs, key=lambda l: l.created_at or _dt_epoch.min, reverse=False)
+        return Response({
+            "submission_uid": str(submission.uid),
+            "student_id":     str(submission.student_id),
+            "events":         [serialize_audit_log_entry(l) for l in logs_sorted],
+        })
+
+    def audit_log_answers(self, request, submission_uid=None):
+        try:
+            submission, _ = self._resolve_submission_for_teacher(
+                submission_uid, request.user.uid
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        submission_type = getattr(submission, "submission_type", "file") or "file"
+        meta_raw = getattr(submission, "meta", "{}") or "{}"
+        try:
+            import json as _json
+            meta = _json.loads(meta_raw) if meta_raw else {}
+        except Exception:
+            meta = {}
+
+        if submission_type in ("multiple_choice", "online_quiz"):
+            return Response({
+                "submission_type": submission_type,
+                "answers": meta.get("results", []),
+                "score": {
+                    "grade": submission.grade,
+                    "max_grade": submission.max_grade,
+                    "correct_count": meta.get("correct_count"),
+                    "total": meta.get("total"),
+                    "score_pct": meta.get("score_pct"),
+                },
+            })
+
+        if submission_type == "file":
+            return Response({
+                "submission_type": "file",
+                "file": {
+                    "url":  meta.get("url"),
+                    "name": meta.get("name"),
+                    "size": meta.get("size"),
+                },
+                "ref_id": str(submission.ref_id) if submission.ref_id else None,
+            })
+
+        return Response({
+            "submission_type": "essay",
+            "essay_content": submission.content or "",
+        })
+
+    def set_effectiveness(self, request, submission_uid=None):
+        is_effective = request.data.get("is_effective")
+        if isinstance(is_effective, str):
+            is_effective = is_effective.lower() in ("true", "1", "yes", "on")
+        if not isinstance(is_effective, bool):
+            return Response(
+                {"error": "is_effective must be a boolean"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            submission = self.session_service.set_submission_effectiveness(
+                submission_id=submission_uid,
+                teacher_id=request.user.uid,
+                is_effective=is_effective,
+            )
+        except ValueError as exc:
+            msg = str(exc)
+            code = (
+                status.HTTP_404_NOT_FOUND
+                if "not found" in msg.lower()
+                else status.HTTP_403_FORBIDDEN
+            )
+            return Response({"error": msg}, status=code)
+
+        try:
+            exam = self.exam_service.get_exam(submission.exam_id)
+            ClassroomActivityLogService().log(
+                classroom_uid=exam.classroom_id,
+                log_level='detail',
+                event_type='grade_validated' if is_effective else 'grade_invalidated',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '')
+                or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_id=submission.uid,
+                target_name=exam.title,
+            )
+        except Exception:
+            pass
+
+        return Response(serialize_exam_submission(submission))

@@ -46,6 +46,13 @@ class Exam(BaseTimeStampModel):
     opened_at = columns.DateTime(required=False)
     late_threshold_seconds = columns.Integer(default=0)
 
+    # Anti-cheat limits
+    # max_visibility_breaks: gộp tất cả (tab leave, window blur, app blur, fullscreen exit, visibility hidden)
+    # max_face_warnings: cảnh báo camera/face (camera_lost, face_not_recognized, multiple_faces)
+    # = 0 nghĩa là không giới hạn
+    max_visibility_breaks = columns.Integer(default=3)
+    max_face_warnings = columns.Integer(default=0)
+
     deleted_at = columns.DateTime(required=False)
 
     class Meta:

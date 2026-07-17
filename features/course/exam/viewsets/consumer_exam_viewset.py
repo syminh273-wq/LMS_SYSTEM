@@ -1,5 +1,5 @@
 import json as _json
-from datetime import datetime
+from datetime import datetime, datetime as _dt_epoch_min
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -42,6 +42,8 @@ def _serialize_exam(exam):
         "exam_mode": exam.exam_mode,
         "duration_seconds": exam.duration_seconds if exam.duration_seconds else 0,
         "due_date": exam.due_date.isoformat() if exam.due_date else None,
+        "max_visibility_breaks": getattr(exam, "max_visibility_breaks", 0) or 0,
+        "max_face_warnings": getattr(exam, "max_face_warnings", 0) or 0,
         "created_at": exam.created_at.isoformat() if exam.created_at else None,
         "updated_at": exam.updated_at.isoformat() if exam.updated_at else None,
     }
@@ -208,4 +210,58 @@ class ConsumerExamViewSet(ViewSet):
             "started_at": session.started_at.isoformat() if session.started_at else None,
             "ends_at": session.ends_at.isoformat() if session.ends_at else None,
             "time_remaining_seconds": time_remaining,
+        })
+
+    def my_audit_log(self, request, session_uid=None):
+        """
+        Sinh viên xem audit log của chính mình trong session đang thi:
+        - events: danh sách chi tiết (timestamp, type, data)
+        - counters: visibility_breaks + face_warnings
+        """
+        from features.course.exam.repositories import (
+            ExamAuditLogRepository,
+            ExamRepository,
+        )
+        from features.course.exam.serializers import (
+            serialize_audit_log_entry,
+            summarize_audit_logs,
+        )
+        from features.course.exam.repositories import ExamSessionRepository
+
+        session_repo = ExamSessionRepository()
+        session = session_repo.get_by_uid(session_uid)
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        if str(session.student_id) != str(request.user.uid):
+            return Response({"error": "This session does not belong to you"}, status=403)
+
+        exam = ExamRepository().get_by_uid(session.exam_id)
+        if not exam:
+            return Response({"error": "Exam not found"}, status=404)
+
+        try:
+            logs = ExamAuditLogRepository().list_by_student(exam.uid, request.user.uid)
+        except Exception:
+            logs = []
+
+        logs_sorted = sorted(logs, key=lambda l: l.created_at or _dt_epoch_min, reverse=False)
+
+        return Response({
+            "session_uid": str(session.uid),
+            "exam_uid": str(exam.uid),
+            "exam_title": exam.title,
+            "max_visibility_breaks": int(getattr(exam, "max_visibility_breaks", 0) or 0),
+            "max_face_warnings": int(getattr(exam, "max_face_warnings", 0) or 0),
+            "counters": {
+                "visibility_breaks": {
+                    "count": int(getattr(session, "visibility_breaks_count", 0) or 0),
+                    "max":   int(getattr(exam, "max_visibility_breaks", 0) or 0),
+                },
+                "face_warnings": {
+                    "count": int(getattr(session, "face_warnings_count", 0) or 0),
+                    "max":   int(getattr(exam, "max_face_warnings", 0) or 0),
+                },
+            },
+            "totals": summarize_audit_logs(logs_sorted),
+            "events": [serialize_audit_log_entry(l) for l in logs_sorted],
         })

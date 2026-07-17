@@ -15,7 +15,7 @@ class ExamSessionService:
         self.member_repo = ClassroomMemberRepository()
         self.audit_repo = ExamAuditLogRepository()
 
-    def open_online(self, exam_uid, teacher_id, late_threshold_seconds=0, duration_seconds=None, camera_required=None):
+    def open_online(self, exam_uid, teacher_id, late_threshold_seconds=0, duration_seconds=None, camera_required=None, max_face_warnings=None):
         exam = self.exam_repo.get_by_uid(exam_uid)
         if not exam:
             raise ValueError("Exam not found")
@@ -39,7 +39,13 @@ class ExamSessionService:
 
         if camera_required is not None:
             update_data["camera_required"] = bool(camera_required)
-            
+
+        if max_face_warnings is not None:
+            try:
+                update_data["max_face_warnings"] = max(0, int(max_face_warnings))
+            except (TypeError, ValueError):
+                update_data["max_face_warnings"] = 0
+
         exam = self.exam_repo.update(exam, **update_data)
 
         members = list(self.member_repo.get_members(classroom_uid=exam.classroom_id))
@@ -178,3 +184,26 @@ class ExamSessionService:
         session = self.session_repo.get_by_student(exam_id, student_id)
         if session and session.token_status == 'active':
             self.session_repo.update(session, token_status='completed')
+
+    def set_submission_effectiveness(self, submission_id, teacher_id, is_effective: bool):
+        """
+        Teacher bật/tắt `is_effective` cho submission. Cho phép teacher quyết định
+        điểm có hiệu lực hay không — kể cả khi student đã bị force_submit.
+
+        Raises:
+          ValueError nếu submission không tồn tại hoặc teacher không sở hữu exam.
+        """
+        from features.course.exam.repositories import ExamSubmissionRepository
+
+        submission_repo = ExamSubmissionRepository()
+        submission = submission_repo.get_by_uid(submission_id)
+        if not submission:
+            raise ValueError("Submission not found")
+
+        exam = self.exam_repo.get_by_uid(submission.exam_id)
+        if not exam:
+            raise ValueError("Exam not found")
+        if str(exam.teacher_id) != str(teacher_id):
+            raise ValueError("You do not own this exam")
+
+        return submission_repo.update(submission, is_effective=bool(is_effective))

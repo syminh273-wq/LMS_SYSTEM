@@ -60,6 +60,15 @@ class ExamSubmission(BaseTimeStampModel):
     ai_sources    = columns.Text(default="")
     ai_confidence = columns.Float(required=False)
 
+    # ── Anti-cheat flags ──────────────────────────────────────────────────────
+    # is_effective: mặc định False; chỉ teacher quyết định bật/tắt.
+    #   - student submit bình thường → is_effective=True
+    #   - force_submit (quá max_visibility_breaks / max_face_warnings) → is_effective=False
+    is_effective = columns.Boolean(default=False)
+    force_submitted = columns.Boolean(default=False)
+    force_submit_reason = columns.Text(default="")  # 'visibility_breaks_exceeded' | 'face_warnings_exceeded' | ''
+    force_submitted_at = columns.DateTime(required=False)
+
     is_deleted = columns.Boolean(default=False)
     deleted_at = columns.DateTime(required=False)
 

@@ -186,6 +186,10 @@ class ExamSubmissionService:
         data["classroom_id"] = exam.classroom_id
         data["student_id"]   = student_id
         data["submitted_at"] = datetime.utcnow()
+        data["is_effective"] = True
+        data["force_submitted"] = False
+        data["force_submit_reason"] = ""
+        data["force_submitted_at"] = None
 
         if not is_mc:
             data.setdefault("status", self.build_submission_status(exam))
@@ -342,3 +346,127 @@ class ExamSubmissionService:
             except Exception as exc:
                 results.append({"submission": sub, "success": False, "error": str(exc)})
         return results
+
+    # ── Force submit (anti-cheat) ──────────────────────────────────────────────
+
+    def force_submit(self, exam_id, student_id, reason, data: dict | None = None):
+        """
+        Server-side force submission khi student vi phạm giới hạn
+        max_visibility_breaks hoặc max_face_warnings.
+
+        - Điểm (grade) vẫn được tính bình thường nếu có answers.
+        - is_effective = False (mặc định; chỉ teacher mới bật được).
+        - force_submitted = True, force_submit_reason = reason.
+        - Đồng thời complete exam session để mọi API call tiếp theo bị reject.
+        - Idempotent: nếu đã force_submit trước đó, trả về submission cũ + complete session.
+        """
+        data = data or {}
+        try:
+            exam = self.exam_repo.get_by_uid(exam_id)
+        except Exception:
+            exam = None
+        if not exam:
+            raise ValueError("Exam not found")
+
+        try:
+            self.assert_student_membership(exam.classroom_id, student_id)
+        except ValueError:
+            pass
+
+        # Idempotency check: nếu đã có submission force_submitted → skip + complete session
+        try:
+            existing_submissions = self.submission_repo.list_by_exam_and_student(exam.uid, student_id)
+            for s in existing_submissions:
+                if bool(getattr(s, "force_submitted", False)):
+                    self._complete_session_safe(exam_id, student_id)
+                    return s, False
+        except Exception:
+            pass
+
+        # Idempotency check 2: nếu session đã completed → không tạo thêm submission
+        try:
+            from features.course.exam.services.exam_session_service import (
+                ExamSessionService,
+            )
+            existing_session = ExamSessionService().session_repo.get_by_student(exam.uid, student_id)
+            if existing_session and existing_session.token_status in ("completed", "expired"):
+                # No-op, just return None — caller will be rejected by record_event
+                return None, False
+        except Exception:
+            pass
+
+        now = datetime.utcnow()
+        result: tuple | None = None
+
+        snapshot_answers = data.get("answers") if isinstance(data.get("answers"), dict) else None
+        submission_type = "online_quiz" if snapshot_answers is not None else "file"
+
+        if submission_type == "online_quiz":
+            try:
+                prepared = {
+                    "submission_type": "online_quiz",
+                    "answers": snapshot_answers,
+                    "time_taken_seconds": 0,
+                }
+                prepared = self.prepare_submission(exam, student_id, prepared)
+                prepared["exam_id"]      = exam.uid
+                prepared["classroom_id"] = exam.classroom_id
+                prepared["student_id"]   = student_id
+                prepared["submitted_at"] = now
+                prepared["is_effective"] = False
+                prepared["force_submitted"] = True
+                prepared["force_submit_reason"] = reason or ""
+                prepared["force_submitted_at"] = now
+                prepared["status"] = "graded"
+                for _field in ("time_taken_seconds",):
+                    prepared.pop(_field, None)
+
+                existing = self.submission_repo.list_by_exam_and_student(exam.uid, student_id)
+                if existing:
+                    result = (self.submission_repo.update(existing[0], **prepared), False)
+                else:
+                    result = (self.submission_repo.create(**prepared), True)
+            except Exception:
+                pass
+
+        if result is None:
+            # file / essay / fallback: tạo submission rỗng để đánh dấu force_submit
+            try:
+                existing = self.submission_repo.list_by_exam_and_student(exam.uid, student_id)
+                payload = {
+                    "submission_type": data.get("submission_type", "file"),
+                    "content": data.get("content", "") or "",
+                    "meta": data.get("meta", "{}") or "{}",
+                    "ref_id": data.get("ref_id"),
+                    "exam_id": exam.uid,
+                    "classroom_id": exam.classroom_id,
+                    "student_id": student_id,
+                    "submitted_at": now,
+                    "is_effective": False,
+                    "force_submitted": True,
+                    "force_submit_reason": reason or "",
+                    "force_submitted_at": now,
+                    "status": "submitted",
+                }
+                if existing:
+                    result = (self.submission_repo.update(existing[0], **payload), False)
+                else:
+                    result = (self.submission_repo.create(**payload), True)
+            except Exception:
+                # Even if submission write fails, still complete the session
+                self._complete_session_safe(exam_id, student_id)
+                raise
+
+        # Always mark exam session as completed so further API calls are rejected
+        self._complete_session_safe(exam_id, student_id)
+        return result
+
+    @staticmethod
+    def _complete_session_safe(exam_id, student_id) -> None:
+        try:
+            from features.course.exam.services.exam_session_service import (
+                ExamSessionService,
+            )
+            ExamSessionService().complete(exam_id, student_id)
+        except Exception:
+            pass

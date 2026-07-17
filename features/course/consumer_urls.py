@@ -2,6 +2,9 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from features.course.classroom.viewsets import ConsumerClassroomViewSet
 from features.course.exam.viewsets import ConsumerExamViewSet
+from features.course.exam.viewsets.consumer_exam_event_viewset import (
+    ConsumerExamEventViewSet,
+)
 
 router = DefaultRouter()
 router.register(r'classrooms', ConsumerClassroomViewSet, basename='consumer-classroom')
@@ -14,6 +17,8 @@ urlpatterns = [
     path('exams/<uuid:exam_uid>/submissions/', ConsumerExamViewSet.as_view({'post': 'submit'})),
     path('exams/<uuid:exam_uid>/submissions/me/', ConsumerExamViewSet.as_view({'get': 'my_submission'})),
     path('exam-sessions/<str:token>/', ConsumerExamViewSet.as_view({'get': 'join_session'})),
+    path('exam-sessions/<uuid:session_uid>/events/', ConsumerExamEventViewSet.as_view({'post': 'record_event'})),
+    path('exam-sessions/<uuid:session_uid>/audit-log/me/', ConsumerExamViewSet.as_view({'get': 'my_audit_log'})),
     path('exams/<uuid:exam_uid>/sessions/me/', ConsumerExamViewSet.as_view({'get': 'my_session'})),
     # SSE streaming AI bot (manual route — pk used as positional kwarg from router)
     path('classrooms/<str:pk>/ask-stream/',

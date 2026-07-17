@@ -83,6 +83,13 @@ def serialize_exam_submission(submission):
         "ai_sources":    _load(getattr(submission, "ai_sources", ""), []),
         "ai_confidence": getattr(submission, "ai_confidence", None),
 
+        # Anti-cheat flags
+        "is_effective":       bool(getattr(submission, "is_effective", False)),
+        "force_submitted":    bool(getattr(submission, "force_submitted", False)),
+        "force_submit_reason": getattr(submission, "force_submit_reason", "") or "",
+        "force_submitted_at": submission.force_submitted_at.isoformat()
+            if getattr(submission, "force_submitted_at", None) else None,
+
         "created_at": submission.created_at.isoformat() if submission.created_at else None,
         "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
     }
