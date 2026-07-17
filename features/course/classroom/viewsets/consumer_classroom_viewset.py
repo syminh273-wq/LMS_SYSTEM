@@ -215,10 +215,99 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
-        
+
         section = request.query_params.get('section')
-        docs = ClassroomDocService().list_docs(classroom_uid=str(pk), section=section)
+        folder_id = request.query_params.get('folder_id') or None
+        doc_service = ClassroomDocService()
+        if folder_id or 'folder_id' in request.query_params:
+            docs = doc_service.list_folder(classroom_uid=str(pk), folder_id=folder_id)
+        else:
+            docs = doc_service.list_docs(classroom_uid=str(pk), section=section)
         return Response(ResourceResponseSerializer(docs, many=True).data)
+
+    @action(detail=True, methods=['get'], url_path='docs/tree')
+    def docs_tree(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/docs/tree/ — read-only mirror."""
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.course.classroom.services.classroom_doc_service import ClassroomDocService
+        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+        from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
+
+        tree = ClassroomDocService().list_tree(classroom_uid=str(pk))
+        return Response({
+            'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
+            'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
+        })
+
+    # ── Doc reading progress + notes ─────────────────────────────────────────
+
+    @action(detail=True, methods=['get', 'post'], url_path=r'docs/(?P<resource_uid>[^/.]+)/progress')
+    def doc_progress(self, request, pk=None, resource_uid=None):
+        """GET/POST /api/v1/consumer/course/classrooms/{uid}/docs/{resource_uid}/progress/"""
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.course.classroom.services.doc_progress_helpers import (
+            get_student_progress,
+            mark_progress,
+        )
+
+        if request.method == 'GET':
+            data = get_student_progress(str(pk), request.user.uid, resource_uid)
+            return Response(data)
+
+        return Response(mark_progress(str(pk), request.user.uid, resource_uid, request.data or {}))
+
+    @action(detail=True, methods=['post'], url_path=r'docs/(?P<resource_uid>[^/.]+)/complete')
+    def doc_complete(self, request, pk=None, resource_uid=None):
+        """POST /api/v1/consumer/course/classrooms/{uid}/docs/{resource_uid}/complete/"""
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.course.classroom.services.doc_progress_helpers import mark_completed
+        is_done = bool((request.data or {}).get('is_completed', True))
+        return Response(mark_completed(str(pk), request.user.uid, resource_uid, is_done))
+
+    @action(detail=True, methods=['get', 'post'], url_path=r'docs/(?P<resource_uid>[^/.]+)/notes')
+    def doc_notes(self, request, pk=None, resource_uid=None):
+        """GET/POST /api/v1/consumer/course/classrooms/{uid}/docs/{resource_uid}/notes/"""
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.course.classroom.services.doc_progress_helpers import (
+            list_notes_for_resource,
+            create_note,
+        )
+
+        if request.method == 'GET':
+            only_mine = bool((request.query_params.get('only_mine') or '').lower() in ('1', 'true', 'yes'))
+            sid = request.user.uid if only_mine else None
+            return Response(list_notes_for_resource(resource_uid, student_id=sid))
+
+        try:
+            note = create_note(str(pk), request.user.uid, resource_uid, request.data or {})
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(note, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'docs/(?P<resource_uid>[^/.]+)/notes/(?P<note_uid>[^/.]+)')
+    def doc_note_detail(self, request, pk=None, resource_uid=None, note_uid=None):
+        """PATCH/DELETE /api/v1/consumer/course/classrooms/{uid}/docs/{rid}/notes/{nid}/"""
+        if not self._check_member(pk, request.user.uid):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.resource.services import DocNoteService
+        from features.course.classroom.services.doc_progress_helpers import update_note, delete_note
+
+        try:
+            note = DocNoteService().find(note_uid)
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_404_NOT_FOUND)
+
+        if str(note.student_id) != str(request.user.uid):
+            return Response({'error': 'Bạn không có quyền sửa note này.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == 'DELETE':
+            delete_note(note)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(update_note(note, request.data or {}))
 
     @action(detail=True, methods=['get'], url_path='active-session')
     def active_session(self, request, pk=None):
