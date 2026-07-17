@@ -127,6 +127,12 @@ class FaceRecognitionService:
         logs = FaceVerificationLog.objects.filter(exam_id=exam_id)
         return list(logs)
 
+    def get_student_exam_logs(self, exam_id, student_id) -> list:
+        logs = FaceVerificationLog.objects.filter(
+            exam_id=exam_id, student_id=student_id
+        ).allow_filtering()
+        return list(logs)
+
     # ── Classroom session ──────────────────────────────────────────────────
 
     SESSION_TTL_HOURS = 8
