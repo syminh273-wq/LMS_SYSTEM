@@ -269,18 +269,12 @@ class QuizViewSet(BaseModelViewSet):
     # ── UPDATE QUESTION  PATCH /quizzes/<uid>/questions/<question_uid>/ ──────
     @action(detail=True, methods=['patch'], url_path=r'questions/(?P<question_uid>[^/.]+)')
     def update_question(self, request, uid=None, question_uid=None):
-        quiz = self.service.find(uid)
-        if str(quiz.created_by) != str(request.user.uid):
-            return Response({'detail': 'You do not have permission to edit this quiz.'}, status=status.HTTP_403_FORBIDDEN)
-        if quiz.status != 'draft':
-            return Response({'detail': 'Questions can only be edited while the quiz is in draft status.'}, status=status.HTTP_400_BAD_REQUEST)
-
         serializer = QuizQuestionUpdateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if not serializer.validated_data:
-            return Response({'detail': 'No fields provided to update.'}, status=status.HTTP_400_BAD_REQUEST)
+        if 'correct_answer' not in serializer.validated_data:
+            return Response({'detail': 'correct_answer is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        question = self.service.find_question(quiz.uid, question_uid)
+        question = self.service.find_question(uid, question_uid)
         updated = self.service.update_question(question, **serializer.validated_data)
         return Response(QuizQuestionSerializer(updated).data)
 
