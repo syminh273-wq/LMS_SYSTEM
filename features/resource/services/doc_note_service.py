@@ -35,22 +35,53 @@ class DocReadingProgressService(BaseService):
         return self.repository.get_for_resource_all_students(classroom_id, resource_uid)
 
     def compute_progress(self, classroom_id, student_id, resource_uid):
-        """Compute progress = max(progress_at of all notes) * 100, capped 99 unless completed.
-        is_completed=True → 100."""
+        """Compute read progress derived from the furthest Take Note.
+
+        For each note we treat the document as a linear sequence:
+            offset = (page - 1) + y_pct          (page is 1-based; y_pct ∈ [0,1])
+
+        Notes without a y_pct (legacy or noxy) are ignored. The
+        furthest offset is divided by the largest page the student
+        has annotated (or 1) to give a 0..1 ratio, scaled to 0..100.
+        is_completed=True pins the value at 100.
+        """
         progress = self.get(classroom_id, student_id, resource_uid)
         notes = self.note_repository.get_for_student_resource(resource_uid, student_id)
-        max_at = 0.0
-        for n in notes:
-            try:
-                v = float(getattr(n, 'progress_at', 0) or 0)
-            except (TypeError, ValueError):
-                v = 0
-            if v > max_at:
-                max_at = v
 
-        derived_pct = int(round(max_at * 100))
+        max_offset = 0.0
+        max_page = 1
+        for n in notes:
+            y_pct = getattr(n, 'y_pct', None)
+            if y_pct is None:
+                continue
+            try:
+                y = float(y_pct)
+            except (TypeError, ValueError):
+                continue
+            if y < 0:
+                y = 0
+            elif y > 1:
+                y = 1
+            page = getattr(n, 'page', None) or 1
+            try:
+                page = int(page)
+            except (TypeError, ValueError):
+                page = 1
+            if page < 1:
+                page = 1
+            if page > max_page:
+                max_page = page
+            offset = (page - 1) + y
+            if offset > max_offset:
+                max_offset = offset
+
+        ratio = max_offset / max_page if max_page > 0 else 0.0
+        if ratio > 1:
+            ratio = 1.0
+        derived_pct = int(round(ratio * 100))
         if derived_pct > 99:
             derived_pct = 99
+
         is_completed = bool(getattr(progress, 'is_completed', False)) if progress else False
         final_pct = 100 if is_completed else derived_pct
         return {
