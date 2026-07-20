@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'features.social',
     'features.account',
     'features.account.otp',
+    'features.course',
     'features.course.classroom',
     'features.course.exam',
     'features.sharing',

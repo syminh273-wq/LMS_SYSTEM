@@ -145,6 +145,23 @@ def _resource_doc(r) -> dict:
     }
 
 
+def _course_doc(c) -> dict:
+    return {
+        'id':           str(c.uid),
+        'uid':          str(c.uid),
+        'pid':          c.pid or '',
+        'name':         c.name or '',
+        'description':  c.description or '',
+        'teacher_id':   str(c.teacher_id),
+        'pricing_type': c.pricing_type or 'free',
+        'price_vnd':    int(c.price_vnd or 0),
+        'status':       c.status or 'draft',
+        'is_deleted':   bool(getattr(c, 'is_deleted', False)),
+        'created_at':   _ts(getattr(c, 'created_at', None)),
+        'updated_at':   _ts(getattr(c, 'updated_at', None)),
+    }
+
+
 # ── Model → (collection, transformer) map ────────────────────────────────────
 
 _COLLECTION_MAP: dict[str, tuple[str, Any]] = {
@@ -155,6 +172,7 @@ _COLLECTION_MAP: dict[str, tuple[str, Any]] = {
     'Quiz':           ('lms_quiz',            _quiz_doc),
     'Resource':       ('lms_resource',        _resource_doc),
     'TeacherContact': ('lms_teacher_contact', _teacher_contact_doc),
+    'Course':         ('lms_course',          _course_doc),
 }
 
 
@@ -250,6 +268,14 @@ class LMSIndexer:
     @classmethod
     def remove_teacher_contact(cls, teacher_id: str, consumer_uid: str) -> None:
         cls._service().remove('lms_teacher_contact', f"{teacher_id}_{consumer_uid}")
+
+    @classmethod
+    def index_course(cls, c) -> None:
+        cls._service().upsert('lms_course', _course_doc(c))
+
+    @classmethod
+    def remove_course(cls, uid: str) -> None:
+        cls._service().remove('lms_course', str(uid))
 
     # ── Backfill helpers ─────────────────────────────────────────────────────
 

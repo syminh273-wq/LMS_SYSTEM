@@ -5,6 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from core.views.ws_test_view import test_chat_view
 from core.views.search_api import SpaceSearchAPIView, SearchHealthAPIView
+from features.course.viewsets import PublicCourseViewSet
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,7 +30,9 @@ urlpatterns = [
     path('api/v1/space/face/', include('features.face.space_urls')),
     path('api/v1/consumer/social/', include('features.social.urls')),
     path('api/v1/public/', include('core.urls')),
+    # Public course preview (no auth) — must be inside /api/v1/public/
+    path('api/v1/public/course/preview/<str:code>/', PublicCourseViewSet.as_view(), name='public-course-preview'),
     path('api/v1/space/search/', SpaceSearchAPIView.as_view(), name='space-search'),
     path('api/v1/space/search/health/', SearchHealthAPIView.as_view(), name='search-health'),
-    path('test-chat/<str:room_name>/', test_chat_view, name='test_chat'),
+    path('test-chat/<str:room_name>/', test_chat_view, name='test-chat'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

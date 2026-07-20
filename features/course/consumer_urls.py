@@ -5,9 +5,11 @@ from features.course.exam.viewsets import ConsumerExamViewSet
 from features.course.exam.viewsets.consumer_exam_event_viewset import (
     ConsumerExamEventViewSet,
 )
+from features.course.viewsets import ConsumerCourseViewSet
 
 router = DefaultRouter()
 router.register(r'classrooms', ConsumerClassroomViewSet, basename='consumer-classroom')
+router.register(r'courses', ConsumerCourseViewSet, basename='consumer-course')
 
 _consumer_classroom = ConsumerClassroomViewSet
 
