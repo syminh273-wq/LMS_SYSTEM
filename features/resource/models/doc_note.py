@@ -4,7 +4,7 @@ from core.utils.uuid import uuid7
 
 
 class DocNote(BaseTimeStampModel):
-    resource_uid = columns.UUID(partition_key=True, index=True)
+    resource_uid = columns.UUID(partition_key=True)
     uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
 
     classroom_id = columns.UUID(index=True)
