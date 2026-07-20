@@ -11,4 +11,5 @@ router.register('leave-requests', LeaveRequestViewSet, basename='space-leave-req
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('recurring-schedules/', CalendarViewSet.as_view({'post': 'create_recurring'}), name='space-calendar-recurring'),
 ]

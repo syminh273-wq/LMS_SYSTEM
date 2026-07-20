@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f9fafb;
+            color: #111827;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            max-width: 560px;
+            margin: 0 auto;
+            padding: 48px 20px;
+        }
+        .logo {
+            margin-bottom: 24px;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #4f46e5;
+        }
+        .card {
+            background: #ffffff;
+            border: 1px solid #f3f4f6;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 30px;
+            margin: 0 0 8px;
+            color: #111827;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0 0 24px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 16px;
+        }
+        .badge-class { background: #eef2ff; color: #4338ca; }
+        .badge-exam { background: #ffe4e6; color: #be123c; }
+        .badge-deadline { background: #fef3c7; color: #b45309; }
+        .badge-study_session { background: #d1fae5; color: #047857; }
+        .summary {
+            background-color: #f9fafb;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin: 24px 0;
+            color: #111827;
+            border-left: 4px solid #4f46e5;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+        }
+        .summary-row .label {
+            color: #6b7280;
+            font-weight: 600;
+        }
+        .summary-row .value {
+            color: #111827;
+            font-weight: 600;
+        }
+        .description {
+            font-size: 15px;
+            line-height: 22px;
+            color: #374151;
+            margin: 16px 0 0;
+            white-space: pre-wrap;
+        }
+        .btn-container {
+            margin: 28px 0 8px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4f46e5;
+            color: #ffffff !important;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 32px;
+            text-align: center;
+        }
+        .footer-text {
+            font-size: 13px;
+            line-height: 18px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">LMS SYSTEM</div>
+        <div class="card">
+            <span class="badge badge-{{ event_type }}">{{ type_label }}</span>
+            <h1>{{ title }}</h1>
+            <p class="subtitle">Thông báo lịch học / lịch thi từ giáo viên</p>
+
+            <div class="summary">
+                <div class="summary-row">
+                    <span class="label">Lớp</span>
+                    <span class="value">{{ classroom_name }}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Bắt đầu</span>
+                    <span class="value">{{ start_time }}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Kết thúc</span>
+                    <span class="value">{{ end_time }}</span>
+                </div>
+            </div>
+
+            {% if description %}
+            <p class="description">{{ description }}</p>
+            {% endif %}
+
+            {% if action_url %}
+            <div class="btn-container">
+                <a href="{{ action_url }}" class="button">{{ action_text|default:"Xem chi tiết" }}</a>
+            </div>
+            {% endif %}
+
+            <p style="font-size: 13px; margin: 24px 0 0; color: #6b7280;">Đây là email tự động từ hệ thống LMS. Vui lòng liên hệ giáo viên nếu có thắc mắc.</p>
+        </div>
+        <div class="footer">
+            <div class="footer-text">
+                &copy; 2026 LMS Platform, Inc.<br>
+                Empowering the future of digital learning.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

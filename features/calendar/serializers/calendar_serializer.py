@@ -65,6 +65,31 @@ class CalendarEventCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class RecurringSlotSerializer(serializers.Serializer):
+    start_time = serializers.DateTimeField()
+    end_time = serializers.DateTimeField()
+
+
+class RecurringScheduleCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200)
+    type = serializers.ChoiceField(choices=['class', 'exam', 'deadline', 'study_session'], default='class')
+    description = serializers.CharField(required=False, allow_blank=True, default='')
+    classroom_id = serializers.UUIDField(required=False, allow_null=True)
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+    slots = RecurringSlotSerializer(many=True)
+
+    def validate(self, attrs):
+        if attrs['end_date'] < attrs['start_date']:
+            raise serializers.ValidationError({'end_date': 'Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.'})
+        if not attrs.get('slots'):
+            raise serializers.ValidationError({'slots': 'Vui lòng cung cấp ít nhất 1 slot thời gian.'})
+        for slot in attrs['slots']:
+            if slot['end_time'] <= slot['start_time']:
+                raise serializers.ValidationError({'slots': 'Mỗi slot phải có end_time > start_time.'})
+        return attrs
+
+
 TYPE_COLORS = {
     'class': 'indigo',
     'exam': 'rose',
