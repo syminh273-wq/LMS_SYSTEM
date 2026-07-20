@@ -18,7 +18,12 @@ class ConsumerLeaveRequestViewSet(UserScopeMixin, ViewSet):
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def list(self, request):
-        requests = LeaveRequestService().repository.get_by_student(request.user.uid)
+        service = LeaveRequestService()
+        classroom_id = request.query_params.get('classroom_id')
+        if classroom_id:
+            requests = service.list_for_classroom(classroom_id, student_id=request.user.uid)
+        else:
+            requests = service.repository.get_by_student(request.user.uid)
         return Response(LeaveRequestSerializer(requests, many=True).data)
 
     def retrieve(self, request, pk=None):
@@ -50,6 +55,7 @@ class ConsumerLeaveRequestViewSet(UserScopeMixin, ViewSet):
             event_id=data.get('event_id'),
             start_date=data.get('start_date'),
             end_date=data.get('end_date'),
+            classroom_id=data.get('classroom_id'),
         )
         return Response(LeaveRequestSerializer(leave).data, status=status.HTTP_201_CREATED)
 

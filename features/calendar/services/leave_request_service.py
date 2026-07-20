@@ -20,7 +20,7 @@ class LeaveRequestService(BaseService):
         return self.attendance_service
 
     def submit_request(self, student_id, space_id, reason, evidence_file=None, event_id=None,
-                       start_date=None, end_date=None):
+                       start_date=None, end_date=None, classroom_id=None):
         evidence_url = None
         if evidence_file:
             upload_result = self.resource_service.upload_resource(
@@ -32,9 +32,19 @@ class LeaveRequestService(BaseService):
             if upload_result.get('success') and upload_result.get('data'):
                 evidence_url = upload_result['data'].url
 
+        resolved_classroom_id = classroom_id
+        if not resolved_classroom_id and event_id:
+            try:
+                from features.calendar.repositories.calendar_event_repository import CalendarEventRepository
+                event = CalendarEventRepository().find(event_id)
+                resolved_classroom_id = event.classroom_id
+            except Exception:
+                resolved_classroom_id = None
+
         return self.create(
             student_id=student_id,
             space_id=space_id,
+            classroom_id=resolved_classroom_id,
             reason=reason,
             evidence_url=evidence_url,
             event_id=event_id,
@@ -42,6 +52,9 @@ class LeaveRequestService(BaseService):
             end_date=end_date,
             status='pending',
         )
+
+    def list_for_classroom(self, classroom_id, student_id=None, status=None):
+        return self.repository.get_by_classroom(classroom_id, student_id=student_id, status=status)
 
     def process_request(self, request_uid, teacher_id, status, rejection_reason=None):
         if status not in ('approved', 'rejected'):

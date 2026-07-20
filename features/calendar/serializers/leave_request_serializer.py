@@ -15,10 +15,10 @@ class LeaveRequestSerializer(serializers.Serializer):
     student_name = serializers.SerializerMethodField()
     student_email = serializers.SerializerMethodField()
     space_id = serializers.UUIDField()
-    event_id = serializers.UUIDField(required=False, allow_null=True)
-    event_title = serializers.SerializerMethodField()
     classroom_id = serializers.SerializerMethodField()
     classroom_name = serializers.SerializerMethodField()
+    event_id = serializers.UUIDField(required=False, allow_null=True)
+    event_title = serializers.SerializerMethodField()
     start_date = serializers.DateTimeField(required=False, allow_null=True)
     end_date = serializers.DateTimeField(required=False, allow_null=True)
     reason = serializers.CharField()
@@ -105,14 +105,16 @@ class LeaveRequestSerializer(serializers.Serializer):
         return info.get('title') if info else None
 
     def get_classroom_id(self, obj):
+        direct = getattr(obj, 'classroom_id', None)
+        if direct:
+            return str(direct)
         if not getattr(obj, 'event_id', None):
             return None
         info = self._get_event(obj.event_id)
         return info.get('classroom_id') if info else None
 
     def get_classroom_name(self, obj):
-        info = self._get_event(obj.event_id) if getattr(obj, 'event_id', None) else None
-        classroom_id = info.get('classroom_id') if info else None
+        classroom_id = self.get_classroom_id(obj)
         if not classroom_id:
             return None
         cache = self._classroom_cache()
@@ -136,9 +138,11 @@ class LeaveRequestSerializer(serializers.Serializer):
 
 class LeaveRequestCreateSerializer(serializers.Serializer):
     event_id = serializers.UUIDField(required=False, allow_null=True)
+    classroom_id = serializers.UUIDField(required=False, allow_null=True)
     start_date = serializers.DateTimeField(required=False, allow_null=True)
     end_date = serializers.DateTimeField(required=False, allow_null=True)
     reason = serializers.CharField(max_length=2000)
+    evidence_file = serializers.FileField(required=False, allow_null=True, write_only=True)
 
     def validate(self, attrs):
         start = attrs.get('start_date')

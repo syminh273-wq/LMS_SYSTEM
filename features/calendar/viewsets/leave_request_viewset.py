@@ -21,6 +21,9 @@ class LeaveRequestViewSet(UserScopeMixin, ViewSet):
         student_id = request.query_params.get('student_id')
         classroom_id = request.query_params.get('classroom_id')
 
+        if classroom_id:
+            return service.list_for_classroom(classroom_id, student_id=student_id, status=status_filter)
+
         if student_id:
             requests = service.repository.get_by_space_student(request.user.uid, student_id)
         elif status_filter == 'pending':
@@ -30,20 +33,11 @@ class LeaveRequestViewSet(UserScopeMixin, ViewSet):
         else:
             requests = service.repository.get_by_space(request.user.uid)
 
-        if classroom_id:
-            requests = self._filter_by_classroom(requests, classroom_id)
-
         return requests
 
     def _filter_by_classroom(self, requests, classroom_id):
-        from features.calendar.repositories.calendar_event_repository import CalendarEventRepository
-
-        event_repo = CalendarEventRepository()
         target = str(classroom_id)
-        matching_event_ids = {
-            str(e.uid) for e in event_repo.get_by_classroom(target) if e.uid is not None
-        }
-        return [r for r in requests if r.event_id and str(r.event_id) in matching_event_ids]
+        return [r for r in requests if r.classroom_id and str(r.classroom_id) == target]
 
     def list(self, request):
         requests = self._get_queryset(request)
