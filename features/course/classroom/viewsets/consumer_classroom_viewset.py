@@ -74,11 +74,18 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
         joined_uids = set(str(u) for u in ClassroomMemberService().get_joined_classroom_uids(request.user.uid))
 
+        member_repo = ClassroomMemberRepository()
         results = []
         for c in classrooms:
             data = ClassroomResponseSerializer(c).data
             data['is_joined'] = str(c.uid) in joined_uids
-            data['has_paid'] = data['is_joined'] and bool(getattr(c, 'pricing_type', 'free') == 'paid' and str(c.uid) in joined_uids)
+            member = member_repo.get_member(c.uid, request.user.uid)
+            if member and not member.is_deleted:
+                data['membership_status'] = member.status
+                data['has_paid'] = bool(getattr(member, 'has_paid', False))
+            else:
+                data['membership_status'] = None
+                data['has_paid'] = False
             results.append(data)
 
         paginator = self.pagination_class()
@@ -127,10 +134,11 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
         existing = ClassroomMemberService().is_member(classroom.uid, request.user.uid)
         if existing:
+            member = ClassroomMemberRepository().get_member(classroom.uid, request.user.uid)
             return Response({
                 'joined': True,
                 'requires_payment': False,
-                'membership_status': 'approved',
+                'membership_status': getattr(member, 'status', 'approved') if member else 'approved',
                 'classroom_uid': str(classroom.uid),
             })
 
@@ -159,7 +167,7 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         return Response({
             'joined': True,
             'requires_payment': False,
-            'membership_status': getattr(member, 'status', 'approved'),
+            'membership_status': getattr(member, 'status', 'pending'),
             'classroom_uid': str(classroom.uid),
         })
 

@@ -16,30 +16,6 @@ class ClassroomMemberService:
         avatar = getattr(user, 'avatar_url', '') or getattr(user, 'logo_url', '') or ''
         member_type = 'space' if hasattr(user, 'logo_url') else 'consumer'
 
-        classroom = None
-        try:
-            from features.course.classroom.repositories import Repository as ClassroomRepo
-            classroom = ClassroomRepo().find(str(classroom_uid))
-        except Exception:
-            pass
-
-        if classroom and getattr(classroom, 'pricing_type', 'free') == 'free':
-            member = self.repo.create(
-                member_id=user.uid,
-                classroom_uid=classroom_uid,
-                member_type=member_type,
-                member_name=name,
-                member_avatar=avatar,
-                role=role,
-                status='approved',
-                has_paid=True,
-            )
-            try:
-                self._register_teacher_contact(classroom, user.uid, name, avatar)
-            except Exception as exc:
-                logger.warning(f"[ClassroomMember] Failed to register teacher contact on free join: {exc}")
-            return member
-
         member = self.repo.create(
             member_id=user.uid,
             classroom_uid=classroom_uid,
@@ -58,21 +34,27 @@ class ClassroomMemberService:
 
         return member
 
-    def approve_paid_member(self, classroom_uid, consumer_id):
-        """Called by payment IPN after a successful MoMo transaction."""
+    def mark_paid_pending(self, classroom_uid, consumer_id):
+        """Called by payment IPN after a successful MoMo transaction.
+
+        Marks `has_paid=True` and keeps `status='pending'` so the teacher
+        still has to approve. The student sees a 'Đã thanh toán · Chờ duyệt'
+        state in the UI until approval.
+        """
         from features.course.classroom.services.classroom_service import Service
         from features.account.consumer.repositories import ConsumerRepository
-        from features.account.consumer.models.consumer import Consumer
+        from datetime import datetime
 
         classroom = Service().find(str(classroom_uid))
         consumer = ConsumerRepository().find(consumer_id)
         if not consumer:
-            logger.warning(f"[ClassroomMember] approve_paid_member: consumer {consumer_id} not found")
+            logger.warning(f"[ClassroomMember] mark_paid_pending: consumer {consumer_id} not found")
             return None
 
         existing = self.repo.get_member(classroom_uid, consumer_id)
         if existing and not existing.is_deleted:
-            member = self.repo.approve_paid_member(classroom_uid, consumer_id)
+            self.repo.update(existing, has_paid=True, paid_at=datetime.utcnow())
+            member = existing
         else:
             name = getattr(consumer, 'full_name', '') or getattr(consumer, 'username', '') or ''
             avatar = getattr(consumer, 'avatar_url', '') or ''
@@ -83,34 +65,39 @@ class ClassroomMemberService:
                 member_name=name,
                 member_avatar=avatar,
                 role='student',
-                status='approved',
+                status='pending',
                 has_paid=True,
+                paid_at=datetime.utcnow(),
             )
 
         try:
-            self._register_teacher_contact(classroom, consumer_id, member.member_name, member.member_avatar)
+            self._notify_teacher_pending(classroom_uid, consumer, member.member_name)
         except Exception as exc:
-            logger.warning(f"[ClassroomMember] Failed to register teacher contact after payment: {exc}")
-
-        self._push_membership_event(consumer_id, classroom_uid, classroom.name, 'approved')
+            logger.warning(f"[ClassroomMember] Failed to notify teacher after payment: {exc}")
+        self._push_pending_signal(classroom_uid, member.member_name)
 
         try:
             from features.notification.services.notification_service import NotificationService
             NotificationService().send_notification(
                 target_uid=consumer_id,
-                notify_type='classroom_paid_approved',
+                notify_type='classroom_payment_received',
                 title='Thanh toán thành công',
-                content=f'Bạn đã được thêm vào lớp "{classroom.name}"',
+                content=f'Bạn đã thanh toán cho lớp "{classroom.name}". Vui lòng chờ giáo viên duyệt.',
                 metadata={
                     'classroom_uid': str(classroom.uid),
                     'classroom_name': classroom.name,
-                    'status': 'approved',
+                    'status': 'pending',
                 },
             )
         except Exception as exc:
-            logger.warning(f"[ClassroomMember] Failed to send paid-approval notification: {exc}")
+            logger.warning(f"[ClassroomMember] Failed to send payment notification: {exc}")
 
         return member
+
+    def approve_paid_member(self, classroom_uid, consumer_id):
+        """Backward-compatible alias. Always sets status='pending' and
+        has_paid=True. Teacher must still call `approve` to finalize."""
+        return self.mark_paid_pending(classroom_uid, consumer_id)
 
     def _register_teacher_contact(self, classroom, consumer_id, name, avatar):
         from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
