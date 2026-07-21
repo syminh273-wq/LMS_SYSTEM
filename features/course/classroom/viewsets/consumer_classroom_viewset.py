@@ -194,23 +194,36 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         if is_paid_classroom and not has_paid:
             data = ClassroomResponseSerializer(instance).data
             data['has_access'] = False
-            data['has_paid'] = False
+            data['has_paid'] = has_paid
             data['requires_payment'] = True
+            data['join_required'] = True
             data['membership_status'] = getattr(member, 'status', None) if member else None
             return Response(data)
 
+        if member and not member.is_deleted and member.status == 'pending':
+            data = ClassroomResponseSerializer(instance).data
+            data['has_access'] = False
+            data['has_paid'] = bool(getattr(member, 'has_paid', False))
+            data['requires_payment'] = False
+            data['join_required'] = False
+            data['membership_status'] = 'pending'
+            return Response(data)
+
         if not member or member.is_deleted:
-            return Response({'error': 'Bạn chưa đăng ký tham gia lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
-        if member.status == 'pending':
-            return Response(
-                {'error': 'Yêu cầu của bạn đang chờ giáo viên phê duyệt.', 'membership_status': 'pending'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            data = ClassroomResponseSerializer(instance).data
+            data['has_access'] = False
+            data['has_paid'] = False
+            data['requires_payment'] = is_paid_classroom
+            data['join_required'] = True
+            data['membership_status'] = None
+            return Response(data)
 
         data = ClassroomResponseSerializer(instance).data
         data['has_access'] = True
         data['has_paid'] = has_paid
         data['requires_payment'] = False
+        data['join_required'] = False
+        data['membership_status'] = 'approved'
         return Response(data)
 
     @action(detail=False, methods=['post'], url_path='join')
