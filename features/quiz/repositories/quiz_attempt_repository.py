@@ -21,6 +21,10 @@ class QuizAttemptRepository:
             )
         ))
 
+    def iter_classroom_attempts(self, classroom_id):
+        """Iterate every quiz attempt in a classroom across all quizzes (ALLOW FILTERING)."""
+        return QuizAttempt.objects.filter(classroom_id=classroom_id).allow_filtering()
+
     def create_attempt(self, quiz_id, classroom_id, student_id, attempt_number,
                        score, total_questions, score_pct, time_taken_seconds,
                        answers: dict) -> QuizAttempt:

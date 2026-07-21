@@ -22,6 +22,10 @@ class ExamSubmissionRepository:
     def list_by_student(self, student_id):
         return ExamSubmission.objects(student_id=student_id, is_deleted=False)
 
+    def iter_by_classroom(self, classroom_id):
+        """Iterate every non-deleted submission in a classroom (uses ALLOW FILTERING)."""
+        return ExamSubmission.objects(classroom_id=classroom_id, is_deleted=False).allow_filtering()
+
     def list_by_exam_and_student(self, exam_id, student_id):
         rows = self.list_by_exam(exam_id)
         return [row for row in rows if str(row.student_id) == str(student_id)]
