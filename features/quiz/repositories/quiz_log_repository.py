@@ -21,6 +21,10 @@ class QuizLogRepository:
             )
         ))
 
+    def iter_classroom_logs(self, classroom_id):
+        """Iterate every quiz log in a classroom across all quizzes (ALLOW FILTERING)."""
+        return QuizLog.objects.filter(classroom_id=classroom_id).allow_filtering()
+
     def create(self, quiz_id, classroom_id, student_id, attempt_number,
                score, total_questions, score_pct, time_taken_seconds,
                answers: dict, source: str = "game", exam_id=None) -> QuizLog:
