@@ -15,6 +15,7 @@ class ClassroomMemberService:
         name = getattr(user, 'full_name', '') or getattr(user, 'username', '') or ''
         avatar = getattr(user, 'avatar_url', '') or getattr(user, 'logo_url', '') or ''
         member_type = 'space' if hasattr(user, 'logo_url') else 'consumer'
+
         member = self.repo.create(
             member_id=user.uid,
             classroom_uid=classroom_uid,
@@ -29,10 +30,91 @@ class ClassroomMemberService:
         except Exception as e:
             logger.warning(f"[ClassroomMember] Failed to send pending notification: {e}")
 
-        # Firebase realtime signal → teacher's UI updates badge count immediately
         self._push_pending_signal(classroom_uid, name)
 
         return member
+
+    def mark_paid_pending(self, classroom_uid, consumer_id):
+        """Called by payment IPN after a successful MoMo transaction.
+
+        Marks `has_paid=True` and keeps `status='pending'` so the teacher
+        still has to approve. The student sees a 'Đã thanh toán · Chờ duyệt'
+        state in the UI until approval.
+        """
+        from features.course.classroom.services.classroom_service import Service
+        from features.account.consumer.repositories import ConsumerRepository
+        from datetime import datetime
+
+        classroom = Service().find(str(classroom_uid))
+        consumer = ConsumerRepository().find(consumer_id)
+        if not consumer:
+            logger.warning(f"[ClassroomMember] mark_paid_pending: consumer {consumer_id} not found")
+            return None
+
+        existing = self.repo.get_member(classroom_uid, consumer_id)
+        if existing and not existing.is_deleted:
+            self.repo.update(existing, has_paid=True, paid_at=datetime.utcnow())
+            member = existing
+        else:
+            name = getattr(consumer, 'full_name', '') or getattr(consumer, 'username', '') or ''
+            avatar = getattr(consumer, 'avatar_url', '') or ''
+            member = self.repo.create(
+                member_id=consumer.uid,
+                classroom_uid=classroom_uid,
+                member_type='consumer',
+                member_name=name,
+                member_avatar=avatar,
+                role='student',
+                status='pending',
+                has_paid=True,
+                paid_at=datetime.utcnow(),
+            )
+
+        try:
+            self._notify_teacher_pending(classroom_uid, consumer, member.member_name)
+        except Exception as exc:
+            logger.warning(f"[ClassroomMember] Failed to notify teacher after payment: {exc}")
+        self._push_pending_signal(classroom_uid, member.member_name)
+
+        try:
+            from features.notification.services.notification_service import NotificationService
+            NotificationService().send_notification(
+                target_uid=consumer_id,
+                notify_type='classroom_payment_received',
+                title='Thanh toán thành công',
+                content=f'Bạn đã thanh toán cho lớp "{classroom.name}". Vui lòng chờ giáo viên duyệt.',
+                metadata={
+                    'classroom_uid': str(classroom.uid),
+                    'classroom_name': classroom.name,
+                    'status': 'pending',
+                },
+            )
+        except Exception as exc:
+            logger.warning(f"[ClassroomMember] Failed to send payment notification: {exc}")
+
+        return member
+
+    def approve_paid_member(self, classroom_uid, consumer_id):
+        """Backward-compatible alias. Always sets status='pending' and
+        has_paid=True. Teacher must still call `approve` to finalize."""
+        return self.mark_paid_pending(classroom_uid, consumer_id)
+
+    def _register_teacher_contact(self, classroom, consumer_id, name, avatar):
+        from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
+        from features.account.consumer.repositories import ConsumerRepository
+        from core.search_engine.typesense.indexer import LMSIndexer
+        consumer = ConsumerRepository().find(consumer_id)
+        contact = TeacherContactRepository().register(
+            teacher_id=classroom.teacher_id,
+            consumer_uid=consumer_id,
+            consumer_name=name,
+            consumer_email=getattr(consumer, 'email', ''),
+            consumer_avatar=avatar or '',
+            first_name=getattr(consumer, 'first_name', '') or '',
+            last_name=getattr(consumer, 'last_name', '') or '',
+        )
+        if contact:
+            LMSIndexer.index_teacher_contact(contact)
 
     def approve(self, classroom_uid, member_id, approved_by_id):
         from features.course.classroom.services.classroom_service import Service

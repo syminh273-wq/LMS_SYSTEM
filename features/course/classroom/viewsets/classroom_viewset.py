@@ -204,6 +204,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         return Response({
             'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
             'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
+            'preview_folder_uid': str(tree['preview_folder'].uid) if tree.get('preview_folder') else None,
         })
 
     @action(detail=True, methods=['post'], url_path='docs/reorder')
@@ -238,14 +239,18 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             serializer = ResourceFolderCreateRequestSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             data = serializer.validated_data
-            folder = folder_service.create_folder(
-                classroom_id=classroom_uuid,
-                teacher_id=request.user.uid,
-                name=data['name'],
-                parent_folder_id=data.get('parent_folder_id'),
-                order_index=data.get('order_index', 0),
-                color=data.get('color'),
-            )
+            try:
+                folder = folder_service.create_folder(
+                    classroom_id=classroom_uuid,
+                    teacher_id=request.user.uid,
+                    name=data['name'],
+                    parent_folder_id=data.get('parent_folder_id'),
+                    order_index=data.get('order_index', 0),
+                    color=data.get('color'),
+                    is_preview_only=data.get('is_preview_only', False),
+                )
+            except ValueError as exc:
+                return Response({'success': False, 'message': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
             ClassroomActivityLogService().log(
                 classroom_uid=uid,
                 log_level='detail',
@@ -296,6 +301,16 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        if 'is_preview_only' in data:
+            target = bool(data['is_preview_only'])
+            if target:
+                other = folder_service.repository.get_preview_folder(folder.classroom_id)
+                if other and str(other.uid) != str(folder.uid):
+                    return Response(
+                        {'success': False, 'message': 'Lớp học đã có Preview folder khác.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            folder_service.repository.update(folder, is_preview_only=target)
         if 'name' in data:
             folder_service.rename_folder(folder, data['name'])
         if 'parent_folder_id' in data:

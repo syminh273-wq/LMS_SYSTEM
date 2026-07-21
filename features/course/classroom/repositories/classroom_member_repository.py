@@ -31,3 +31,29 @@ class ClassroomMemberRepository(BaseRepository):
         if m and not m.is_deleted:
             m.update(status='approved')
         return m
+
+    def approve_paid_member(self, classroom_uid, member_id):
+        from datetime import datetime
+        m = self.get_member(classroom_uid, member_id)
+        if not m or m.is_deleted:
+            return None
+        m.update(
+            status='approved',
+            has_paid=True,
+            paid_at=datetime.utcnow(),
+        )
+        return m
+
+    def mark_paid(self, classroom_uid, member_id):
+        from datetime import datetime
+        m = self.get_member(classroom_uid, member_id)
+        if not m or m.is_deleted:
+            return None
+        m.update(has_paid=True, paid_at=datetime.utcnow())
+        return m
+
+    def get_paid_member(self, classroom_uid, member_id):
+        m = self.get_member(classroom_uid, member_id)
+        if not m or m.is_deleted:
+            return None
+        return m if (m.has_paid and m.status == 'approved') else None

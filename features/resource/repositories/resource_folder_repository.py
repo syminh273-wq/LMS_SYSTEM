@@ -23,6 +23,20 @@ class ResourceFolderRepository(BaseRepository):
             is_deleted=False,
         )
 
+    def get_preview_folder(self, classroom_id):
+        return self.filter(
+            classroom_id=classroom_id,
+            is_preview_only=True,
+            is_deleted=False,
+        ).first()
+
+    def count_preview_folders(self, classroom_id):
+        return self.model.objects.filter(
+            classroom_id=classroom_id,
+            is_preview_only=True,
+            is_deleted=False,
+        ).count()
+
     def find(self, uid):
         try:
             folder_uid = uid if isinstance(uid, UUID) else UUID(str(uid))

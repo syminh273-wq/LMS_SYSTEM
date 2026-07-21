@@ -107,15 +107,50 @@ class ClassroomDocService:
         folder_uuid = _uuid.UUID(str(folder_id)) if folder_id else None
         return self._resource_repo.get_by_owner_and_folder(owner_id, folder_uuid)
 
-    def list_tree(self, classroom_uid: str):
-        """Return {folders: [...], docs_root: [...]} for the classroom."""
+    def list_tree(self, classroom_uid: str, consumer_id=None):
+        """Return {folders: [...], docs_root: [...]} for the classroom.
+
+        When a consumer_id is provided and the classroom is paid, restrict
+        the result to the preview folder + its docs.
+        """
+        from features.course.classroom.repositories import Repository as ClassroomRepository
+        from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
+
         owner_id = _uuid.UUID(str(classroom_uid))
+        preview_only = False
+        if consumer_id is not None:
+            try:
+                classroom = ClassroomRepository().find(str(classroom_uid))
+                if getattr(classroom, 'pricing_type', 'free') == 'paid':
+                    member = ClassroomMemberRepository().get_paid_member(classroom_uid, consumer_id)
+                    if member is None:
+                        preview_only = True
+            except Exception:
+                pass
+
+        if preview_only:
+            preview_folder = self._folder_repo.get_preview_folder(owner_id)
+            folders = [preview_folder] if preview_folder else []
+            preview_folder_id = preview_folder.uid if preview_folder else None
+            docs_root = self._resource_repo.get_by_owner_and_folder(owner_id, preview_folder_id)
+            return {
+                'folders': folders,
+                'docs_root': [],
+                'preview_only': True,
+                'preview_folder': preview_folder,
+            }
+
         folders = self._folder_service.list_tree(owner_id)
         root_docs = self._resource_repo.get_by_owner_and_folder(owner_id, None)
         return {
             'folders': folders,
             'docs_root': root_docs,
+            'preview_only': False,
         }
+
+    def get_preview_folder(self, classroom_uid: str):
+        owner_id = _uuid.UUID(str(classroom_uid))
+        return self._folder_repo.get_preview_folder(owner_id)
 
     def reorder(self, classroom_uid: str, items):
         """items: list of {uid, folder_id?, order_index?}.

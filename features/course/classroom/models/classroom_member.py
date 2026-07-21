@@ -15,6 +15,8 @@ class ClassroomMember(DjangoCassandraModel):
     is_deleted = columns.Boolean(default=False)
     is_verified = columns.Boolean(default=False)
     verified_at = columns.DateTime(required=False)
+    has_paid = columns.Boolean(default=False, index=True)
+    paid_at = columns.DateTime(required=False)
 
     __table_name__ = 'course_classroom_members'
 

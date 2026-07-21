@@ -9,6 +9,7 @@ class ResourceFolderResponseSerializer(serializers.Serializer):
     owner_id = serializers.UUIDField(read_only=True)
     order_index = serializers.IntegerField(required=False, default=0)
     color = serializers.CharField(allow_blank=True, allow_null=True, required=False)
+    is_preview_only = serializers.BooleanField(required=False, default=False)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
 
@@ -18,6 +19,7 @@ class ResourceFolderCreateRequestSerializer(serializers.Serializer):
     parent_folder_id = serializers.UUIDField(required=False, allow_null=True)
     order_index = serializers.IntegerField(required=False, default=0)
     color = serializers.CharField(max_length=32, required=False, allow_null=True, allow_blank=True)
+    is_preview_only = serializers.BooleanField(required=False, default=False)
 
 
 class ResourceFolderUpdateRequestSerializer(serializers.Serializer):
@@ -25,3 +27,4 @@ class ResourceFolderUpdateRequestSerializer(serializers.Serializer):
     parent_folder_id = serializers.UUIDField(required=False, allow_null=True)
     order_index = serializers.IntegerField(required=False)
     color = serializers.CharField(max_length=32, required=False, allow_null=True, allow_blank=True)
+    is_preview_only = serializers.BooleanField(required=False)

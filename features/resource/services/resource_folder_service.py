@@ -10,7 +10,11 @@ class ResourceFolderService(BaseService):
         self.repository = ResourceFolderRepository()
         self.resource_repository = ResourceRepository()
 
-    def create_folder(self, classroom_id, teacher_id, name, parent_folder_id=None, order_index=0, color=None):
+    def create_folder(self, classroom_id, teacher_id, name, parent_folder_id=None, order_index=0, color=None, is_preview_only=False):
+        if is_preview_only:
+            existing = self.repository.count_preview_folders(classroom_id)
+            if existing > 0:
+                raise ValueError('Lớp học này đã có Preview folder. Mỗi lớp chỉ được tạo tối đa 1 Preview folder.')
         data = {
             'classroom_id': UUID(str(classroom_id)),
             'name': name,
@@ -18,6 +22,7 @@ class ResourceFolderService(BaseService):
             'owner_id': UUID(str(teacher_id)),
             'order_index': int(order_index or 0),
             'color': color or None,
+            'is_preview_only': bool(is_preview_only),
         }
         return self.repository.create(**data)
 
@@ -29,6 +34,19 @@ class ResourceFolderService(BaseService):
         if new_parent_uuid and new_parent_uuid == folder.uid:
             raise ValueError('Folder cannot be its own parent.')
         return self.repository.update(folder, parent_folder_id=new_parent_uuid)
+
+    def ensure_preview_folder(self, classroom_id, teacher_id):
+        existing = self.repository.get_preview_folder(classroom_id)
+        if existing:
+            return existing, False
+        folder = self.create_folder(
+            classroom_id=classroom_id,
+            teacher_id=teacher_id,
+            name='Preview',
+            order_index=-1,
+            is_preview_only=True,
+        )
+        return folder, True
 
     def delete_folder(self, folder):
         """Soft-delete folder + descendants, move docs to root."""

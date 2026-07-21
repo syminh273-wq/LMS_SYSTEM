@@ -7,6 +7,9 @@ from features.social.viewsets.post_viewset import (
 from features.social.viewsets.follow_viewset import (
     FollowToggleView, FollowingListView, FollowersListView, FollowStatusView
 )
+from features.social.viewsets.classroom_favorite_viewset import (
+    ClassroomFavoriteToggleView, ClassroomFavoriteStatusView, ClassroomFavoriteListView,
+)
 
 urlpatterns = [
     # Posts & Feed
@@ -25,4 +28,9 @@ urlpatterns = [
     path('follow/status/<str:target_uid>/',        FollowStatusView.as_view(),       name='social-follow-status'),
     path('following/',                             FollowingListView.as_view(),      name='social-following-list'),
     path('followers/',                             FollowersListView.as_view(),      name='social-followers-list'),
+
+    # Classroom favorites
+    path('classrooms/favorites/',                  ClassroomFavoriteListView.as_view(),  name='social-classroom-favorites'),
+    path('classrooms/<str:classroom_uid>/favorite/',         ClassroomFavoriteToggleView.as_view(), name='social-classroom-favorite'),
+    path('classrooms/<str:classroom_uid>/favorite/status/',  ClassroomFavoriteStatusView.as_view(), name='social-classroom-favorite-status'),
 ]

@@ -12,6 +12,7 @@ class ResourceFolder(BaseTimeStampModel):
     owner_id = columns.UUID(index=True)
     order_index = columns.Integer(default=0)
     color = columns.Text(required=False)
+    is_preview_only = columns.Boolean(default=False, index=True)
 
     class Meta:
         get_pk_field = 'uid'
