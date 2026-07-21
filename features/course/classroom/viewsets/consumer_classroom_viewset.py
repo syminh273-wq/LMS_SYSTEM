@@ -178,20 +178,6 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         """GET /api/v1/consumer/course/classrooms/{uid}/access/ — poll endpoint for checkout flow."""
         return Response(Service().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
 
-    @action(detail=True, methods=['get'], url_path='lessons')
-    def lessons(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/lessons/ — gated by paid status."""
-        from core.serializers.course import CourseLessonResponseSerializer
-        from features.course.classroom.services.classroom_lesson_service import ClassroomLessonService
-
-        result = ClassroomLessonService().list_lessons(pk, consumer_id=str(request.user.uid))
-        return Response({
-            'lessons': CourseLessonResponseSerializer(result['lessons'], many=True).data,
-            'pricing_type': result['pricing_type'],
-            'is_locked': result['is_locked'],
-            'is_paid_member': result['is_paid_member'],
-        })
-
     @action(detail=True, methods=['get'], url_path='preview-folder')
     def preview_folder(self, request, pk=None):
         """GET /api/v1/consumer/course/classrooms/{uid}/preview-folder/ — always accessible."""

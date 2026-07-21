@@ -7,7 +7,6 @@ class ClassroomRequestSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=['active', 'private'], required=False, default='active')
     pricing_type = serializers.ChoiceField(choices=['free', 'paid'], required=False, default='free')
     price_vnd = serializers.IntegerField(required=False, default=0, min_value=0)
-    course_uid = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs.get('pricing_type') == 'paid':

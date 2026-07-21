@@ -10,7 +10,6 @@ class ClassroomResponseSerializer(serializers.Serializer):
     status = serializers.CharField()
     pricing_type = serializers.CharField()
     price_vnd = serializers.IntegerField()
-    course_uid = serializers.UUIDField(allow_null=True, required=False)
     preview_folder_uid = serializers.SerializerMethodField()
     has_access = serializers.BooleanField(read_only=True, required=False)
     has_paid = serializers.BooleanField(read_only=True, required=False)
