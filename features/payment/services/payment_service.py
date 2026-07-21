@@ -79,13 +79,8 @@ class PaymentService:
             consumer_id = meta.get('consumer_id')
 
             if resource_type == 'classroom':
-                from features.course.classroom.repositories import Repository as ClassroomRepo
                 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
-                from features.account.consumer.repositories import ConsumerRepository
-
-                classroom = ClassroomRepo().find(resource_id)
-                consumer = ConsumerRepository().find(consumer_id)
-                ClassroomMemberService().join(classroom.uid, consumer, role='student')
+                ClassroomMemberService().approve_paid_member(resource_id, consumer_id)
             elif resource_type == 'course':
                 from features.course.services import (
                     CourseService,

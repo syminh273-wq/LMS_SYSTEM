@@ -58,7 +58,25 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         except ValueError:
             return Response({'error': 'ID lớp không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        instance = Service().find(pk)
+        if getattr(instance, 'status', 'active') == 'private':
+            return Response({'error': 'Lớp học này không khả dụng.'}, status=status.HTTP_403_FORBIDDEN)
+        from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
+        if ClassroomBlacklistService().is_blocked(instance.uid, instance.teacher_id, request.user.uid):
+            return Response({'error': 'Bạn đã bị chặn khỏi lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+
         member = ClassroomMemberRepository().get_member(classroom_uid, request.user.uid)
+        has_paid = bool(member and not member.is_deleted and getattr(member, 'has_paid', False) and member.status == 'approved')
+        is_paid_classroom = getattr(instance, 'pricing_type', 'free') == 'paid'
+
+        if is_paid_classroom and not has_paid:
+            data = ClassroomResponseSerializer(instance).data
+            data['has_access'] = False
+            data['has_paid'] = False
+            data['requires_payment'] = True
+            data['membership_status'] = getattr(member, 'status', None) if member else None
+            return Response(data)
+
         if not member or member.is_deleted:
             return Response({'error': 'Bạn chưa đăng ký tham gia lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         if member.status == 'pending':
@@ -67,13 +85,11 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        instance = Service().find(pk)
-        if getattr(instance, 'status', 'active') == 'private':
-            return Response({'error': 'Lớp học này không khả dụng.'}, status=status.HTTP_403_FORBIDDEN)
-        from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
-        if ClassroomBlacklistService().is_blocked(instance.uid, instance.teacher_id, request.user.uid):
-            return Response({'error': 'Bạn đã bị chặn khỏi lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
-        return Response(ClassroomResponseSerializer(instance).data)
+        data = ClassroomResponseSerializer(instance).data
+        data['has_access'] = True
+        data['has_paid'] = has_paid
+        data['requires_payment'] = False
+        return Response(data)
 
     @action(detail=False, methods=['post'], url_path='join')
     def join_by_code(self, request):
@@ -91,15 +107,105 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         if ClassroomBlacklistService().is_blocked(classroom.uid, classroom.teacher_id, request.user.uid):
             return Response({'error': 'Bạn đã bị chặn khỏi lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
 
+        if getattr(classroom, 'pricing_type', 'free') == 'paid':
+            try:
+                from features.payment.services import PaymentService
+                result = PaymentService().initiate(
+                    consumer_id=str(request.user.uid),
+                    amount=int(classroom.price_vnd or 0),
+                    order_info=f'Lớp học: {classroom.name}',
+                    resource_type='classroom',
+                    resource_id=str(classroom.uid),
+                )
+            except Exception as exc:
+                return Response({'error': f'Khởi tạo thanh toán thất bại: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'requires_payment': True,
+                'membership_status': 'pending',
+                'classroom_uid': str(classroom.uid),
+                'amount': int(classroom.price_vnd or 0),
+                **result,
+            })
+
         member = ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
-        member_status = getattr(member, 'status', 'pending')
+        member_status = getattr(member, 'status', 'approved')
         return Response(
             {
+                'requires_payment': False,
                 'membership_status': member_status,
-                'message': 'Đã gửi lời mời tham gia lớp này' if member_status == 'pending' else 'Tham gia lớp thành công',
+                'message': 'Tham gia lớp thành công' if member_status == 'approved' else 'Đã gửi lời mời tham gia lớp này',
+                'classroom_uid': str(classroom.uid),
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=['post'], url_path='checkout')
+    def checkout(self, request, pk=None):
+        """POST /api/v1/consumer/course/classrooms/{uid}/checkout/ — initiate MoMo for a paid classroom."""
+        from features.course.classroom.repositories import Repository
+        try:
+            classroom = Repository().find(str(pk))
+        except Exception:
+            return Response({'error': 'Lớp học không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if getattr(classroom, 'pricing_type', 'free') != 'paid':
+            return Response({'error': 'Lớp học này miễn phí, không cần thanh toán.'}, status=status.HTTP_400_BAD_REQUEST)
+        if int(classroom.price_vnd or 0) < 1000:
+            return Response({'error': 'Giá lớp học không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from features.course.classroom.services.classroom_member_service import ClassroomMemberService
+        from features.payment.services import PaymentService
+        ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
+
+        try:
+            result = PaymentService().initiate(
+                consumer_id=str(request.user.uid),
+                amount=int(classroom.price_vnd),
+                order_info=f'Lớp học: {classroom.name}',
+                resource_type='classroom',
+                resource_id=str(classroom.uid),
+            )
+        except Exception as exc:
+            return Response({'error': f'Khởi tạo thanh toán thất bại: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'classroom_uid': str(classroom.uid),
+            'amount': int(classroom.price_vnd),
+            **result,
+        })
+
+    @action(detail=True, methods=['get'], url_path='access')
+    def access(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/access/ — poll endpoint for checkout flow."""
+        return Response(Service().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
+
+    @action(detail=True, methods=['get'], url_path='lessons')
+    def lessons(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/lessons/ — gated by paid status."""
+        from core.serializers.course import CourseLessonResponseSerializer
+        from features.course.classroom.services.classroom_lesson_service import ClassroomLessonService
+
+        result = ClassroomLessonService().list_lessons(pk, consumer_id=str(request.user.uid))
+        return Response({
+            'lessons': CourseLessonResponseSerializer(result['lessons'], many=True).data,
+            'pricing_type': result['pricing_type'],
+            'is_locked': result['is_locked'],
+            'is_paid_member': result['is_paid_member'],
+        })
+
+    @action(detail=True, methods=['get'], url_path='preview-folder')
+    def preview_folder(self, request, pk=None):
+        """GET /api/v1/consumer/course/classrooms/{uid}/preview-folder/ — always accessible."""
+        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+        from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
+
+        folder = ClassroomDocService().get_preview_folder(str(pk))
+        if not folder:
+            return Response({'folder': None, 'docs': []})
+        docs = ClassroomDocService().list_folder(classroom_uid=str(pk), folder_id=str(folder.uid))
+        return Response({
+            'folder': ResourceFolderResponseSerializer(folder).data,
+            'docs': ResourceResponseSerializer(docs, many=True).data,
+        })
 
     @action(detail=True, methods=['get'])
     def conversation(self, request, pk=None):
@@ -227,17 +333,48 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='docs/tree')
     def docs_tree(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/docs/tree/ — read-only mirror."""
-        if not self._check_member(pk, request.user.uid):
-            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+        """GET /api/v1/consumer/course/classrooms/{uid}/docs/tree/ — read-only mirror.
+
+        Paid + non-member → only preview folder + preview docs.
+        Paid + member   → full tree.
+        Free            → full tree (no member check).
+        """
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
         from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
 
-        tree = ClassroomDocService().list_tree(classroom_uid=str(pk))
+        from features.course.classroom.repositories import Repository
+        from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
+        try:
+            classroom = Repository().find(str(pk))
+        except Exception:
+            return Response({'error': 'Lớp học không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+
+        consumer_id = str(request.user.uid)
+        is_paid_classroom = getattr(classroom, 'pricing_type', 'free') == 'paid'
+        has_access = True
+        if is_paid_classroom:
+            member = ClassroomMemberRepository().get_paid_member(pk, consumer_id)
+            has_access = member is not None
+
+        if not has_access:
+            tree = ClassroomDocService().list_tree(classroom_uid=str(pk), consumer_id=consumer_id)
+            return Response({
+                'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
+                'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
+                'preview_only': True,
+                'requires_payment': True,
+            })
+
+        if not self._check_member(pk, consumer_id):
+            return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+
+        tree = ClassroomDocService().list_tree(classroom_uid=str(pk), consumer_id=consumer_id)
         return Response({
             'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
             'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
+            'preview_only': tree.get('preview_only', False),
+            'requires_payment': False,
         })
 
     # ── Doc reading progress + notes ─────────────────────────────────────────

@@ -12,6 +12,9 @@ class Classroom(BaseTimeStampModel):
     teacher_id = columns.UUID(index=True, required=True)
     max_students = columns.Integer(default=0)
     status = columns.Text(default='active')
+    pricing_type = columns.Text(default='free', index=True)
+    price_vnd = columns.BigInt(default=0)
+    course_uid = columns.UUID(index=True, required=False)
 
     class Meta:
         get_pk_field = 'uid'
