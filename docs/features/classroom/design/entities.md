@@ -20,6 +20,8 @@
 | `status` | Text | — | `active` \| `inactive` |
 | `pricing_type` | Text | Indexed | `free` (default) \| `paid` |
 | `price_vnd` | BigInt | — | Price in VND; must be `≥ 1000` if `pricing_type='paid'` |
+| `category` | Text | Indexed | `math` \| `physics` \| `chemistry` \| `biology` \| `language` \| `programming` \| `business` \| `design` \| `music` \| `other` |
+| `visibility_type` | Text | Indexed | `public` (default — shown in consumer Discover page, can be joined directly) \| `private` (only joinable by invite code) |
 | `created_at` | DateTime | — | |
 | `updated_at` | DateTime | — | |
 | `is_deleted` | Boolean | — | Soft delete flag |

@@ -49,6 +49,120 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return paginator.get_paginated_response(ClassroomResponseSerializer(page, many=True).data)
         return Response(ClassroomResponseSerializer(classrooms, many=True).data)
 
+    @action(detail=False, methods=['get'], url_path='discover')
+    def discover(self, request):
+        """GET /api/v1/consumer/course/classrooms/discover/
+
+        Public classroom catalog for the consumer Discover page.
+        Query params:
+            category    (optional) — math, physics, ... see CATEGORY_CHOICES
+            pricing_type (optional) — 'free' or 'paid'
+            search      (optional) — substring match on name + description
+        """
+        category = (request.query_params.get('category') or '').strip().lower() or None
+        pricing_type = (request.query_params.get('pricing_type') or '').strip().lower() or None
+        search = (request.query_params.get('search') or '').strip() or None
+
+        if pricing_type and pricing_type not in ('free', 'paid'):
+            return Response({'error': 'pricing_type không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        classrooms = list(Service().list_discoverable(
+            category=category,
+            pricing_type=pricing_type,
+            search=search,
+        ))
+
+        joined_uids = set(str(u) for u in ClassroomMemberService().get_joined_classroom_uids(request.user.uid))
+
+        results = []
+        for c in classrooms:
+            data = ClassroomResponseSerializer(c).data
+            data['is_joined'] = str(c.uid) in joined_uids
+            data['has_paid'] = data['is_joined'] and bool(getattr(c, 'pricing_type', 'free') == 'paid' and str(c.uid) in joined_uids)
+            results.append(data)
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(results, request)
+        if page is not None:
+            return paginator.get_paginated_response(page)
+        return Response(results)
+
+    @action(detail=False, methods=['post'], url_path='quick-join')
+    def quick_join(self, request):
+        """POST /api/v1/consumer/course/classrooms/quick-join/  body: {classroom_uid}
+
+        Public-classroom quick join. Returns the same shape as `join_by_code`:
+            Free  → { joined: true, classroom_uid, membership_status: 'approved' }
+            Paid  → { requires_payment: true, pay_url, order_id, amount, classroom_uid }
+            Private → 403
+            Already member → { joined: true, classroom_uid, membership_status: 'approved' }
+        """
+        from features.course.classroom.repositories import Repository as ClassroomRepo
+        from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
+
+        classroom_uid_raw = (request.data.get('classroom_uid') or '').strip()
+        if not classroom_uid_raw:
+            return Response({'error': 'classroom_uid là bắt buộc.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            classroom_uuid = uuid.UUID(classroom_uid_raw)
+        except ValueError:
+            return Response({'error': 'classroom_uid không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            classroom = ClassroomRepo().find(str(classroom_uuid))
+        except Exception:
+            return Response({'error': 'Lớp học không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if getattr(classroom, 'status', 'active') != 'active':
+            return Response({'error': 'Lớp học không khả dụng.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if getattr(classroom, 'visibility_type', 'public') != 'public':
+            return Response(
+                {'error': 'Lớp học này ở chế độ riêng tư. Vui lòng dùng mã mời.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if ClassroomBlacklistService().is_blocked(classroom.uid, classroom.teacher_id, request.user.uid):
+            return Response({'error': 'Bạn đã bị chặn khỏi lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
+
+        existing = ClassroomMemberService().is_member(classroom.uid, request.user.uid)
+        if existing:
+            return Response({
+                'joined': True,
+                'requires_payment': False,
+                'membership_status': 'approved',
+                'classroom_uid': str(classroom.uid),
+            })
+
+        if getattr(classroom, 'pricing_type', 'free') == 'paid':
+            try:
+                from features.payment.services import PaymentService
+                result = PaymentService().initiate(
+                    consumer_id=str(request.user.uid),
+                    amount=int(classroom.price_vnd or 0),
+                    order_info=f'Lớp học: {classroom.name}',
+                    resource_type='classroom',
+                    resource_id=str(classroom.uid),
+                )
+            except Exception as exc:
+                return Response({'error': f'Khởi tạo thanh toán thất bại: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'joined': False,
+                'requires_payment': True,
+                'membership_status': 'pending',
+                'classroom_uid': str(classroom.uid),
+                'amount': int(classroom.price_vnd or 0),
+                **result,
+            })
+
+        member = ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
+        return Response({
+            'joined': True,
+            'requires_payment': False,
+            'membership_status': getattr(member, 'status', 'approved'),
+            'classroom_uid': str(classroom.uid),
+        })
+
     def retrieve(self, request, pk=None):
         """GET /api/v1/consumer/course/classrooms/{uid}/"""
         from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository

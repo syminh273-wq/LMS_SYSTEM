@@ -22,6 +22,14 @@ class Service:
     def get_by_teacher(self, teacher_id):
         return self.repository.get_by_teacher(teacher_id)
 
+    def list_discoverable(self, *, category=None, pricing_type=None, search=None):
+        return self.repository.discover(
+            category=category or None,
+            pricing_type=pricing_type or None,
+            visibility_type='public',
+            search=search or None,
+        )
+
     def create_classroom(self, teacher_id, data: dict):
         # Generate a unique 6-char uppercase alphanumeric pid (invite code)
         pid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))

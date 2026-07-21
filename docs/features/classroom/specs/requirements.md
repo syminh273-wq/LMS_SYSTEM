@@ -49,3 +49,17 @@
 | FR-CLS-12 | FR | The system shall expose `POST /api/v1/consumer/course/classrooms/{uid}/checkout/` to initiate a MoMo payment for a paid classroom. | BR-CLS-06 | High | Endpoint returns `{classroom_uid, amount, order_id, pay_url}`. | v1.1 |
 | FR-CLS-13 | FR | The system shall expose `GET /api/v1/consumer/course/classrooms/{uid}/access/` to poll payment status. | BR-CLS-06 | High | Endpoint returns `{has_access, has_paid, pricing_type, is_paid_classroom, pending_payment}`. | v1.1 |
 | NFR-CLS-03 | NFR | Folder listing for paid + unpaid consumers must not degrade beyond 100ms additional latency. | BR-CLS-06 | High | p95 latency of `/docs/tree/` for paid classrooms ≤ 350ms (baseline + 100ms). | v1.1 |
+
+### Discover + quick join (LMS-discover-classrooms)
+
+| ID | Type | Description | Parent | Priority | Acceptance Criteria | Release |
+|---|---|---|---|---|---|---|
+| BR-CLS-09 | BR | Classrooms must be classifiable by a fixed category enum so the consumer can browse them in a Discover page. | — | High | `Classroom.category` ∈ {math, physics, chemistry, biology, language, programming, business, design, music, other}. | v1.1 |
+| BR-CLS-10 | BR | Classrooms must support a public/private visibility flag. Public classrooms are browsable and joinable directly; private ones are joinable only by invite code. | BR-CLS-09 | High | `Classroom.visibility_type ∈ {public, private}`. `private` is hidden from `/discover/`. | v1.1 |
+| UR-CLS-08 | UR | As a teacher, I want to choose a category and visibility when creating/editing a classroom so that students can find it (or not) on the Discover page. | BR-CLS-09, BR-CLS-10 | High | Create/edit form has a category dropdown and a public/private radio. | v1.1 |
+| UR-CLS-09 | UR | As a student, I want to browse public classrooms, filter by category and price type, search by name, and join directly from the list. | BR-CLS-09, BR-CLS-10 | High | `/consumer/discover` page shows a grid with filter bar and search; clicking "Tham gia" calls the quick-join endpoint. | v1.1 |
+| FR-CLS-14 | FR | The system shall expose `GET /api/v1/consumer/course/classrooms/discover/` accepting `category`, `pricing_type`, `search`, `page` and returning paginated public classrooms. | BR-CLS-09, BR-CLS-10 | High | Endpoint returns paginated results with `is_joined` flag per row. | v1.1 |
+| FR-CLS-15 | FR | The system shall expose `POST /api/v1/consumer/course/classrooms/quick-join/` with body `{classroom_uid}`. Free → auto-join; Paid → MoMo pay_url. | BR-CLS-10 | High | Endpoint returns `{joined, requires_payment, classroom_uid, pay_url?}` shape. | v1.1 |
+| FR-CLS-16 | FR | The system shall enforce at most one `is_preview_only` folder per classroom. | BR-CLS-07 | High | `ResourceFolderService.create_folder` rejects a second preview folder with 400. | v1.1 |
+| FR-CLS-17 | FR | The system shall add `category` and `visibility_type` columns to `account_classrooms` (additive migration). | BR-CLS-09, BR-CLS-10 | High | New columns present in the keyspace after `sync_cassandra`. | v1.1 |
+| NFR-CLS-04 | NFR | Discover listing must remain p95 ≤ 300ms even with 5,000 public classrooms. | BR-CLS-09 | Medium | Load test with 5k rows; p95 ≤ 300ms. | v1.1 |
