@@ -161,43 +161,64 @@ class Service:
             action_type = 'join'
 
         pay_url = None
+        pending_payment = None
         amount = int(classroom.price_vnd or 0)
         if action_type == 'checkout':
-            existing_member = member is not None and not member.is_deleted
-            if not existing_member:
-                try:
-                    from features.account.consumer.repositories import ConsumerRepository
-                    consumer = ConsumerRepository().find(str(consumer_id))
-                    if consumer is not None:
-                        from features.course.classroom.services.classroom_member_service import ClassroomMemberService
-                        ClassroomMemberService().join(
-                            classroom_uid=classroom.uid,
-                            user=consumer,
-                            role='student',
-                        )
-                except Exception:
-                    pass
             try:
-                from features.payment.services import PaymentService
-                init = PaymentService().initiate(
-                    consumer_id=str(consumer_id),
-                    amount=amount,
-                    order_info=f'Lớp học: {classroom.name}',
-                    resource_type='classroom',
-                    resource_id=str(classroom.uid),
-                )
-                pay_url = init.get('pay_url')
+                from features.payment.repositories import PaymentRepository
+                from features.payment.enums import PaymentStatus
+                import base64
+                import json
+
+                for p in PaymentRepository().get_by_consumer(str(consumer_id)):
+                    if p.status != PaymentStatus.PENDING.value:
+                        continue
+                    try:
+                        meta = json.loads(base64.b64decode(p.extra_data).decode())
+                    except Exception:
+                        continue
+                    if (meta.get('resource_type') == 'classroom'
+                            and meta.get('resource_id') == str(classroom.uid)):
+                        pending_payment = {
+                            'order_id': p.order_id,
+                            'pay_url': p.pay_url,
+                            'amount': int(p.amount or 0),
+                        }
+                        break
             except Exception:
-                pay_url = None
+                pass
+
+            if pending_payment:
+                pay_url = pending_payment.get('pay_url')
+                amount = pending_payment.get('amount') or amount
+            else:
+                try:
+                    from features.payment.services import PaymentService
+                    init = PaymentService().initiate(
+                        consumer_id=str(consumer_id),
+                        amount=amount,
+                        order_info=f'Lớp học: {classroom.name}',
+                        resource_type='classroom',
+                        resource_id=str(classroom.uid),
+                    )
+                    pay_url = init.get('pay_url')
+                except Exception:
+                    pay_url = None
 
         preview_folder = ClassroomDocService().get_preview_folder(str(classroom.uid))
         if preview_folder is not None:
-            docs = ClassroomDocService().list_folder(classroom_uid=str(classroom.uid), folder_id=str(preview_folder.uid))
             folder_payload = ResourceFolderResponseSerializer(preview_folder).data
-            docs_payload = ResourceResponseSerializer(docs, many=True).data
+            root_docs = ClassroomDocService().list_folder(
+                classroom_uid=str(classroom.uid), folder_id=str(preview_folder.uid)
+            )
+            items = self._build_preview_tree(
+                classroom_uid=str(classroom.uid),
+                root_folder=preview_folder,
+                root_docs=root_docs,
+            )
         else:
             folder_payload = None
-            docs_payload = []
+            items = []
 
         classroom_payload = ClassroomResponseSerializer(classroom).data
         is_favorited = False
@@ -216,7 +237,7 @@ class Service:
             'classroom': classroom_payload,
             'preview': {
                 'folder': folder_payload,
-                'docs': docs_payload,
+                'items': items,
             },
             'actions': {
                 'type': action_type,
@@ -228,3 +249,55 @@ class Service:
             'is_favorited': is_favorited,
             'favorite_count': favorite_count,
         }
+
+    def _build_preview_tree(self, classroom_uid, root_folder, root_docs):
+        """Walk all descendant folders of `root_folder` and return a flat list
+        of items, ordered for nested rendering. Each item is one of:
+
+            {"type": "folder", "uid": "...", "name": "...",
+             "parent_folder_id": "..." | null, "depth": 0}
+            {"type": "doc", "uid": "...", "name": "...", "url": "...",
+             "file_type": "...", "size": ..., "folder_id": "...",
+             "depth": 0}
+
+        BFS so siblings at the same depth come together; docs appear
+        immediately after their parent folder at the same depth.
+        """
+        from features.resource.repositories.resource_folder_repository import ResourceFolderRepository
+        from features.resource.repositories.resource_repository import ResourceRepository
+        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+        from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
+
+        folder_repo = ResourceFolderRepository()
+        resource_repo = ResourceRepository()
+
+        items = []
+        queue = [(root_folder, 0)]
+        while queue:
+            current_folder, depth = queue.pop(0)
+            items.append({
+                'type': 'folder',
+                'uid': str(current_folder.uid),
+                'name': current_folder.name,
+                'parent_folder_id': str(current_folder.parent_folder_id) if current_folder.parent_folder_id else None,
+                'is_preview_only': bool(getattr(current_folder, 'is_preview_only', False)),
+                'depth': depth,
+            })
+            folder_docs = resource_repo.get_by_owner_and_folder(
+                current_folder.classroom_id, current_folder.uid
+            )
+            for doc in folder_docs:
+                items.append({
+                    'type': 'doc',
+                    'uid': str(doc.uid),
+                    'name': doc.name,
+                    'url': doc.url,
+                    'file_type': doc.file_type or '',
+                    'size': int(getattr(doc, 'size', 0) or 0),
+                    'folder_id': str(current_folder.uid),
+                    'depth': depth,
+                })
+            children = folder_repo.get_children(current_folder.classroom_id, current_folder.uid)
+            for child in children:
+                queue.append((child, depth + 1))
+        return items

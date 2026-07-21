@@ -293,8 +293,19 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['post'], url_path='checkout')
     def checkout(self, request, pk=None):
-        """POST /api/v1/consumer/course/classrooms/{uid}/checkout/ — initiate MoMo for a paid classroom."""
+        """POST /api/v1/consumer/course/classrooms/{uid}/checkout/ — initiate MoMo for a paid classroom.
+
+        Member + teacher notification are deferred to the MoMo IPN success path
+        (`ClassroomMemberService.mark_paid_pending`). This endpoint only ensures
+        a PENDING payment exists and returns the MoMo pay_url.
+        """
         from features.course.classroom.repositories import Repository
+        from features.payment.enums import PaymentStatus
+        from features.payment.repositories import PaymentRepository
+        from features.payment.services import PaymentService
+        import base64
+        import json
+
         try:
             classroom = Repository().find(str(pk))
         except Exception:
@@ -305,9 +316,24 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         if int(classroom.price_vnd or 0) < 1000:
             return Response({'error': 'Giá lớp học không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        from features.course.classroom.services.classroom_member_service import ClassroomMemberService
-        from features.payment.services import PaymentService
-        ClassroomMemberService().join(classroom_uid=classroom.uid, user=request.user, role='student')
+        try:
+            for p in PaymentRepository().get_by_consumer(str(request.user.uid)):
+                if p.status != PaymentStatus.PENDING.value:
+                    continue
+                try:
+                    meta = json.loads(base64.b64decode(p.extra_data).decode())
+                except Exception:
+                    continue
+                if (meta.get('resource_type') == 'classroom'
+                        and meta.get('resource_id') == str(classroom.uid)):
+                    return Response({
+                        'classroom_uid': str(classroom.uid),
+                        'amount': int(p.amount or 0),
+                        'order_id': p.order_id,
+                        'pay_url': p.pay_url,
+                    })
+        except Exception:
+            pass
 
         try:
             result = PaymentService().initiate(
