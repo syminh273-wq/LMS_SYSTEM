@@ -36,13 +36,6 @@ Present the plan with these sections:
 ```markdown
 ## Plan: <Ticket or short task name>
 
-### Branch
-feature/LMS-<id>-<short-desc>
-```
-
-Use `fix/LMS-<id>-<short-desc>` for bug fixes. If there is no ticket ID, use `feature/lms-unknown-<short-desc>` or ask whether a Jira ticket should be created.
-
-```markdown
 ### Context Read
 - AGENTS.md
 - docs/features/<module>/...
@@ -80,8 +73,7 @@ Does this plan look correct? Reply `yes`, `go`, `ok`, or `confirm` to proceed, o
 
 After confirmation, follow the project workflow in `AGENTS.md`:
 
-1. Create the branch with `git checkout -b <branch-name>`.
-2. Implement in layer order:
+1. Implement in layer order:
    - Model
    - Repository
    - Service
@@ -89,11 +81,12 @@ After confirmation, follow the project workflow in `AGENTS.md`:
    - ViewSet
    - URLs
    - Settings, only if needed
-3. Keep Cassandra queries inside repositories only.
-4. Use soft delete only; never hard delete records.
-5. Run `python manage.py sync_cassandra` if any Cassandra model changed.
-6. Verify affected endpoints and behavior.
-7. Stage only specific files; never use `git add -A` or `git add .`.
+2. Keep Cassandra queries inside repositories only.
+3. Use soft delete only; never hard delete records.
+4. Run `python manage.py sync_cassandra` if any Cassandra model changed.
+5. Verify affected endpoints and behavior.
+6. Stage only specific files; never use `git add -A` or `git add .`.
+7. Do not create branches, commit, push, or merge — those are handled outside this skill.
 
 ## Exceptions
 

@@ -1,10 +1,10 @@
 from datetime import datetime
 from cassandra.cqlengine import columns
-from django_cassandra_engine.models import DjangoCassandraModel
+from core.models.cassandra import BaseTimeStampModel
 from core.utils.uuid import uuid7
 
 
-class PostComment(DjangoCassandraModel):
+class PostComment(BaseTimeStampModel):
     """
     Comments on a post.
     Partition by post_uid → all comments for a post in one query.
@@ -18,7 +18,6 @@ class PostComment(DjangoCassandraModel):
     author_name   = columns.Text(default='')
     author_avatar = columns.Text(default='')
     content       = columns.Text(default='')
-    is_deleted    = columns.Boolean(default=False)
 
     __table_name__ = 'post_comments'
 

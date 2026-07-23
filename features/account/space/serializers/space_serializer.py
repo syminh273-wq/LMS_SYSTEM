@@ -35,6 +35,21 @@ class SpaceAccountSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
+    portfolio = serializers.SerializerMethodField()
+
+    def get_portfolio(self, obj):
+        try:
+            from features.portfolio.services import PortfolioService
+            service = PortfolioService()
+            return service.get_public('space', obj.uid)
+        except Exception:
+            return {
+                'intro': None,
+                'certificate': [],
+                'experience': [],
+                'achievement': [],
+                'course': [],
+            }
 
     def get_logo_url(self, obj):
         if not obj.logo_url:
@@ -53,6 +68,51 @@ class SpaceAccountSerializer(serializers.Serializer):
             return ""
         from core.storages.storage_service import storage_service
         return storage_service.get_public_url(obj.avatar_url)
+
+
+class PublicSpaceSerializer(serializers.Serializer):
+    uid = serializers.UUIDField(read_only=True)
+    full_name = serializers.CharField()
+    name = serializers.CharField()
+    slug = serializers.CharField()
+    description = serializers.CharField(required=False, allow_blank=True)
+    logo_url = serializers.SerializerMethodField()
+    cover_url = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
+    portfolio = serializers.SerializerMethodField()
+
+    def get_portfolio(self, obj):
+        try:
+            from features.portfolio.services import PortfolioService
+            service = PortfolioService()
+            return service.get_public('space', obj.uid)
+        except Exception:
+            return {
+                'intro': None,
+                'certificate': [],
+                'experience': [],
+                'achievement': [],
+                'course': [],
+            }
+
+    def get_logo_url(self, obj):
+        if not obj.logo_url:
+            return ""
+        from core.storages.storage_service import storage_service
+        return storage_service.get_public_url(obj.logo_url)
+
+    def get_cover_url(self, obj):
+        if not obj.cover_url:
+            return ""
+        from core.storages.storage_service import storage_service
+        return storage_service.get_public_url(obj.cover_url)
+
+    def get_avatar_url(self, obj):
+        if not obj.avatar_url:
+            return ""
+        from core.storages.storage_service import storage_service
+        return storage_service.get_public_url(obj.avatar_url)
+
 
 class SpaceAccountCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()

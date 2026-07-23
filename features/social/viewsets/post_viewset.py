@@ -12,6 +12,14 @@ def _author_info(user):
     )
 
 
+def _detect_author_type(user) -> str:
+    """Detect if request.user is a Space (teacher) or Consumer (student)."""
+    cls_name = type(user).__name__
+    if cls_name == 'Space':
+        return 'space'
+    return 'consumer'
+
+
 class FeedView(APIView):
     """GET /api/v1/consumer/social/feed/"""
 
@@ -59,15 +67,18 @@ class PostListCreateView(APIView):
         content   = (request.data.get('content') or '').strip()
         emotion   = request.data.get('emotion', '')
         image_url = request.data.get('image_url', '')
+        image_urls = request.data.get('image_urls', [])
         visibility = request.data.get('visibility', 'public')
-        classroom_tag = request.data.get('classroom_tag')
+        classroom_tags = request.data.get('classroom_tags') or request.data.get('classroom_tag') or []
 
-        if not content and not image_url:
+        if not content and not image_url and not image_urls:
             return Response({'error': 'Nội dung không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
         if visibility not in ('public', 'private', 'friends'):
             return Response({'error': 'visibility không hợp lệ'}, status=status.HTTP_400_BAD_REQUEST)
 
         name, avatar = _author_info(request.user)
+        author_type = _detect_author_type(request.user)
+        space_uid = request.user.uid if author_type == 'space' else None
         post = PostService().create_post(
             consumer_uid=request.user.uid,
             author_name=name,
@@ -76,9 +87,12 @@ class PostListCreateView(APIView):
                 'content': content,
                 'emotion': emotion,
                 'image_url': image_url,
+                'image_urls': image_urls,
                 'visibility': visibility,
-                'classroom_tag': classroom_tag,
+                'classroom_tags': classroom_tags,
             },
+            author_type=author_type,
+            space_uid=space_uid,
         )
         return Response(post, status=status.HTTP_201_CREATED)
 

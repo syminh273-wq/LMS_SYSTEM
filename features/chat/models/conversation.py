@@ -1,10 +1,9 @@
-from datetime import datetime
 from cassandra.cqlengine import columns
-from django_cassandra_engine.models import DjangoCassandraModel
+from core.models.cassandra import BaseTimeStampModel
 from core.utils.uuid import uuid7
 
 
-class Conversation(DjangoCassandraModel):
+class Conversation(BaseTimeStampModel):
     bucket = columns.Integer(partition_key=True, default=0)
     uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
     type = columns.Text(default='channel')             # 'channel' | 'direct'
@@ -18,8 +17,6 @@ class Conversation(DjangoCassandraModel):
     last_msg_text = columns.Text(default='')
     last_msg_sender = columns.Text(default='')
     created_by_id = columns.UUID(required=False)
-    created_at = columns.DateTime(default=datetime.utcnow)
-    is_deleted = columns.Boolean(default=False)
 
     __table_name__ = 'chat_conversations'
 

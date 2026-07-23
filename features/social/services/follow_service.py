@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from features.social.models import UserFollow
+from features.social.services.profile_service import ProfileService
 
 
 class FollowService:
@@ -25,14 +26,14 @@ class FollowService:
     def follow_user(self, follower_uid, followed_uid, follower_data: dict, followed_data: dict) -> bool:
         f_uid = uuid.UUID(str(follower_uid))
         t_uid = uuid.UUID(str(followed_uid))
-        
+
         if f_uid == t_uid:
             return False
-            
+
         existing = list(UserFollow.objects.filter(follower_uid=f_uid, followed_uid=t_uid).limit(1))
         if existing:
             return True # already following
-            
+
         UserFollow.create(
             follower_uid=f_uid,
             followed_uid=t_uid,
@@ -42,15 +43,29 @@ class FollowService:
             followed_avatar=followed_data.get('avatar', ''),
             created_at=datetime.utcnow()
         )
+
+        try:
+            svc = ProfileService()
+            svc.increment_followers(t_uid, 1)
+            svc.increment_following(f_uid, 1)
+        except Exception:
+            pass
+
         return True
 
     def unfollow_user(self, follower_uid, followed_uid) -> bool:
         f_uid = uuid.UUID(str(follower_uid))
         t_uid = uuid.UUID(str(followed_uid))
-        
+
         existing = list(UserFollow.objects.filter(follower_uid=f_uid, followed_uid=t_uid).limit(1))
         if existing:
             existing[0].delete()
+            try:
+                svc = ProfileService()
+                svc.increment_followers(t_uid, -1)
+                svc.increment_following(f_uid, -1)
+            except Exception:
+                pass
             return True
         return False
 

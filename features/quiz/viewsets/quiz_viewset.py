@@ -1,7 +1,9 @@
 import json
+import logging
 import uuid
 
 import django_rq
+logger = logging.getLogger(__name__)
 from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
@@ -449,19 +451,33 @@ class QuizViewSet(BaseModelViewSet):
     # ── LIST TASKS  GET /quizzes/tasks/ ──────────────────────────────────────
     @action(detail=False, methods=['get'], url_path='tasks')
     def list_tasks(self, request):
-        queue = django_rq.get_queue('default')
+        try:
+            queue = django_rq.get_queue('default')
+            queue.job_ids
+        except Exception as e:
+            logger.warning("Redis unavailable for /quiz/tasks/: %s", e)
+            return Response([])
+
         teacher_uid = str(request.user.uid)
         status_filter = request.query_params.get('status')
         if status_filter:
             status_filter = {s.strip() for s in status_filter.split(',') if s.strip()}
 
-        job_ids = list(queue.job_ids)
-        started_registry = queue.started_job_registry
-        finished_registry = queue.finished_job_registry
-        failed_registry = queue.failed_job_registry
-        deferred_registry = queue.deferred_job_registry
-        scheduled_registry = queue.scheduled_job_registry
-        canceled_registry = queue.canceled_job_registry
+        try:
+            job_ids = list(queue.job_ids)
+        except Exception as e:
+            logger.warning("Redis error reading job_ids: %s", e)
+            return Response([])
+        try:
+            started_registry = queue.started_job_registry
+            finished_registry = queue.finished_job_registry
+            failed_registry = queue.failed_job_registry
+            deferred_registry = queue.deferred_job_registry
+            scheduled_registry = queue.scheduled_job_registry
+            canceled_registry = queue.canceled_job_registry
+        except Exception as e:
+            logger.warning("Redis error reading registries: %s", e)
+            return Response([])
 
         all_ids = set(job_ids)
         for reg in (started_registry, finished_registry, failed_registry,

@@ -1,8 +1,11 @@
+import os
 import uuid
 from datetime import datetime
 
+from core.storages.storage_service import storage_service
 from features.social.models import ConsumerPost, PostLike, PostComment
 from features.social.services.follow_service import FollowService
+from features.social.services.profile_service import ProfileService
 
 
 class PostService:
@@ -10,17 +13,46 @@ class PostService:
     # ── Serialize helpers ─────────────────────────────────────────────────────
 
     @staticmethod
+    def _coerce_image_urls(data: dict) -> list[str]:
+        """Normalize image URLs from request: accept 'image_urls' (list or JSON string)
+        and 'image_url' (single string). Returns deduped list preserving order, with
+        image_url inserted at the front if not already present."""
+        raw = data.get('image_urls')
+        urls: list[str] = []
+        if isinstance(raw, str):
+            import json
+            try:
+                raw = json.loads(raw)
+            except (ValueError, TypeError):
+                raw = [raw] if raw else []
+        if isinstance(raw, list):
+            for u in raw:
+                if isinstance(u, str) and u and u not in urls:
+                    urls.append(u)
+        single = data.get('image_url') or ''
+        if isinstance(single, str) and single and single not in urls:
+            urls.insert(0, single)
+        return urls
+
+    @staticmethod
     def _serialize_post(p: ConsumerPost, liked_by_me: bool = False) -> dict:
+        raw_tags = list(p.classroom_tags or [])
+        image_urls = list(p.image_urls or [])
+        if not image_urls and p.image_url:
+            image_urls = [p.image_url]
         return {
             'uid':            str(p.uid),
             'consumer_uid':   str(p.consumer_uid),
             'author_name':    p.author_name or '',
             'author_avatar':  p.author_avatar or '',
+            'author_type':    p.author_type or 'consumer',
+            'space_uid':      str(p.space_uid) if p.space_uid else None,
             'content':        p.content or '',
             'emotion':        p.emotion or '',
-            'image_url':      p.image_url or '',
+            'image_url':      p.image_url or (image_urls[0] if image_urls else ''),
+            'image_urls':     image_urls,
             'visibility':     p.visibility or 'public',
-            'classroom_tag':  str(p.classroom_tag) if p.classroom_tag else None,
+            'classroom_tags': [str(t) for t in raw_tags],
             'likes_count':    int(p.likes_count or 0),
             'comments_count': int(p.comments_count or 0),
             'liked_by_me':    liked_by_me,
@@ -41,19 +73,66 @@ class PostService:
 
     # ── Posts ─────────────────────────────────────────────────────────────────
 
-    def create_post(self, consumer_uid, author_name: str, author_avatar: str, data: dict) -> dict:
+    def create_post(self, consumer_uid, author_name: str, author_avatar: str, data: dict,
+                    author_type: str = 'consumer', space_uid=None) -> dict:
+        raw_tags = data.get('classroom_tags') or data.get('classroom_tag') or []
+        if isinstance(raw_tags, str):
+            raw_tags = [raw_tags]
+        tag_uuids = []
+        for t in raw_tags:
+            if not t:
+                continue
+            try:
+                tag_uuids.append(uuid.UUID(str(t)))
+            except (ValueError, TypeError):
+                continue
+
+        image_urls = self._coerce_image_urls(data)
+        image_url_first = image_urls[0] if image_urls else ''
+
+        space_uuid = None
+        if author_type == 'space' and space_uid:
+            try:
+                space_uuid = uuid.UUID(str(space_uid))
+            except (ValueError, TypeError):
+                space_uuid = None
+
         post = ConsumerPost.create(
             consumer_uid=uuid.UUID(str(consumer_uid)),
             author_name=author_name,
             author_avatar=author_avatar,
+            author_type=author_type,
+            space_uid=space_uuid,
             content=data.get('content', ''),
             emotion=data.get('emotion', ''),
-            image_url=data.get('image_url', ''),
+            image_url=image_url_first,
+            image_urls=image_urls,
             visibility=data.get('visibility', 'public'),
-            classroom_tag=uuid.UUID(str(data['classroom_tag'])) if data.get('classroom_tag') else None,
+            classroom_tags=tag_uuids,
             created_at=datetime.utcnow(),
         )
+        try:
+            ProfileService().increment_posts(consumer_uid, 1)
+        except Exception:
+            pass
         return self._serialize_post(post)
+
+    def upload_post_images(self, files, owner_id: str) -> tuple[list[str], list[dict]]:
+        """Upload multiple files to R2 under posts/{owner_id}/. Returns (urls, errors)."""
+        urls: list[str] = []
+        errors: list[dict] = []
+        for f in files:
+            try:
+                ext = os.path.splitext(f.name)[1] or '.jpg'
+                object_key = f"posts/{owner_id}/{uuid.uuid4()}{ext}"
+                result = storage_service.upload_fileobj(f, object_key, is_public=True)
+                if result.get('success'):
+                    urls.append(result.get('url', ''))
+                else:
+                    errors.append({'name': f.name, 'error': result.get('message', 'Upload failed')})
+            except Exception as e:
+                errors.append({'name': getattr(f, 'name', ''), 'error': str(e)})
+        return urls, errors
 
     def get_feed(self, requester_uid, limit: int = 20, before: str | None = None) -> list[dict]:
         """Public feed — all public posts across all users, newest first."""
@@ -128,6 +207,10 @@ class PostService:
         if not post or str(post.consumer_uid) != str(consumer_uid):
             return False
         post.update(is_deleted=True)
+        try:
+            ProfileService().increment_posts(consumer_uid, -1)
+        except Exception:
+            pass
         return True
 
     # ── Likes ─────────────────────────────────────────────────────────────────

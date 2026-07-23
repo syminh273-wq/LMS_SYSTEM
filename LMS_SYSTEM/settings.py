@@ -26,7 +26,14 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-=ml)-2up77okb726(@7r&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '.ngrok-free.dev',
+    '.ngrok.app',
+    '.ngrok.io',
+]
 
 
 # Application definition
@@ -68,6 +75,7 @@ INSTALLED_APPS = [
     'features.payment',
     'features.face',
     'features.quiz_collection',
+    'features.portfolio',
 ]
 
 REST_FRAMEWORK = {

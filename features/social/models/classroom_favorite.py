@@ -1,9 +1,8 @@
-from datetime import datetime
 from cassandra.cqlengine import columns
-from django_cassandra_engine.models import DjangoCassandraModel
+from core.models.cassandra import BaseTimeStampModel
 
 
-class ClassroomFavorite(DjangoCassandraModel):
+class ClassroomFavorite(BaseTimeStampModel):
     """
     A consumer (student) marks a classroom as favorite.
 
@@ -14,7 +13,6 @@ class ClassroomFavorite(DjangoCassandraModel):
 
     consumer_uid  = columns.UUID(partition_key=True, required=True)
     classroom_uid = columns.UUID(primary_key=True, clustering_order='DESC', required=True)
-    created_at    = columns.DateTime(default=datetime.utcnow)
 
     __table_name__ = 'classroom_favorites'
 
