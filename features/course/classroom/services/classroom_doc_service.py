@@ -23,19 +23,37 @@ class ClassroomDocService:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def upload_and_index(self, classroom_uid: str, file_obj, section: str = '', folder_id=None, order_index=0):
+    def upload_and_index(self, classroom_uid: str, file_obj, section: str = '', folder_id=None, order_index=0, exam_period=None):
         """
         Upload a document to R2 (tagged as classroom resource) and index
         its text content in the per-classroom LanceDB collection.
+
+        If `exam_period` is provided and `folder_id` is not, auto-resolve the
+        matching sub-folder under the classroom's "Bài kiểm tra" root folder.
         """
         owner_id = _uuid.UUID(str(classroom_uid))
         folder_uuid = _uuid.UUID(str(folder_id)) if folder_id else None
+
+        if folder_uuid is None and exam_period:
+            try:
+                from features.resource.services.resource_folder_seed_service import ResourceFolderSeedService
+                sub_folder = ResourceFolderSeedService().resolve_exam_sub_folder(
+                    classroom_id=owner_id, exam_period=exam_period
+                )
+                if sub_folder is not None:
+                    folder_uuid = sub_folder.uid
+            except Exception as exc:
+                print(f"[ClassroomDocService] Failed to resolve exam sub-folder: {exc}")
+
+        metadata = {'section': section}
+        if exam_period:
+            metadata['exam_period'] = exam_period
 
         result = self._resource_service.upload_resource(
             file_obj=file_obj,
             owner_id=owner_id,
             owner_type='classroom',
-            metadata={'section': section},
+            metadata=metadata,
             folder_id=folder_uuid,
             order_index=order_index,
         )

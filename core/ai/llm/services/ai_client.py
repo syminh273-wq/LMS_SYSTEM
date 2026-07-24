@@ -81,3 +81,19 @@ class AIClient:
         Call LLM with tool definitions. Returns {"content": str|None, "tool_calls": list|None}.
         """
         return _Backend.chat_with_tools(messages, tools=tools, models=models, timeout=timeout)
+
+    @classmethod
+    def chat_with_image(
+        cls,
+        messages: List[dict],
+        image_b64: str,
+        models: List[str] = None,
+        timeout: int = 180,
+    ) -> str:
+        """
+        Vision-capable chat. Attaches a single base64 image to the last user
+        message and calls a vision model (default: OLLAMA_VISION_MODEL = llava).
+        """
+        return _Backend.chat_with_image(
+            messages, image_b64, models=models, timeout=timeout
+        )

@@ -123,6 +123,63 @@ class OllamaClient:
 
         raise RuntimeError(f"All models failed. Last: {last_error}")
 
+    # ── Vision chat (single image) ────────────────────────────────────────────
+
+    @classmethod
+    def chat_with_image(
+        cls,
+        messages: List[dict],
+        image_b64: str,
+        models: List[str] = None,
+        timeout: int = 180,
+    ) -> str:
+        """
+        Call a vision-capable Ollama model with a single image attached to the
+        last user message. The image must be base64-encoded (without the
+        ``data:...;base64,`` prefix). The vision model itself reads the image,
+        so callers should not pass any image bytes inside ``messages``.
+
+        Falls back through ``models`` in order. Default model is the configured
+        ``OLLAMA_VISION_MODEL`` (llava).
+        """
+        if models is None:
+            models = cls.VISION_MODELS
+
+        if not image_b64:
+            raise ValueError("image_b64 is required for chat_with_image")
+        if not messages:
+            raise ValueError("messages is required for chat_with_image")
+
+        # Attach the image to the last user message (Ollama convention).
+        attached = list(messages)
+        last = dict(attached[-1])
+        if last.get("role") != "user":
+            raise ValueError("Last message must be role='user' for vision call")
+        last["images"] = [image_b64]
+        attached[-1] = last
+
+        last_error = ""
+        for model in models:
+            try:
+                print(f"[Ollama] vision → {model}")
+                resp = requests.post(
+                    _CHAT_URL,
+                    json={"model": model, "messages": attached, "stream": False,
+                          "options": {"temperature": 0, "num_ctx": 8192}},
+                    timeout=timeout,
+                )
+                if resp.status_code == 200:
+                    content = resp.json().get("message", {}).get("content", "")
+                    if content:
+                        print(f"[Ollama] vision OK — {model}")
+                        return content.strip()
+                last_error = f"{model} → HTTP {resp.status_code}: {resp.text[:200]}"
+            except Exception as exc:
+                last_error = f"{model} → {exc}"
+                print(f"[Ollama] {last_error}")
+
+        raise RuntimeError(f"All vision models failed. Last: {last_error}")
+
     # ── Streaming chat ───────────────────────────────────────────────────────
 
     @classmethod

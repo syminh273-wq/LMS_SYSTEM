@@ -2,6 +2,7 @@ import json as _json
 from datetime import datetime as _dt_epoch
 
 from rest_framework import status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
@@ -32,6 +33,7 @@ def _serialize_exam(exam):
         "title": exam.title,
         "description": exam.description,
         "exam_type": getattr(exam, "exam_type", None) or "assignment",
+        "exam_period": getattr(exam, "exam_period", None) or "regular",
         "max_grade": getattr(exam, "max_grade", None) or 10.0,
         "content_type": exam.content_type,
         "body": exam.body or "",
@@ -97,6 +99,7 @@ def _submission_error_response(exc):
 
 
 class SpaceExamViewSet(ViewSet):
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -124,7 +127,14 @@ class SpaceExamViewSet(ViewSet):
         return Response(_serialize_exam(self.exam_service.get_exam(uid)))
 
     def create(self, request):
-        exam = self.exam_service.create_exam(request.user.uid, request.data.copy())
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        file_obj = request.FILES.get('file')
+
+        try:
+            exam = self.exam_service.create_exam(request.user.uid, data, file_obj=file_obj)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         ClassroomActivityLogService().log(
             classroom_uid=exam.classroom_id,
             log_level='major',

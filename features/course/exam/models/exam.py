@@ -36,6 +36,7 @@ class Exam(BaseTimeStampModel):
     due_date = columns.DateTime(required=False)
 
     exam_type = columns.Text(default='assignment')  # 'assignment' | 'quiz'
+    exam_period = columns.Text(default='regular', index=True)  # 'regular' | 'midterm' | 'final'
     max_grade = columns.Float(default=10.0)
     camera_required = columns.Boolean(default=False)
     exam_mode = columns.Text(default='offline')

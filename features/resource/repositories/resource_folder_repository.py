@@ -30,6 +30,19 @@ class ResourceFolderRepository(BaseRepository):
             is_deleted=False,
         ).first()
 
+    def get_by_name_and_parent(self, classroom_id, name, parent_folder_id=None):
+        qs = self.filter(
+            classroom_id=classroom_id,
+            name=name,
+            is_deleted=False,
+        )
+        if parent_folder_id is None:
+            qs = [f for f in qs if getattr(f, 'parent_folder_id', None) is None]
+        else:
+            parent_uuid = parent_folder_id if isinstance(parent_folder_id, UUID) else UUID(str(parent_folder_id))
+            qs = [f for f in qs if getattr(f, 'parent_folder_id', None) == parent_uuid]
+        return qs[0] if qs else None
+
     def count_preview_folders(self, classroom_id):
         return self.model.objects.filter(
             classroom_id=classroom_id,

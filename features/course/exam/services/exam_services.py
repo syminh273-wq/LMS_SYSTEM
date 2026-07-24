@@ -68,6 +68,25 @@ class ExamService:
                 data["meta"] = "{}"
             data["ref_id"] = ref_id
             data["body"] = ""
+
+            try:
+                from features.course.exam.constants import FOLDER_NAME_TO_EXAM_PERIOD, EXAM_PERIODS
+                if not data.get("exam_period") or data["exam_period"] not in EXAM_PERIODS:
+                    folder_id = getattr(resource, "folder_id", None)
+                    if folder_id:
+                        from features.resource.repositories import ResourceFolderRepository
+                        folder = ResourceFolderRepository().find(folder_id)
+                        resolved = FOLDER_NAME_TO_EXAM_PERIOD.get(folder.name)
+                        if resolved:
+                            data["exam_period"] = resolved
+            except Exception:
+                pass
+
+            if "exam_period" not in data or not data.get("exam_period"):
+                data["exam_period"] = "regular"
+
+            self._maybe_move_resource_to_folder(data)
+
             return data
 
         raise ValueError("Invalid content_type")
@@ -103,10 +122,15 @@ class ExamService:
         data["due_date"] = parsed_due_date
         return data
 
-    def create_exam(self, teacher_id, data):
+    def create_exam(self, teacher_id, data, file_obj=None):
         self.validate_exam_type(data)
-        data = self.validate_content(data)
         data = self.normalize_due_date(data)
+
+        if file_obj is not None:
+            data = self._handle_file_upload(data, file_obj, teacher_id)
+        else:
+            data = self.validate_content(data)
+
         data["teacher_id"] = teacher_id
 
         if not data.get("status"):
@@ -117,6 +141,89 @@ class ExamService:
         exam = self.exam_repo.create(**data)
         LMSIndexer.index_exam(exam)
         return exam
+
+    def _handle_file_upload(self, data, file_obj, teacher_id):
+        from uuid import UUID
+        from features.resource.services.resource_service import ResourceService
+        from features.resource.services.resource_folder_seed_service import ResourceFolderSeedService
+        from features.course.exam.constants import EXAM_PERIOD_TO_FOLDER_NAME, EXAM_PERIODS
+
+        raw_classroom_id = data.get("classroom_id")
+        if not raw_classroom_id:
+            raise ValueError("classroom_id is required when uploading exam file")
+        classroom_id_uuid = UUID(str(raw_classroom_id))
+
+        exam_period = data.get("exam_period") or "regular"
+        if exam_period not in EXAM_PERIODS:
+            raise ValueError(f"Invalid exam_period. Must be one of {list(EXAM_PERIODS)}")
+
+        target_folder = ResourceFolderSeedService().resolve_exam_sub_folder(
+            classroom_id=classroom_id_uuid, exam_period=exam_period
+        )
+
+        resource_service = ResourceService()
+        result = resource_service.upload_resource(
+            file_obj=file_obj,
+            owner_id=classroom_id_uuid,
+            owner_type="classroom",
+            metadata={"exam_period": exam_period},
+            folder_id=target_folder.uid if target_folder else None,
+        )
+        if not result.get("success"):
+            raise ValueError(result.get("message", "Upload failed"))
+
+        resource = result["data"]
+        data["content_type"] = self._file_extension_to_content_type(resource.file_type)
+        data["ref_id"] = resource.uid
+        data["body"] = ""
+        data["meta"] = json.dumps({"url": resource.url, "name": resource.name}, ensure_ascii=False)
+        data["exam_period"] = exam_period
+        return data
+
+    def _file_extension_to_content_type(self, file_type):
+        if not file_type:
+            return "file"
+        ft = file_type.lower()
+        if ft == "pdf":
+            return "pdf"
+        if ft in ("jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"):
+            return "image"
+        return "file"
+
+    def _maybe_move_resource_to_folder(self, data):
+        from uuid import UUID
+        from features.resource.repositories import ResourceRepository, ResourceFolderRepository
+        from features.course.exam.constants import FOLDER_NAME_TO_EXAM_PERIOD, EXAM_PERIODS
+
+        ref_id = data.get("ref_id")
+        if not ref_id:
+            return
+
+        exam_period = data.get("exam_period")
+        if not exam_period or exam_period not in EXAM_PERIODS:
+            return
+
+        try:
+            resource = ResourceRepository().find(ref_id)
+        except Exception:
+            return
+
+        if getattr(resource, "folder_id", None):
+            return
+
+        classroom_id = getattr(resource, "owner_id", None)
+        if not classroom_id:
+            return
+
+        from features.resource.services.resource_folder_seed_service import ResourceFolderSeedService
+        target = ResourceFolderSeedService().resolve_exam_sub_folder(
+            classroom_id=classroom_id, exam_period=exam_period
+        )
+        if not target:
+            return
+
+        resource_repo = ResourceRepository()
+        resource_repo.update(resource, folder_id=target.uid)
 
     def get_exam(self, uid):
         exam = self.exam_repo.get_by_uid(uid)

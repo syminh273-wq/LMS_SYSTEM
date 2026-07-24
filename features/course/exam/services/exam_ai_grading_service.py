@@ -1,4 +1,6 @@
+import base64
 import json
+import logging
 import os
 import re
 import tempfile
@@ -9,6 +11,14 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 
 from core.ai.llm.services.ai_client import AIClient
 from core.ai.rag.services.rag_pipeline import RAGPipeline
+from features.course.exam.models.exam import Exam
+from features.course.exam.models.exam_submission import ExamSubmission
+
+logger = logging.getLogger(__name__)
+
+SUPPORTED_TEXT_SUFFIXES = {".pdf", ".txt", ".md"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MB cap for vision calls
 
 
 class ExamAIGradingService:
@@ -110,7 +120,7 @@ class ExamAIGradingService:
             f"RUBRIC:\n{rubric}\n\n"
             f"EXAM_TITLE:\n{exam.title}\n\n"
             f"EXAM_DESCRIPTION:\n{exam.description or ''}\n\n"
-            f"EXAM_CONTENT:\n{exam_content_text or exam.resource_name}\n\n"
+            f"EXAM_CONTENT:\n{exam_content_text or (self._load_meta(exam).get('name') or exam.title)}\n\n"
             f"STUDENT_ID:\n{submission.student_id}\n\n"
             f"STUDENT_SUBMISSION:\n{submission_text}\n\n"
             f"CLASSROOM_DOCUMENT_CONTEXT:\n{context or 'Không tìm thấy tài liệu lớp học phù hợp.'}\n\n"
@@ -118,37 +128,196 @@ class ExamAIGradingService:
         )
 
     def _extract_text_from_resource(self, resource):
-        """Generic text extraction for Exam or ExamSubmission"""
-        if resource.content_type == "markdown":
-            return resource.content or ""
+        """Generic text extraction for Exam or ExamSubmission.
 
-        if not resource.resource_url:
-            return ""
+        Exam fields:           content_type, body (markdown text), meta (JSON with url/name)
+        ExamSubmission fields: submission_type, content (essay text), meta (JSON with url/name)
 
-        suffix = os.path.splitext(resource.resource_name or "")[1].lower()
-        if not suffix and resource.content_type in {"pdf", "file"}:
-            suffix = ".pdf" if resource.content_type == "pdf" else ".txt"
+        Returns the extracted text. Raises ValueError with a precise reason when the
+        resource cannot be read (missing url, unsupported type, download failure,
+        empty extracted content) so the caller can surface a useful error to the
+        teacher instead of a generic "no readable text" message.
+        """
+        kind = "exam" if isinstance(resource, Exam) else (
+            "submission" if isinstance(resource, ExamSubmission) else "resource"
+        )
+        meta = self._load_meta(resource)
+        resource_url = meta.get("url")
+        resource_name = meta.get("name") or ""
 
-        if suffix not in {".pdf", ".txt", ".md"}:
-            return ""
+        if isinstance(resource, Exam):
+            content_type = resource.content_type
+            inline_text = resource.body or ""
+        else:
+            content_type = getattr(resource, "submission_type", None) or "file"
+            inline_text = resource.content or ""
+
+        if isinstance(resource, Exam) and content_type == "markdown":
+            return inline_text
+        if isinstance(resource, ExamSubmission) and content_type == "essay":
+            return inline_text
+
+        if not resource_url:
+            logger.warning(
+                "AI grading: %s has no url in meta (name=%r, content_type=%s)",
+                kind, resource_name, content_type,
+            )
+            raise ValueError(
+                f"{kind.capitalize()} has no downloadable file (url missing in meta). "
+                f"content_type={content_type}, name={resource_name or '(empty)'}"
+            )
+
+        suffix = os.path.splitext(resource_name)[1].lower()
+        if not suffix and content_type in {"pdf", "file"}:
+            suffix = ".pdf" if content_type == "pdf" else ".txt"
+        if not suffix and content_type in {"image", "png", "jpg", "jpeg", "webp", "gif", "bmp"}:
+            suffix = ".png"
+
+        if suffix in IMAGE_SUFFIXES:
+            return self._describe_image(
+                resource_url=resource_url,
+                resource_name=resource_name,
+                kind=kind,
+            )
+
+        if suffix not in SUPPORTED_TEXT_SUFFIXES:
+            logger.warning(
+                "AI grading: unsupported file type name=%r suffix=%r (content_type=%s)",
+                resource_name, suffix, content_type,
+            )
+            raise ValueError(
+                f"Unsupported file type for AI grading: name={resource_name!r}, "
+                f"suffix={suffix or '(none)'}. Supported: "
+                f"{sorted(SUPPORTED_TEXT_SUFFIXES | IMAGE_SUFFIXES)}. "
+                f"Binary office files (.docx, .pptx, ...) cannot be graded automatically."
+            )
 
         tmp_path = None
         try:
-            response = requests.get(resource.resource_url, timeout=60)
+            response = requests.get(resource_url, timeout=60)
             response.raise_for_status()
+        except requests.RequestException as exc:
+            logger.warning(
+                "AI grading: download failed url=%s name=%r error=%s",
+                resource_url, resource_name, exc,
+            )
+            raise ValueError(
+                f"Failed to download file for AI grading: name={resource_name!r}, error={exc}"
+            ) from exc
+
+        try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 tmp.write(response.content)
                 tmp_path = tmp.name
 
             loader = PyPDFLoader(tmp_path) if suffix == ".pdf" else TextLoader(tmp_path)
             docs = loader.load()
-            return "\n\n".join(doc.page_content for doc in docs)
-        except Exception:
-            # Fallback to resource name if extraction fails
-            return resource.resource_name or ""
+            text = "\n\n".join(doc.page_content for doc in docs)
+            if not text.strip():
+                raise ValueError(
+                    f"File appears to be empty or unreadable: name={resource_name!r}"
+                )
+            return text
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "AI grading: text extraction failed name=%r suffix=%s error=%s",
+                resource_name, suffix, exc,
+            )
+            raise ValueError(
+                f"Failed to extract text from file: name={resource_name!r}, error={exc}"
+            ) from exc
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
+
+    @staticmethod
+    def _load_meta(resource):
+        raw = getattr(resource, "meta", None) or ""
+        try:
+            return json.loads(raw) if raw else {}
+        except (TypeError, json.JSONDecodeError):
+            return {}
+
+    def _describe_image(self, resource_url, resource_name, kind):
+        """Download an image and have a vision model describe its content.
+
+        Returns the description as plain text so the downstream grading flow
+        can treat it like any other extracted text. Raises ValueError on any
+        failure with a precise reason.
+        """
+        try:
+            response = requests.get(resource_url, timeout=60, stream=True)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            logger.warning(
+                "AI grading: image download failed url=%s name=%r error=%s",
+                resource_url, resource_name, exc,
+            )
+            raise ValueError(
+                f"Failed to download image for AI grading: name={resource_name!r}, error={exc}"
+            ) from exc
+
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > MAX_IMAGE_BYTES:
+                raise ValueError(
+                    f"Image too large for AI grading: name={resource_name!r} "
+                    f"(>{MAX_IMAGE_BYTES // (1024*1024)} MB)"
+                )
+            chunks.append(chunk)
+        image_bytes = b"".join(chunks)
+        if not image_bytes:
+            raise ValueError(f"Image is empty: name={resource_name!r}")
+
+        image_b64 = base64.b64encode(image_bytes).decode("ascii")
+
+        prompt = (
+            "Đây là ảnh bài làm của học sinh. Hãy trích xuất TOÀN BỘ nội dung văn bản, "
+            "công thức, bảng biểu và mô tả ngắn gọn hình vẽ/sơ đồ (nếu có) theo đúng "
+            "trình tự xuất hiện trong ảnh. Nếu ảnh chứa nhiều trang/khung, liệt kê rõ. "
+            "Chỉ trả về nội dung trích xuất, không nhận xét thêm."
+        )
+
+        try:
+            description = AIClient.chat_with_image(
+                messages=[{"role": "user", "content": prompt}],
+                image_b64=image_b64,
+                timeout=180,
+            )
+        except Exception as exc:
+            logger.warning(
+                "AI grading: vision model failed name=%r error=%s",
+                resource_name, exc,
+            )
+            error_text = str(exc)
+            hint = ""
+            if "not found" in error_text.lower() or "404" in error_text:
+                hint = (
+                    " Vision model is not installed in local Ollama. "
+                    "Run: `ollama pull llava` (or set OLLAMA_VISION_MODEL to a vision "
+                    "model you have already pulled, e.g. `llava:13b`, `llava-phi3`, `moondream`)."
+                )
+            raise ValueError(
+                f"Failed to describe image with vision model: name={resource_name!r}, "
+                f"error={error_text}.{hint}"
+            ) from exc
+
+        if not description or not description.strip():
+            raise ValueError(
+                f"Vision model returned empty description for image: name={resource_name!r}"
+            )
+
+        logger.info(
+            "AI grading: image described name=%r kind=%s chars=%d",
+            resource_name, kind, len(description),
+        )
+        return description
 
     def _parse_json(self, raw):
         try:

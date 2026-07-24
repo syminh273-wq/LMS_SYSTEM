@@ -46,12 +46,12 @@ class Service:
             }
         })
 
-        # Auto-create a Preview folder so the new flow has a default free tab
+        # Auto-create default folders: Preview, Docs, Bài kiểm tra (with 3 sub-folders)
         try:
-            from features.resource.services.resource_folder_service import ResourceFolderService
-            ResourceFolderService().ensure_preview_folder(classroom.uid, teacher_id)
+            from features.resource.services.resource_folder_seed_service import ResourceFolderSeedService
+            ResourceFolderSeedService().ensure_default_folders(classroom.uid, teacher_id)
         except Exception as exc:
-            print(f"[ClassroomService] Failed to auto-create preview folder: {exc}")
+            print(f"[ClassroomService] Failed to auto-create default folders: {exc}")
 
         LMSIndexer.index_classroom(classroom)
         return classroom

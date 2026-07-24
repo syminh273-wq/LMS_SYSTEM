@@ -158,6 +158,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
             section = request.data.get('section', '')
             folder_id = request.data.get('folder_id') or None
+            exam_period = request.data.get('exam_period') or None
             try:
                 order_index = int(request.data.get('order_index', 0))
             except (TypeError, ValueError):
@@ -168,6 +169,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
                 section=section,
                 folder_id=folder_id,
                 order_index=order_index,
+                exam_period=exam_period,
             )
             resource = result.get('data')
             if resource:
