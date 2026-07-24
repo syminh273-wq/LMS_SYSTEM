@@ -181,13 +181,13 @@ class RAGPipeline:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _get_store(self, embed_dim: int = None) -> LanceVectorService:
-        # Always return a single shared instance per collection — the
-        # underlying LanceDB table is the same regardless of embed_dim (dim
-        # is enforced by the table schema itself), and multiple cached
-        # instances cause stale-handle issues across ingest/retrieve.
         if not self._store_cache:
             self._store_cache[0] = LanceVectorService(self.collection, embed_dim=embed_dim)
-        return self._store_cache[0]
+            return self._store_cache[0]
+        store = self._store_cache[0]
+        if embed_dim and not store._embed_dim:
+            store._embed_dim = embed_dim
+        return store
 
     # ─────────────────────────────────────────────────────────────────────────
     # ④ retrieve() — vector search với metadata filter
