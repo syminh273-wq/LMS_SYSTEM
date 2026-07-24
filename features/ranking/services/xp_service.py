@@ -164,7 +164,7 @@ class XPService:
     def get_student_xp(self, student_id):
         return self.xp_repo.get(self._safe_uuid(student_id))
 
-    def get_transactions(self, student_id, limit=20, event_type=None, classroom_id=None):
+    def get_transactions(self, student_id, limit=None, event_type=None, classroom_id=None):
         return self.tx_repo.list_by_student(
             student_id, limit=limit,
             event_type=event_type, classroom_id=classroom_id,

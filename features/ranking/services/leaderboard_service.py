@@ -72,6 +72,7 @@ class LeaderboardService:
 
     def _hydrate(self, rows):
         from features.account.consumer.repositories import ConsumerRepository
+        from features.ranking.services.level_service import level_title
         consumers = ConsumerRepository()
         out = []
         for i, row in enumerate(rows, start=1):
@@ -85,12 +86,14 @@ class LeaderboardService:
                     avatar = getattr(c, 'avatar_url', '') or ''
             except Exception:
                 pass
+            level = int(row.level or 1)
             out.append({
                 'rank': i,
                 'student_id': sid,
                 'student_name': name,
                 'student_avatar': avatar,
                 'total_xp': int(row.total_xp or 0),
-                'level': int(row.level or 1),
+                'level': level,
+                'level_title': level_title(level),
             })
         return out

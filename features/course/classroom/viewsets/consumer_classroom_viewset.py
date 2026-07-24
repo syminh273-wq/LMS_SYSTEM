@@ -402,34 +402,6 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         """GET /api/v1/consumer/course/classrooms/{uid}/access/ — poll endpoint for checkout flow."""
         return Response(Service().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
 
-    @action(detail=True, methods=['get'], url_path='leaderboard')
-    def leaderboard(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/leaderboard/?limit=10
-
-        Returns top-N students in the classroom plus the caller's rank.
-        Only approved members of the classroom can view.
-        """
-        from features.course.classroom.services.leaderboard_service import LeaderboardService
-
-        if not ClassroomMemberService().is_member(str(pk), request.user.uid):
-            return Response(
-                {'error': 'Bạn cần tham gia lớp để xem bảng xếp hạng.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        try:
-            limit = int(request.query_params.get('limit', 10))
-        except (TypeError, ValueError):
-            limit = 10
-        limit = max(1, min(limit, 100))
-
-        payload = LeaderboardService().build(
-            classroom_id=str(pk),
-            current_user_id=str(request.user.uid),
-            limit=limit,
-        )
-        return Response(payload)
-
     @action(detail=True, methods=['get'], url_path='preview-folder')
     def preview_folder(self, request, pk=None):
         """GET /api/v1/consumer/course/classrooms/{uid}/preview-folder/ — always accessible."""
