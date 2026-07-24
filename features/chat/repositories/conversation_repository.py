@@ -19,3 +19,11 @@ class ConversationRepository(BaseRepository):
             direct_b_id=uuid.UUID(ids[1]),
             type='direct',
         ).allow_filtering().first()
+
+    def get_direct_by_pair_key(self, pair_key: str):
+        if not pair_key:
+            return None
+        return self.model.objects.filter(
+            pair_key=pair_key,
+            type='direct',
+        ).allow_filtering().first()

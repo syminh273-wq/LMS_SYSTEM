@@ -39,6 +39,17 @@ class DirectConversationViewSet(UserScopeMixin, ViewSet):
         data = list_direct_conversations(request.user.uid)
         return Response(data)
 
+    @action(detail=False, methods=['post'], url_path='lookup-by-target')
+    def lookup_by_target(self, request):
+        target_user_id = request.data.get('target_user_id')
+        if not target_user_id:
+            return Response({'error': 'target_user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        from features.chat.services.direct_service import find_conversation_with_target
+        result = find_conversation_with_target(request.user.uid, uuid.UUID(str(target_user_id)))
+        if result is None:
+            return Response({'conversation_uid': None}, status=status.HTTP_200_OK)
+        return Response({'conversation_uid': str(result.uid), 'other_user': result['other_user']})
+
     def create(self, request):
         target_user_id = request.data.get('target_user_id')
         if not target_user_id:

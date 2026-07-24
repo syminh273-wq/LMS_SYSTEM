@@ -4,6 +4,8 @@ from datetime import datetime
 from features.chat.models.conversation import Conversation
 from features.chat.models.conversation_member import ConversationMember
 from features.chat.models.message import Message
+from features.chat.services.identity_resolver import pair_key as build_pair_key, _email_for_uid
+from features.chat.services.conversation_service import ConversationService
 
 
 def _serialize_direct(conv: Conversation, other_member: ConversationMember, unread: int, last_msg: dict | None) -> dict:
@@ -31,6 +33,33 @@ def _fetch_unread(conv_uid, member_id, last_read_msg_uid) -> int:
     return sum(1 for _ in qs)
 
 
+def find_conversation_with_target(user_uid, target_uid):
+    """Tìm conversation direct đã tồn tại giữa current user và target user (không tạo mới).
+
+    Trả về dict {conversation_uid, other_user} hoặc None.
+    Dùng canonical pair_key (email) để match cả 2 trường hợp UID khác nhau cùng 1 người.
+    """
+    pk = build_pair_key(user_uid, target_uid)
+    repo = ConversationService().repo
+    conv = repo.get_direct_by_pair_key(pk)
+    if not conv:
+        return None
+
+    members = list(ConversationMember.objects.filter(conversation_uid=conv.uid, is_deleted=False))
+    me = next((m for m in members if str(m.member_id) == str(user_uid)), None)
+    other = next((m for m in members if str(m.member_id) != str(user_uid)), None)
+    if not other:
+        return None
+    return {
+        'conversation_uid': str(conv.uid),
+        'other_user': {
+            'uid': str(other.member_id),
+            'name': other.member_name or '',
+            'avatar': other.member_avatar or '',
+        },
+    }
+
+
 def list_direct_conversations(user_uid) -> list[dict]:
     uid = uuid.UUID(str(user_uid))
     all_qs = Conversation.objects.filter(bucket=0, type='direct', is_deleted=False).allow_filtering()
@@ -39,8 +68,14 @@ def list_direct_conversations(user_uid) -> list[dict]:
     convs = direct_a + direct_b
     convs.sort(key=lambda c: c.last_msg_at or c.created_at or datetime.min, reverse=True)
 
+    seen_pair_keys: set[str] = set()
     out = []
     for conv in convs:
+        if conv.pair_key:
+            if conv.pair_key in seen_pair_keys:
+                continue
+            seen_pair_keys.add(conv.pair_key)
+
         members = list(ConversationMember.objects.filter(conversation_uid=conv.uid, is_deleted=False))
         me = next((m for m in members if str(m.member_id) == str(uid)), None)
         other = next((m for m in members if str(m.member_id) != str(uid)), None)

@@ -12,6 +12,7 @@ class Conversation(BaseTimeStampModel):
     description = columns.Text(default='')
     direct_a_id = columns.UUID(index=True, required=False)  # smaller UUID
     direct_b_id = columns.UUID(index=True, required=False)  # larger UUID
+    pair_key = columns.Text(index=True, required=False, default='')  # sorted "emailA|emailB" canonical key
     member_count = columns.Integer(default=0)
     last_msg_at = columns.DateTime(required=False)
     last_msg_text = columns.Text(default='')

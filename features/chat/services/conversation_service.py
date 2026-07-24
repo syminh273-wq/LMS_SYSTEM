@@ -1,6 +1,7 @@
 import uuid as _uuid
 from datetime import datetime
 from features.chat.repositories.conversation_repository import ConversationRepository
+from features.chat.services.identity_resolver import pair_key as build_pair_key
 
 
 class ConversationService:
@@ -20,14 +21,17 @@ class ConversationService:
         )
 
     def get_or_create_direct(self, user_a_id, user_b_id):
-        ids = sorted([str(user_a_id), str(user_b_id)])
-        existing = self.repo.get_direct(ids[0], ids[1])
+        pk = build_pair_key(user_a_id, user_b_id)
+        existing = self.repo.get_direct_by_pair_key(pk)
         if existing:
             return existing, False
+
+        ids = sorted([str(user_a_id), str(user_b_id)])
         conv = self.repo.create(
             type='direct',
             direct_a_id=_uuid.UUID(ids[0]),
             direct_b_id=_uuid.UUID(ids[1]),
+            pair_key=pk,
             member_count=2,
         )
         return conv, True

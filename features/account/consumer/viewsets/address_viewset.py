@@ -4,7 +4,7 @@ Address API — 1 user : 1 address.
 All endpoints are bound to the currently authenticated user (Consumer or
 Space), resolved from the JWT `user_id` + `user_type` claims.
 
-    GET    /api/v1/account/addresses/me/   → 200 with address | 404
+    GET    /api/v1/account/addresses/me/   → 200 with address | 200 with []
     PUT    /api/v1/account/addresses/me/   → create or replace (200)
     PATCH  /api/v1/account/addresses/me/   → partial update (200)
     DELETE /api/v1/account/addresses/me/   → soft delete (204)
@@ -45,7 +45,7 @@ class MyAddressView(APIView):
             return Response({'detail': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
         data = AddressService().get_for_owner(owner_id, owner_type)
         if data is None:
-            return Response({'detail': 'Chưa có địa chỉ.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response([], status=status.HTTP_200_OK)
         return Response(data)
 
     def put(self, request):
