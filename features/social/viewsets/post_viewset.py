@@ -2,14 +2,40 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from features.account.consumer.models import Consumer
+from features.account.space.models import Space
 from features.social.services import PostService
+from features.social.services.profile_service import ProfileService
+
+
+def _resolve_avatar_url(value: str) -> str:
+    if not value:
+        return ''
+    from core.storages.storage_service import storage_service
+    return storage_service.get_public_url(value)
+
+
+def _profile_avatar(user) -> str:
+    """Best-effort avatar lookup from the social UserProfile table. Returns the
+    raw stored value (object key, /media/... or full URL); caller must run it
+    through the public URL resolver."""
+    try:
+        owner_type = 'space' if isinstance(user, Space) else 'consumer'
+        profile = ProfileService().get_or_create_for_user(user)
+        return (profile.avatar_url or '') if profile else ''
+    except Exception:
+        return ''
 
 
 def _author_info(user):
-    return (
-        getattr(user, 'full_name', '') or getattr(user, 'username', '') or '',
-        getattr(user, 'avatar_url', '') or '',
-    )
+    """Return (display_name, avatar_url_already_resolved) for the given user.
+    Avatar is resolved through storage_service so the value can be persisted
+    directly into Post/Comment without re-conversion."""
+    name = getattr(user, 'full_name', '') or getattr(user, 'username', '') or ''
+    raw_avatar = getattr(user, 'avatar_url', '') or ''
+    if not raw_avatar:
+        raw_avatar = _profile_avatar(user)
+    return name, _resolve_avatar_url(raw_avatar)
 
 
 def _detect_author_type(user) -> str:
@@ -101,10 +127,12 @@ class PostDetailView(APIView):
     """GET / DELETE /api/v1/consumer/social/posts/<uid>/"""
 
     def get(self, request, uid=None):
-        post = PostService().get_post(uid)
+        svc = PostService()
+        post = svc.get_post(uid)
         if not post or post.is_deleted:
             return Response({'error': 'Không tìm thấy bài đăng'}, status=status.HTTP_404_NOT_FOUND)
-        return Response(PostService()._serialize_post(post))
+        profile_avatars = svc._profile_avatar_map([post.consumer_uid])
+        return Response(svc._serialize_post(post, profile_avatars=profile_avatars))
 
     def delete(self, request, uid=None):
         ok = PostService().delete_post(uid, request.user.uid)

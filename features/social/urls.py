@@ -15,6 +15,7 @@ from features.social.viewsets.profile_viewset import (
     MyProfileView, PublicProfileView,
     ProfileAvatarUploadView, ProfileCoverUploadView,
 )
+from features.social.viewsets.suggestions_viewset import SuggestedUsersView
 
 urlpatterns = [
     # Posts & Feed
@@ -45,4 +46,7 @@ urlpatterns = [
     path('classrooms/favorites/',                  ClassroomFavoriteListView.as_view(),  name='social-classroom-favorites'),
     path('classrooms/<str:classroom_uid>/favorite/',         ClassroomFavoriteToggleView.as_view(), name='social-classroom-favorite'),
     path('classrooms/<str:classroom_uid>/favorite/status/',  ClassroomFavoriteStatusView.as_view(), name='social-classroom-favorite-status'),
+
+    # Suggestions
+    path('suggestions/',                           SuggestedUsersView.as_view(),          name='social-suggestions'),
 ]

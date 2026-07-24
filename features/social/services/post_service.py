@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from core.storages.storage_service import storage_service
-from features.social.models import ConsumerPost, PostLike, PostComment
+from features.social.models import ConsumerPost, PostLike, PostComment, UserProfile
 from features.social.services.follow_service import FollowService
 from features.social.services.profile_service import ProfileService
 
@@ -35,16 +35,60 @@ class PostService:
         return urls
 
     @staticmethod
-    def _serialize_post(p: ConsumerPost, liked_by_me: bool = False) -> dict:
+    def _resolve_avatar_url(value: str) -> str:
+        """Convert a stored avatar (object key, relative path, or full URL) into
+        a public URL. Mirrors the helper used by account/space serializers so
+        the social feed returns renderable avatar URLs regardless of upload flow."""
+        if not value:
+            return ''
+        return storage_service.get_public_url(value)
+
+    @staticmethod
+    def _profile_avatar_map(owner_ids: list) -> dict:
+        """Batch-fetch avatar URLs from the social UserProfile table for any owners
+        whose Post/Comment was created with an empty author_avatar. Returns a map
+        of owner_id(str) -> raw avatar value (object key or full URL)."""
+        if not owner_ids:
+            return {}
+        result: dict[str, str] = {}
+        for raw in owner_ids:
+            try:
+                owner_uuid = uuid.UUID(str(raw))
+            except (ValueError, TypeError):
+                continue
+            try:
+                rows = list(UserProfile.objects.filter(bucket=0, owner_id=owner_uuid).limit(1))
+            except Exception:
+                continue
+            if rows and rows[0].avatar_url:
+                result[str(owner_uuid)] = rows[0].avatar_url
+        return result
+
+    @staticmethod
+    def _backfill_avatar(stored: str, owner_id, profile_avatars: dict) -> str:
+        """If `stored` is empty, fall back to the social UserProfile avatar; then
+        run the value through the public URL resolver."""
+        value = (stored or '').strip()
+        if not value and owner_id is not None:
+            value = (profile_avatars.get(str(owner_id)) or '').strip()
+        return PostService._resolve_avatar_url(value)
+
+    @staticmethod
+    def _serialize_post(p: ConsumerPost, liked_by_me: bool = False,
+                        profile_avatars: dict | None = None) -> dict:
         raw_tags = list(p.classroom_tags or [])
         image_urls = list(p.image_urls or [])
         if not image_urls and p.image_url:
             image_urls = [p.image_url]
+        profile_avatars = profile_avatars or {}
+        author_avatar = PostService._backfill_avatar(
+            p.author_avatar, p.consumer_uid, profile_avatars
+        )
         return {
             'uid':            str(p.uid),
             'consumer_uid':   str(p.consumer_uid),
             'author_name':    p.author_name or '',
-            'author_avatar':  p.author_avatar or '',
+            'author_avatar':  author_avatar,
             'author_type':    p.author_type or 'consumer',
             'space_uid':      str(p.space_uid) if p.space_uid else None,
             'content':        p.content or '',
@@ -60,13 +104,17 @@ class PostService:
         }
 
     @staticmethod
-    def _serialize_comment(c: PostComment) -> dict:
+    def _serialize_comment(c: PostComment, profile_avatars: dict | None = None) -> dict:
+        profile_avatars = profile_avatars or {}
+        author_avatar = PostService._backfill_avatar(
+            c.author_avatar, c.consumer_uid, profile_avatars
+        )
         return {
             'uid':           str(c.uid),
             'post_uid':      str(c.post_uid),
             'consumer_uid':  str(c.consumer_uid),
             'author_name':   c.author_name or '',
-            'author_avatar': c.author_avatar or '',
+            'author_avatar': author_avatar,
             'content':       c.content or '',
             'created_at':    c.created_at.isoformat() if c.created_at else None,
         }
@@ -146,29 +194,31 @@ class PostService:
         posts = [p for p in posts if p.visibility == 'public'][:limit]
 
         liked_set = self._liked_set(requester_uid, [p.uid for p in posts])
-        return [self._serialize_post(p, str(p.uid) in liked_set) for p in posts]
+        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        return [self._serialize_post(p, str(p.uid) in liked_set, profile_avatars) for p in posts]
 
     def get_following_feed(self, requester_uid, limit: int = 20) -> list[dict]:
         """Feed from people the user is following."""
         following = FollowService().get_following(requester_uid, limit=200)
         followed_uids = [uuid.UUID(f['consumer_uid']) for f in following]
-        
+
         if not followed_uids:
             return []
-            
+
         # We can't easily do a multi-user 'IN' query with Cassandra effectively for a feed
         # So we fetch a few from each or use the global bucket and filter.
         # For simplicity and performance with small following lists, we fetch from the global bucket
         # but filter for the ones we follow.
-        
+
         qs = ConsumerPost.objects.filter(bucket=0, is_deleted=False).limit(limit * 5)
         posts_raw = list(qs)
-        
+
         followed_set = {str(uid) for uid in followed_uids}
         posts = [p for p in posts_raw if str(p.consumer_uid) in followed_set][:limit]
-        
+
         liked_set = self._liked_set(requester_uid, [p.uid for p in posts])
-        return [self._serialize_post(p, str(p.uid) in liked_set) for p in posts]
+        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        return [self._serialize_post(p, str(p.uid) in liked_set, profile_avatars) for p in posts]
 
     def get_my_posts(self, consumer_uid, limit: int = 20, before: str | None = None) -> list[dict]:
         """All posts by a specific user (visible to themselves)."""
@@ -179,7 +229,8 @@ class PostService:
             except Exception:
                 pass
         posts = list(qs.limit(limit))
-        return [self._serialize_post(p) for p in posts]
+        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        return [self._serialize_post(p, profile_avatars=profile_avatars) for p in posts]
 
     def get_user_posts(self, consumer_uid, requester_uid, limit: int = 20) -> list[dict]:
         """Posts by user visible to requester (filters by visibility)."""
@@ -193,7 +244,8 @@ class PostService:
             posts = [p for p in posts_raw if p.visibility == 'public'][:limit]
 
         liked_set = self._liked_set(requester_uid, [p.uid for p in posts])
-        return [self._serialize_post(p, str(p.uid) in liked_set) for p in posts]
+        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        return [self._serialize_post(p, str(p.uid) in liked_set, profile_avatars) for p in posts]
 
     def get_post(self, post_uid: str) -> ConsumerPost | None:
         try:
@@ -252,7 +304,8 @@ class PostService:
         comments = list(
             PostComment.objects.filter(post_uid=uuid.UUID(post_uid), is_deleted=False).limit(limit)
         )
-        return [self._serialize_comment(c) for c in comments]
+        profile_avatars = self._profile_avatar_map([c.consumer_uid for c in comments])
+        return [self._serialize_comment(c, profile_avatars) for c in comments]
 
     def add_comment(self, post_uid: str, consumer_uid, author_name: str, author_avatar: str, content: str) -> dict:
         p_uid = uuid.UUID(post_uid)

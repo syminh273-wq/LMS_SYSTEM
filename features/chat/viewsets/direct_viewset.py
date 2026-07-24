@@ -1,6 +1,10 @@
+import logging
 import uuid
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
@@ -12,6 +16,21 @@ from features.chat.services.direct_service import (
     create_message as svc_create_message,
     mark_conversation_seen,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _broadcast_direct_message(conversation_uid: str, payload: dict) -> None:
+    try:
+        layer = get_channel_layer()
+        if layer is None:
+            return
+        async_to_sync(layer.group_send)(
+            f'chat_{conversation_uid}',
+            {'type': 'broadcast_message', **payload},
+        )
+    except Exception as exc:
+        logger.warning('Failed to broadcast direct message to WS group: %s', exc)
 
 
 class DirectConversationViewSet(UserScopeMixin, ViewSet):
@@ -90,12 +109,27 @@ class DirectMessageViewSet(UserScopeMixin, ViewSet):
                 resource_name=resource_name,
                 resource_size=resource_size,
             )
+            _broadcast_direct_message(str(conversation_uid), {
+                'uid': msg['uid'],
+                'conversation_uid': msg['conversation_uid'],
+                'msg_type': msg['msg_type'],
+                'content': msg.get('content', ''),
+                'sender_id': msg.get('sender_id'),
+                'sender_type': msg.get('sender_type', ''),
+                'sender_name': msg.get('sender_name', ''),
+                'resource_uid': (msg.get('attachment') or {}).get('uid'),
+                'resource_url': (msg.get('attachment') or {}).get('url', ''),
+                'resource_name': (msg.get('attachment') or {}).get('name', ''),
+                'resource_size': (msg.get('attachment') or {}).get('size', 0),
+                'created_at': msg.get('created_at') or '',
+            })
             return Response(msg, status=status.HTTP_201_CREATED)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': f'Send failed: {e}'}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['post'], url_path='seen')
     def seen(self, request):
         conversation_uid = request.data.get('conversation_uid')
         msg_uid = request.data.get('msg_uid')

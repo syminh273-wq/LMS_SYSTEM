@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from features.account.consumer.viewsets.consumer_viewset import ViewSet
+from features.account.consumer.viewsets.address_viewset import MyAddressView
 from features.account.consumer.views.consumer_login_view import ConsumerLoginView
 from features.account.consumer.views.consumer_register_view import ConsumerRegisterView
 from features.account.consumer.views.consumer_update_view import ConsumerUpdateView

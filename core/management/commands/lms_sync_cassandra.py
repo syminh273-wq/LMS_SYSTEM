@@ -17,6 +17,7 @@ from features.social.models import (
     UserProfile, ClassroomFavorite,
 )
 from features.chat.models import Conversation, ConversationMember, Message
+from features.account.consumer.models.address import Address
 
 
 def _cassandra_cfg():
@@ -137,6 +138,7 @@ class Command(BaseCommand):
             ('chat.Conversation',      Conversation),
             ('chat.ConversationMember', ConversationMember),
             ('chat.Message',           Message),
+            ('account.Address',        Address),
         ]
 
         for label, model in models:

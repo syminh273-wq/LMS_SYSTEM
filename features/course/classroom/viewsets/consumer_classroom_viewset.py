@@ -49,6 +49,52 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return paginator.get_paginated_response(ClassroomResponseSerializer(page, many=True).data)
         return Response(ClassroomResponseSerializer(classrooms, many=True).data)
 
+    @action(detail=False, methods=['get'], url_path='by-teacher')
+    def by_teacher(self, request):
+        """GET /api/v1/consumer/course/classrooms/by-teacher/?teacher_id=<uid>
+
+        Lightweight, public-safe listing for a teacher profile page. Returns
+        only `active` + `public` classrooms (visibility_type='public'), sorted
+        newest first. No teacher-only fields are exposed.
+        """
+        teacher_id_raw = (request.query_params.get('teacher_id') or '').strip()
+        if not teacher_id_raw:
+            return Response({'error': 'teacher_id là bắt buộc.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            teacher_uuid = uuid.UUID(teacher_id_raw)
+        except (ValueError, TypeError):
+            return Response({'error': 'teacher_id không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            rows = list(Service().get_by_teacher(teacher_uuid))
+        except Exception:
+            rows = []
+
+        results = []
+        for c in rows:
+            if getattr(c, 'is_deleted', False):
+                continue
+            if getattr(c, 'status', 'active') != 'active':
+                continue
+            if getattr(c, 'visibility_type', 'public') != 'public':
+                continue
+            data = ClassroomResponseSerializer(c).data
+            keep = {
+                'uid': data.get('uid'),
+                'name': data.get('name'),
+                'description': data.get('description'),
+                'category': data.get('category'),
+                'pricing_type': data.get('pricing_type'),
+                'price_vnd': data.get('price_vnd'),
+                'max_students': data.get('max_students'),
+                'preview_folder_uid': data.get('preview_folder_uid'),
+                'created_at': data.get('created_at'),
+            }
+            results.append(keep)
+
+        results.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
+        return Response(results)
+
     @action(detail=False, methods=['get'], url_path='discover')
     def discover(self, request):
         """GET /api/v1/consumer/course/classrooms/discover/

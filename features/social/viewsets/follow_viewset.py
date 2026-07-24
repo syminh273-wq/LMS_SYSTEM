@@ -3,15 +3,28 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from features.social.services import FollowService
 from features.account.consumer.models import Consumer
+from features.account.space.models import Space
 import uuid
 
 
 def _user_info(u_uid):
     try:
-        user = Consumer.objects.get(uid=uuid.UUID(str(u_uid)))
+        u = uuid.UUID(str(u_uid))
+    except Exception:
+        return {'name': 'Unknown', 'avatar': ''}
+    try:
+        user = Consumer.objects.get(uid=u)
         return {
             'name': user.full_name or user.username or '',
             'avatar': user.avatar_url or ''
+        }
+    except Exception:
+        pass
+    try:
+        user = Space.objects.get(uid=u)
+        return {
+            'name': user.full_name or user.name or user.slug or '',
+            'avatar': user.avatar_url or user.logo_url or ''
         }
     except Exception:
         return {'name': 'Unknown', 'avatar': ''}

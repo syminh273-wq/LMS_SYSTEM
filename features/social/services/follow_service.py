@@ -1,7 +1,14 @@
 import uuid
 from datetime import datetime
+from core.storages.storage_service import storage_service
 from features.social.models import UserFollow
 from features.social.services.profile_service import ProfileService
+
+
+def _resolve_avatar(value: str) -> str:
+    if not value:
+        return ''
+    return storage_service.get_public_url(value)
 
 
 class FollowService:
@@ -12,14 +19,14 @@ class FollowService:
             return {
                 'consumer_uid': str(f.followed_uid),
                 'name': f.followed_name,
-                'avatar': f.followed_avatar,
+                'avatar': _resolve_avatar(f.followed_avatar or ''),
                 'created_at': f.created_at.isoformat() if f.created_at else None
             }
         else:
             return {
                 'consumer_uid': str(f.follower_uid),
                 'name': f.follower_name,
-                'avatar': f.follower_avatar,
+                'avatar': _resolve_avatar(f.follower_avatar or ''),
                 'created_at': f.created_at.isoformat() if f.created_at else None
             }
 
