@@ -7,6 +7,8 @@ from core.notification.enums.notification_provider import NotificationProvider
 
 VALID_STATUSES = ('waiting', 'active', 'ended')
 
+LIVE_ROOM_PATH = 'classrooms/{classroom_uid}/live_room'
+
 
 class MeetingRoomService:
     def __init__(self):
@@ -61,13 +63,44 @@ class MeetingRoomService:
         kwargs = {'status': status}
         if status == 'active' and not room.started_at:
             kwargs['started_at'] = datetime.utcnow()
-            # Notify members if linked to a classroom
             if room.classroom_uid:
+                self._write_live_room_marker(room)
                 self._notify_meeting_started(room)
         elif status == 'ended':
             kwargs['ended_at'] = datetime.utcnow()
+            if room.classroom_uid:
+                self._clear_live_room_marker(str(room.classroom_uid), str(room.uid))
 
         return self.repo.update(room, **kwargs)
+
+    def _write_live_room_marker(self, room):
+        marker = {
+            'room_uid': str(room.uid),
+            'classroom_uid': str(room.classroom_uid),
+            'title': room.title,
+            'host_id': str(room.host_id),
+            'host_name': room.host_name,
+            'started_at': (room.started_at or datetime.utcnow()).isoformat(),
+        }
+        path = LIVE_ROOM_PATH.format(classroom_uid=room.classroom_uid)
+        self.notification_service.set_message(path, marker)
+
+    def _clear_live_room_marker(self, classroom_uid: str, room_uid: str):
+        path = LIVE_ROOM_PATH.format(classroom_uid=classroom_uid)
+        try:
+            current = self.notification_service.get_message(path)
+        except Exception:
+            current = None
+        if isinstance(current, dict) and current.get('room_uid') == room_uid:
+            self.notification_service.set_message(path, None)
+
+    def get_live_room(self, classroom_uid: str):
+        path = LIVE_ROOM_PATH.format(classroom_uid=classroom_uid)
+        try:
+            data = self.notification_service.get_message(path)
+        except Exception:
+            return None
+        return data if isinstance(data, dict) and data.get('room_uid') else None
 
     def _notify_meeting_started(self, room):
         """Notify all members of the classroom about the meeting."""

@@ -50,6 +50,8 @@ class MessageConsumer(BaseWebSocketConsumer):
                 await self.send_error('Failed to save message')
                 return
 
+            await self._update_last_message(content, message.sender_name)
+
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -126,6 +128,16 @@ class MessageConsumer(BaseWebSocketConsumer):
         except Exception as e:
             logger.error(f"Save message error: {e}")
             return None
+
+    @database_sync_to_async
+    def _update_last_message(self, text, sender_name):
+        try:
+            if not self.room_name:
+                return
+            from features.chat.services.conversation_service import ConversationService
+            ConversationService().update_last_message(self.room_name, text, sender_name)
+        except Exception:
+            pass
 
     @database_sync_to_async
     def _update_last_seen(self):

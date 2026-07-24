@@ -109,6 +109,7 @@ class GoogleConsumerOAuthCallbackView(APIView):
 
         refresh = RefreshToken.for_user(consumer)
         refresh['user_type'] = 'consumer'
+        refresh.access_token['user_type'] = 'consumer'
 
         return redirect(
             f'{frontend_url}/consumer/auth/callback'

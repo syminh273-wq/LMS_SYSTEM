@@ -13,3 +13,16 @@ class MeetingRoomRepository(BaseRepository):
 
     def get_active_rooms(self):
         return self.model.objects.filter(bucket=0, status='active', is_deleted=False)
+
+    def increment_participant(self, room_uid):
+        room = self.find(str(room_uid))
+        if not room:
+            return None
+        return self.update(room, participant_count=(room.participant_count or 0) + 1)
+
+    def decrement_participant(self, room_uid):
+        room = self.find(str(room_uid))
+        if not room:
+            return None
+        new_count = max(0, (room.participant_count or 0) - 1)
+        return self.update(room, participant_count=new_count)

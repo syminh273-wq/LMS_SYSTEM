@@ -12,3 +12,6 @@ class RealtimeFirebaseService(BaseRealtimeService):
 
     def _get_value(self, channel: str):
         return FirebaseApp.get_value(channel)
+
+    def _delete_value(self, channel: str):
+        FirebaseApp.set_value(channel, None)

@@ -14,13 +14,19 @@ def get_user_from_token(token_str):
         from rest_framework_simplejwt.tokens import UntypedToken
         validated = UntypedToken(token_str)
         user_id = validated['user_id']
-        user_type = validated.get('user_type', 'consumer')
+        user_type = validated.get('user_type')
         if user_type == 'space':
             from features.account.space.models.space import Space
             return Space.objects.filter(uid=user_id).allow_filtering().first()
-        else:
+        if user_type == 'consumer':
             from features.account.consumer.models.consumer import Consumer
             return Consumer.objects.filter(uid=user_id).allow_filtering().first()
+        from features.account.space.models.space import Space as _Space
+        from features.account.consumer.models.consumer import Consumer as _Consumer
+        space_user = _Space.objects.filter(uid=user_id).allow_filtering().first()
+        if space_user:
+            return space_user
+        return _Consumer.objects.filter(uid=user_id).allow_filtering().first()
     except Exception as e:
         logger.warning(f"WS JWT auth failed: {e}")
         return AnonymousUser()

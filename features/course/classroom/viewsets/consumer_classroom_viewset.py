@@ -38,7 +38,7 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         for uid in uids:
             try:
                 classroom = service.find(str(uid))
-                if getattr(classroom, 'status', 'active') == 'private':
+                if getattr(classroom, 'visibility_type', 'public') == 'private':
                     continue
                 classrooms.append(classroom)
             except Exception:
@@ -232,7 +232,7 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
             return Response({'error': 'ID lớp không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
         instance = Service().find(pk)
-        if getattr(instance, 'status', 'active') == 'private':
+        if getattr(instance, 'visibility_type', 'public') == 'private':
             return Response({'error': 'Lớp học này không khả dụng.'}, status=status.HTTP_403_FORBIDDEN)
         from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
         if ClassroomBlacklistService().is_blocked(instance.uid, instance.teacher_id, request.user.uid):

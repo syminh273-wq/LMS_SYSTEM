@@ -106,6 +106,7 @@ class GoogleSpaceOAuthCallbackView(APIView):
 
         refresh = RefreshToken.for_user(space)
         refresh['user_type'] = 'space'
+        refresh.access_token['user_type'] = 'space'
 
         return redirect(
             f'{frontend_url}/space/auth/callback'

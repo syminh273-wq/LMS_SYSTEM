@@ -16,6 +16,7 @@ class ConsumerLoginView(APIView):
         if user:
             refresh = RefreshToken.for_user(user)
             refresh['user_type'] = 'consumer'
+            refresh.access_token['user_type'] = 'consumer'
             return Response({
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),

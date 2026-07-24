@@ -7,10 +7,13 @@ logger = logging.getLogger(__name__)
 
 class BaseRealtimeService(RealtimeInterface):
 
-    def set_message(self, channel: str, data: dict) -> bool:
-        """Overwrite data at channel path."""
+    def set_message(self, channel: str, data) -> bool:
+        """Overwrite data at channel path. Pass None to delete."""
         try:
-            self._set_value(channel, self._to_string_values(data))
+            if data is None:
+                self._delete_value(channel)
+            else:
+                self._set_value(channel, self._to_string_values(data))
             return True
         except Exception as e:
             logger.error(f"[Realtime] set_message failed on {channel}: {e}")
@@ -31,6 +34,14 @@ class BaseRealtimeService(RealtimeInterface):
             logger.error(f"[Realtime] get_message failed on {channel}: {e}")
             return None
 
+    def delete_message(self, channel: str) -> bool:
+        try:
+            self._delete_value(channel)
+            return True
+        except Exception as e:
+            logger.error(f"[Realtime] delete_message failed on {channel}: {e}")
+            return False
+
     def _to_string_values(self, data):
         if isinstance(data, dict):
             return {k: self._to_string_values(v) for k, v in data.items()}
@@ -45,4 +56,7 @@ class BaseRealtimeService(RealtimeInterface):
         raise NotImplementedError
 
     def _get_value(self, channel: str):
+        raise NotImplementedError
+
+    def _delete_value(self, channel: str):
         raise NotImplementedError

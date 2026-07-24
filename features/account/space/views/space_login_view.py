@@ -16,6 +16,7 @@ class SpaceLoginView(APIView):
         if user:
             refresh = RefreshToken.for_user(user)
             refresh['user_type'] = 'space'
+            refresh.access_token['user_type'] = 'space'
             return Response({
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
