@@ -21,7 +21,7 @@ class OllamaEmbeddings(Embeddings):
     """LangChain-compatible embeddings via local Ollama /api/embed."""
 
     def __init__(self, model: str = None, base_url: str = None):
-        self.model = model or config("OLLAMA_EMBED_MODEL", default="nomic-embed-text")
+        self.model = model or config("OLLAMA_EMBED_MODEL", default="bge-m3")
         self.api_url = (base_url or config("OLLAMA_BASE_URL", default="http://localhost:11434")) + "/api/embed"
 
     def _call(self, texts: List[str]) -> List[List[float]]:

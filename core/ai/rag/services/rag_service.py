@@ -70,6 +70,19 @@ class RAGService:
         return unique_id
 
     @classmethod
+    def delete_image(cls, classroom_id: str = None, resource_uid: str = None) -> int:
+        """Delete image-store rows for a classroom or a specific resource."""
+        where = {}
+        if classroom_id:
+            where["classroom_id"] = str(classroom_id)
+        if resource_uid:
+            where["resource_uid"] = str(resource_uid)
+        if not where:
+            return 0
+        store = LanceVectorService(_IMAGE_COLLECTION)
+        return store.delete_where(where)
+
+    @classmethod
     def get_image_context(
         cls,
         image_source,

@@ -572,6 +572,7 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
         mode = (request.data.get('mode') or 'doc').strip()
         section = request.data.get('section')
+        document_id = request.data.get('document_id')
 
         resp = StreamingHttpResponse(
             ai_service.ask_stream(
@@ -580,6 +581,7 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
                 user_id=request.user.uid,
                 classroom_id=pk,
                 mode=mode,
+                document_id=document_id,
                 section=section
             ),
             content_type='text/event-stream; charset=utf-8'

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Learning Management System built with Django + Cassandra"
 authors = [{ name = "hsminh" }]
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "Django>=4.0,<6.0",
     "cassandra-driver",
@@ -39,6 +39,7 @@ dependencies = [
     "django-rq (>=4.1,<5.0)",
     "rq (>=2.8,<3.0)",
     "redis (>=5.0,<6.0)",
+    "viparse[pdf] (>=0.1.5,<0.2.0)",
 ]
 
 [project.optional-dependencies]
@@ -50,7 +51,7 @@ dev = [
 package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.11,<3.14"
 django = ">=4.0,<6.0"
 cassandra-driver = "^3.30.0"
 python-decouple = "^3.8"

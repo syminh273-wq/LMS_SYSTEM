@@ -9,7 +9,12 @@ from features.resource.services.resource_folder_service import ResourceFolderSer
 from features.resource.services.resource_service import ResourceService
 
 # File types that can be parsed + indexed in LanceDB
-_INDEXABLE_EXTENSIONS = {'.pdf', '.txt', '.md', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.csv', '.json', '.xml', '.jpeg'}
+_INDEXABLE_EXTENSIONS = {
+    '.pdf', '.txt', '.md', '.doc', '.docx',
+    '.xls', '.xlsx', '.ppt', '.pptx',
+    '.csv', '.json', '.xml',
+    '.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif',
+}
 
 
 class ClassroomDocService:
@@ -65,8 +70,7 @@ class ClassroomDocService:
         ext = os.path.splitext(file_obj.name)[1].lower()
         if ext in _INDEXABLE_EXTENSIONS:
             old_count = self._pipeline.delete_document({
-                'classroom_id': str(classroom_uid),
-                'doc_name': resource.name,
+                'document_id': str(resource.uid),
             })
             if old_count:
                 print(f"[RAG] Removed {old_count} stale chunk(s) for '{resource.name}' before re-index")
@@ -83,6 +87,7 @@ class ClassroomDocService:
                     file_path=tmp_path,
                     metadata={
                         'classroom_id': str(classroom_uid),
+                        'document_id': str(resource.uid),
                         'resource_uid': str(resource.uid),
                         'doc_name': resource.name,
                         'doc_url': resource.url,
