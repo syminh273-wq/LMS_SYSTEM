@@ -99,12 +99,35 @@ class DocReadingProgressService(BaseService):
         if 'is_completed' in data:
             allowed['is_completed'] = bool(data.get('is_completed'))
         allowed['last_opened_at'] = datetime.now()
-        return self.repository.upsert(
+        result = self.repository.upsert(
             classroom_id=classroom_id,
             student_id=student_id,
             resource_uid=resource_uid,
             **allowed,
         )
+
+        try:
+            is_just_completed = bool(allowed.get('is_completed')) and bool(getattr(result, 'is_completed', False))
+        except Exception:
+            is_just_completed = False
+        if is_just_completed:
+            try:
+                from uuid import UUID
+                from features.ranking.services.xp_service import XPService
+                ruid = resource_uid if isinstance(resource_uid, UUID) else UUID(str(resource_uid))
+                XPService().award(
+                    student_id=student_id,
+                    event_type='doc_completed',
+                    ref_type='doc_reading_progress',
+                    ref_id=ruid,
+                    classroom_id=classroom_id,
+                    description='Hoàn thành đọc tài liệu',
+                    metadata={'resource_uid': str(ruid)},
+                )
+            except Exception:
+                pass
+
+        return result
 
 
 class DocNoteService(BaseService):

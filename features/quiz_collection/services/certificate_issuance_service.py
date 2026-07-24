@@ -176,6 +176,21 @@ class CertificateIssuanceService:
             except Exception as exc:
                 logger.warning(f"[Certificate] Notification failed: {exc}")
 
+            try:
+                from features.ranking.services.xp_service import XPService
+                XPService().award(
+                    student_id=student_id,
+                    event_type='certificate_issued',
+                    ref_type='issued_certificate',
+                    ref_id=issued.uid,
+                    classroom_id=classroom_id,
+                    description=f'Nhận chứng chỉ: {getattr(collection, "title", "")}',
+                    metadata={'collection_id': str(collection_id)},
+                    count_field='certificates_count',
+                )
+            except Exception as exc:
+                logger.warning(f"[Certificate] XP award failed: {exc}")
+
         return issued_now
 
     def _ensure_all_quiz_assignments(self, collection_id, classroom_id, collection) -> None:

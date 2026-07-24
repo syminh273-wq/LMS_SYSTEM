@@ -8,25 +8,43 @@ class AttendanceService(BaseService):
 
     def mark_attendance(self, event_id, user_id, status='present', joined_at=None, left_at=None):
         attendance = self.repository.find(event_id, user_id)
-        
+
         data = {
             'status': status,
             'date': date.today()
         }
-        
+
         if joined_at:
             data['joined_at'] = joined_at
         if left_at:
             data['left_at'] = left_at
-            
+
+        result = None
         if attendance:
-            return self.update(attendance, **data)
-        
-        return self.create(
-            event_id=event_id,
-            user_id=user_id,
-            **data
-        )
+            result = self.update(attendance, **data)
+        else:
+            result = self.create(
+                event_id=event_id,
+                user_id=user_id,
+                **data
+            )
+
+        try:
+            from uuid import UUID
+            from features.ranking.services.xp_service import XPService
+            if str(status).lower() == 'present':
+                XPService().award(
+                    student_id=user_id,
+                    event_type='attendance_present',
+                    ref_type='attendance',
+                    ref_id=UUID(str(event_id)),
+                    description='Có mặt tại buổi học',
+                    count_field='attendance_count',
+                )
+        except Exception:
+            pass
+
+        return result
 
     def audit_daily_attendance(self, user_id, events):
         """

@@ -167,6 +167,21 @@ class ClassroomMemberService:
         except Exception as e:
             logger.warning(f"[ClassroomMember] Failed to send approval notification: {e}")
 
+        # XP: award when a student is approved into a classroom (idempotent per classroom).
+        try:
+            from features.ranking.services.xp_service import XPService
+            XPService().award(
+                student_id=member_id,
+                event_type='classroom_joined',
+                ref_type='classroom_member',
+                ref_id=classroom.uid,
+                classroom_id=classroom.uid,
+                description=f'Tham gia lớp: {classroom.name}',
+                count_field='classrooms_joined_count',
+            )
+        except Exception as exc:
+            logger.warning(f"[ClassroomMember] XP award failed: {exc}")
+
         return member
 
     def reject(self, classroom_uid, member_id, rejected_by_id):

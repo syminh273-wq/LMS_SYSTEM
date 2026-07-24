@@ -33,6 +33,8 @@ urlpatterns = [
     path('api/v1/consumer/social/', include('features.social.urls')),
     path('api/v1/space/social/',    include('features.social.urls')),
     path('api/v1/portfolio/', include('features.portfolio.urls')),
+    path('api/v1/consumer/ranking/', include('features.ranking.consumer_urls')),
+    path('api/v1/space/ranking/', include('features.ranking.space_urls')),
     path('api/v1/public/', include('core.urls')),
     # Public course preview (no auth) — must be inside /api/v1/public/
     path('api/v1/public/course/preview/<str:code>/', PublicCourseViewSet.as_view(), name='public-course-preview'),
