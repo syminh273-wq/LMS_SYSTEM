@@ -38,6 +38,53 @@ class QuizLogService:
             source=source,
             exam_id=exam_id,
         )
+
+        # Award XP for this quiz attempt. Idempotent per (student, quiz_log_uid).
+        try:
+            from features.ranking.services.xp_service import XPService
+            xp = XPService()
+            xp.award(
+                student_id=student_id,
+                event_type='quiz_submitted',
+                ref_type='quiz_log',
+                ref_id=log.uid,
+                classroom_id=classroom_id,
+                description=f'Nộp bài quiz: {score_pct}%',
+                metadata={'quiz_id': str(quiz_id), 'score_pct': score_pct},
+            )
+            passing = 50
+            try:
+                from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
+                assign = QuizAssignmentRepository().find_assignment(quiz_id, classroom_id)
+                if assign and assign.passing_score_pct:
+                    passing = int(assign.passing_score_pct)
+            except Exception:
+                pass
+            if score_pct >= passing:
+                xp.award(
+                    student_id=student_id,
+                    event_type='quiz_passed',
+                    ref_type='quiz_log',
+                    ref_id=log.uid,
+                    classroom_id=classroom_id,
+                    description=f'Đậu bài quiz: {score_pct}%',
+                    metadata={'quiz_id': str(quiz_id), 'score_pct': score_pct},
+                    count_field='quizzes_passed_count',
+                )
+            if score_pct >= 100:
+                xp.award(
+                    student_id=student_id,
+                    event_type='quiz_perfect',
+                    ref_type='quiz_log',
+                    ref_id=log.uid,
+                    classroom_id=classroom_id,
+                    description=f'Đạt 100% bài quiz',
+                    metadata={'quiz_id': str(quiz_id)},
+                    count_field='perfect_scores_count',
+                )
+        except Exception:
+            pass
+
         return log, correct_count, total, score_pct, score
 
     def count_attempts(self, quiz_id, classroom_id, student_id) -> int:

@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'features.face',
     'features.quiz_collection',
     'features.portfolio',
+    'features.ranking',
 ]
 
 REST_FRAMEWORK = {

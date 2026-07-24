@@ -243,6 +243,33 @@ class ExamSubmissionService:
         except Exception:
             pass
 
+        # XP: award on every effective submission
+        try:
+            from features.ranking.services.xp_service import XPService
+            if getattr(result_submission, 'is_effective', True) and not getattr(result_submission, 'force_submitted', False):
+                XPService().award(
+                    student_id=student_id,
+                    event_type='exam_submitted',
+                    ref_type='exam_submission',
+                    ref_id=result_submission.uid,
+                    classroom_id=exam.classroom_id,
+                    description=f'Nộp bài thi: {getattr(exam, "title", "")}',
+                    metadata={'exam_id': str(exam.uid)},
+                )
+                if bool(getattr(result_submission, 'passed', False)):
+                    XPService().award(
+                        student_id=student_id,
+                        event_type='exam_passed',
+                        ref_type='exam_submission',
+                        ref_id=result_submission.uid,
+                        classroom_id=exam.classroom_id,
+                        description=f'Đậu bài thi: {getattr(exam, "title", "")}',
+                        metadata={'exam_id': str(exam.uid)},
+                        count_field='exams_passed_count',
+                    )
+        except Exception:
+            pass
+
         return result_submission, created
 
     # ── Read ───────────────────────────────────────────────────────────────────
