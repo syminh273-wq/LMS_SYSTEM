@@ -11,7 +11,12 @@ from features.quiz.serializers.quiz_response_serializer import (
     QuizPublicDetailResponseSerializer,
     QuizAttemptResponseSerializer,
 )
+from features.quiz.serializers.quiz_leaderboard_serializer import (
+    QuizLeaderboardResponseSerializer,
+    QuizLeaderboardStudentDetailSerializer,
+)
 from features.quiz.services.quiz_service import QuizService
+from features.quiz.services.quiz_leaderboard_service import QuizLeaderboardService
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +25,7 @@ class ConsumerQuizViewSet(ViewSet):
     """Student-facing quiz endpoints. Correct answers are never exposed."""
 
     service = QuizService()
+    leaderboard_service = QuizLeaderboardService()
 
     # ── LIST  GET /consumer/quiz/?classroom_id=<uid> ──────────────────────
     def list(self, request):
@@ -55,6 +61,17 @@ class ConsumerQuizViewSet(ViewSet):
                 data['shuffle_options'] = assignment.shuffle_options or False
                 data['show_explanation'] = assignment.show_explanation or True
                 data['passing_score_pct'] = assignment.passing_score_pct or 50
+                status_payload = self.service.get_assignment_status(pk, classroom_id)
+                data['is_closed'] = status_payload['is_closed']
+                data['is_open'] = status_payload['is_open']
+                data['is_expired'] = status_payload['is_expired']
+                data['opens_at'] = status_payload['opens_at']
+                data['closes_at'] = status_payload['closes_at']
+                data['closed_at'] = status_payload['closed_at']
+            else:
+                data['is_closed'] = False
+                data['is_open'] = True
+                data['is_expired'] = False
 
         return Response(data)
 
@@ -67,6 +84,52 @@ class ConsumerQuizViewSet(ViewSet):
         my_attempts = self.service.get_student_attempts(pk, classroom_id, request.user.uid)
         return Response(QuizAttemptResponseSerializer(list(my_attempts), many=True).data)
 
+    # ── LEADERBOARD  GET /consumer/quiz/<uid>/leaderboard/?classroom_id=<id> ─
+    @action(detail=True, methods=['get'], url_path='leaderboard')
+    def leaderboard(self, request, pk=None):
+        classroom_id = request.query_params.get('classroom_id')
+        if not classroom_id:
+            return Response({'detail': 'classroom_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        status_payload = self.service.get_assignment_status(pk, classroom_id)
+        if status_payload['is_open']:
+            return Response(
+                {'detail': 'Bảng vàng chỉ hiển thị khi quiz đã đóng.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 100))
+        payload = self.leaderboard_service.build(
+            quiz_id=pk,
+            classroom_id=classroom_id,
+            current_user_id=request.user.uid,
+            limit=limit,
+        )
+        payload['closed_at'] = status_payload['closed_at']
+        payload['closes_at'] = status_payload['closes_at']
+        return Response(QuizLeaderboardResponseSerializer(payload).data)
+
+    # ── STUDENT DETAIL  GET /consumer/quiz/<uid>/leaderboard/<student_uid>/?classroom_id=<id> ─
+    @action(detail=True, methods=['get'], url_path=r'leaderboard/(?P<student_uid>[^/.]+)')
+    def leaderboard_student(self, request, pk=None, student_uid=None):
+        classroom_id = request.query_params.get('classroom_id')
+        if not classroom_id:
+            return Response({'detail': 'classroom_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        status_payload = self.service.get_assignment_status(pk, classroom_id)
+        if status_payload['is_open']:
+            return Response(
+                {'detail': 'Bảng vàng chỉ hiển thị khi quiz đã đóng.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        payload = self.leaderboard_service.student_detail(
+            quiz_id=pk,
+            classroom_id=classroom_id,
+            student_id=student_uid,
+        )
+        return Response(QuizLeaderboardStudentDetailSerializer(payload).data)
+
     # ── SUBMIT  POST /consumer/quiz/<uid>/submit/ ─────────────────────────
     @action(detail=True, methods=['post'], url_path='submit')
     def submit(self, request, pk=None):
@@ -78,6 +141,15 @@ class ConsumerQuizViewSet(ViewSet):
 
         # Get assignment to read this classroom's settings
         assignment = self.service.get_assignment(pk, classroom_id)
+
+        # Guard: bài quiz đã đóng (đóng thủ công hoặc đã quá closes_at)
+        if assignment is not None and not self.service.is_assignment_open(pk, classroom_id):
+            status_payload = self.service.get_assignment_status(pk, classroom_id)
+            reason = 'đã được giáo viên đóng' if status_payload['is_closed'] else 'đã hết hạn'
+            return Response(
+                {'detail': f'Bài quiz {reason}, không thể nộp.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Enforce max_attempts for this classroom
         if assignment and assignment.max_attempts and assignment.max_attempts > 0:

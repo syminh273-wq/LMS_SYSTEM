@@ -52,6 +52,12 @@ class QuizPublicDetailResponseSerializer(QuizResponseSerializer):
     shuffle_options    = serializers.BooleanField(default=False)
     show_explanation   = serializers.BooleanField(default=True)
     passing_score_pct  = serializers.IntegerField(default=50)
+    is_closed          = serializers.BooleanField(default=False)
+    is_open            = serializers.BooleanField(default=True)
+    is_expired         = serializers.BooleanField(default=False)
+    opens_at           = serializers.DateTimeField(allow_null=True, required=False)
+    closes_at          = serializers.DateTimeField(allow_null=True, required=False)
+    closed_at          = serializers.DateTimeField(allow_null=True, required=False)
 
 
 class QuizAssignmentResponseSerializer(serializers.Serializer):
@@ -65,6 +71,12 @@ class QuizAssignmentResponseSerializer(serializers.Serializer):
     shuffle_options    = serializers.BooleanField(default=False)
     show_explanation   = serializers.BooleanField(default=True)
     passing_score_pct  = serializers.IntegerField(default=50)
+    is_closed          = serializers.BooleanField(default=False)
+    is_open            = serializers.BooleanField(default=True)
+    is_expired         = serializers.BooleanField(default=False)
+    opens_at           = serializers.DateTimeField(allow_null=True, required=False)
+    closes_at          = serializers.DateTimeField(allow_null=True, required=False)
+    closed_at          = serializers.DateTimeField(allow_null=True, required=False)
 
 
 class QuizLogResponseSerializer(serializers.Serializer):

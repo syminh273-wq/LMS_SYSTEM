@@ -16,6 +16,8 @@ from features.quiz.serializers.quiz_request_serializer import (
     QuizUpdateRequestSerializer,
     QuizAssignRequestSerializer,
     QuizAssignUpdateRequestSerializer,
+    QuizCloseRequestSerializer,
+    QuizReopenRequestSerializer,
     QuizQuestionUpdateRequestSerializer,
 )
 from features.quiz.serializers.quiz_response_serializer import (
@@ -25,7 +27,12 @@ from features.quiz.serializers.quiz_response_serializer import (
     QuizAttemptResponseSerializer,
     QuizQuestionSerializer,
 )
+from features.quiz.serializers.quiz_leaderboard_serializer import (
+    QuizLeaderboardResponseSerializer,
+    QuizLeaderboardStudentDetailSerializer,
+)
 from features.quiz.services.quiz_service import QuizService
+from features.quiz.services.quiz_leaderboard_service import QuizLeaderboardService
 from features.quiz.services.quiz_generation_service import QuizGenerationService, QUIZ_TYPES, _extract_pdf_text
 from features.quiz.tasks.generate_quiz_task import generate_quiz_task
 from features.quiz.tasks.serializers import (
@@ -258,6 +265,97 @@ class QuizViewSet(BaseModelViewSet):
     def unassign(self, request, uid=None, classroom_id=None):
         self.service.unassign_from_classroom(quiz_uid=uid, classroom_id=classroom_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── CLOSE  POST /quizzes/<uid>/assign/<classroom_id>/close/ ───────────
+    @action(detail=True, methods=['post'], url_path=r'assign/(?P<classroom_id>[^/.]+)/close')
+    def close(self, request, uid=None, classroom_id=None):
+        serializer = QuizCloseRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        assignment = self.service.close_assignment(
+            quiz_uid=uid,
+            classroom_id=classroom_id,
+            closes_at=serializer.validated_data.get('closes_at'),
+        )
+        try:
+            quiz_title = self.service.repository.find(uid).title
+        except Exception:
+            quiz_title = ''
+        ClassroomActivityLogService().log(
+            classroom_uid=classroom_id,
+            log_level='major',
+            event_type='quiz_closed',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=uid,
+            target_name=quiz_title,
+        )
+        payload = QuizAssignmentResponseSerializer(assignment).data
+        status_payload = self.service.get_assignment_status(uid, classroom_id)
+        payload.update({
+            'is_open': status_payload['is_open'],
+            'is_expired': status_payload['is_expired'],
+        })
+        return Response(payload)
+
+    # ── REOPEN  POST /quizzes/<uid>/assign/<classroom_id>/reopen/ ─────────
+    @action(detail=True, methods=['post'], url_path=r'assign/(?P<classroom_id>[^/.]+)/reopen')
+    def reopen(self, request, uid=None, classroom_id=None):
+        serializer = QuizReopenRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        assignment = self.service.reopen_assignment(
+            quiz_uid=uid,
+            classroom_id=classroom_id,
+            opens_at=serializer.validated_data.get('opens_at'),
+            closes_at=serializer.validated_data.get('closes_at'),
+        )
+        try:
+            quiz_title = self.service.repository.find(uid).title
+        except Exception:
+            quiz_title = ''
+        ClassroomActivityLogService().log(
+            classroom_uid=classroom_id,
+            log_level='major',
+            event_type='quiz_reopened',
+            actor_id=request.user.uid,
+            actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+            actor_role='teacher',
+            target_id=uid,
+            target_name=quiz_title,
+        )
+        payload = QuizAssignmentResponseSerializer(assignment).data
+        status_payload = self.service.get_assignment_status(uid, classroom_id)
+        payload.update({
+            'is_open': status_payload['is_open'],
+            'is_expired': status_payload['is_expired'],
+        })
+        return Response(payload)
+
+    # ── LEADERBOARD  GET /quizzes/<uid>/assign/<classroom_id>/leaderboard/ ─
+    @action(detail=True, methods=['get'], url_path=r'assign/(?P<classroom_id>[^/.]+)/leaderboard')
+    def leaderboard(self, request, uid=None, classroom_id=None):
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 100))
+        payload = QuizLeaderboardService().build(
+            quiz_id=uid,
+            classroom_id=classroom_id,
+            current_user_id=None,
+            limit=limit,
+        )
+        return Response(QuizLeaderboardResponseSerializer(payload).data)
+
+    # ── STUDENT DETAIL  GET /quizzes/<uid>/assign/<classroom_id>/leaderboard/<student_uid>/ ─
+    @action(detail=True, methods=['get'], url_path=r'assign/(?P<classroom_id>[^/.]+)/leaderboard/(?P<student_uid>[^/.]+)')
+    def leaderboard_student(self, request, uid=None, classroom_id=None, student_uid=None):
+        payload = QuizLeaderboardService().student_detail(
+            quiz_id=uid,
+            classroom_id=classroom_id,
+            student_id=student_uid,
+        )
+        return Response(QuizLeaderboardStudentDetailSerializer(payload).data)
 
     # ── ATTEMPTS  GET /quizzes/<uid>/attempts/?classroom_id=<id> ──────────
     @action(detail=True, methods=['get'], url_path='attempts')

@@ -20,6 +20,11 @@ class QuizAssignment(BaseTimeStampModel):
     show_explanation   = columns.Boolean(default=True)
     passing_score_pct  = columns.Integer(default=50)
 
+    is_closed  = columns.Boolean(default=False)
+    opens_at   = columns.DateTime(required=False)
+    closes_at  = columns.DateTime(required=False)
+    closed_at  = columns.DateTime(required=False)
+
     __table_name__ = 'quiz_assignments'
 
     class Meta:

@@ -57,3 +57,12 @@ class QuizAssignmentRepository(BaseRepository):
         q_id = UUID(str(quiz_id)) if not isinstance(quiz_id, UUID) else quiz_id
         c_id = UUID(str(classroom_id)) if not isinstance(classroom_id, UUID) else classroom_id
         self.model.objects.filter(quiz_id=q_id, classroom_id=c_id).delete()
+
+    def update_close_state(self, quiz_id, classroom_id, **kwargs) -> QuizAssignment:
+        q_id = UUID(str(quiz_id)) if not isinstance(quiz_id, UUID) else quiz_id
+        c_id = UUID(str(classroom_id)) if not isinstance(classroom_id, UUID) else classroom_id
+        qs = self.model.objects.filter(quiz_id=q_id, classroom_id=c_id)
+        if not qs.first():
+            raise ValueError(f"Assignment not found for Quiz {q_id} and Classroom {c_id}")
+        qs.update(**kwargs)
+        return qs.first()

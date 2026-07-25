@@ -7,6 +7,10 @@ from features.quiz.repositories.quiz_assignment_repository import QuizAssignment
 from features.quiz.repositories.quiz_log_repository import QuizLogRepository
 
 
+class QuizClosedError(Exception):
+    pass
+
+
 class QuizService(BaseService):
     def __init__(self):
         self.repository = QuizRepository()
@@ -48,6 +52,66 @@ class QuizService(BaseService):
 
     def unassign_from_classroom(self, quiz_uid, classroom_id):
         self.assignment_repo.unassign(quiz_uid, classroom_id)
+
+    def _is_open(self, assignment, now=None):
+        from datetime import datetime
+        if assignment is None:
+            return True
+        if getattr(assignment, 'is_closed', False):
+            return False
+        closes_at = getattr(assignment, 'closes_at', None)
+        if closes_at is not None:
+            current = now or datetime.now()
+            if current > closes_at:
+                return False
+        return True
+
+    def is_assignment_open(self, quiz_uid, classroom_id, now=None):
+        assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
+        return self._is_open(assignment, now=now)
+
+    def get_assignment_status(self, quiz_uid, classroom_id, now=None):
+        from datetime import datetime
+        assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
+        current = now or datetime.now()
+        is_open = self._is_open(assignment, now=current)
+        is_closed_flag = bool(getattr(assignment, 'is_closed', False)) if assignment else False
+        closes_at = getattr(assignment, 'closes_at', None) if assignment else None
+        opens_at = getattr(assignment, 'opens_at', None) if assignment else None
+        closed_at = getattr(assignment, 'closed_at', None) if assignment else None
+        is_expired = (closes_at is not None and current > closes_at) and not is_closed_flag
+        return {
+            'is_open': is_open,
+            'is_closed': is_closed_flag,
+            'is_expired': is_expired,
+            'opens_at': opens_at,
+            'closes_at': closes_at,
+            'closed_at': closed_at,
+        }
+
+    def close_assignment(self, quiz_uid, classroom_id, closes_at=None):
+        from datetime import datetime
+        now = datetime.now()
+        payload = {
+            'is_closed': True,
+            'closed_at': now,
+        }
+        if closes_at is not None:
+            payload['closes_at'] = closes_at
+        else:
+            payload['closes_at'] = now
+        return self.assignment_repo.update_close_state(quiz_uid, classroom_id, **payload)
+
+    def reopen_assignment(self, quiz_uid, classroom_id, opens_at=None, closes_at=None):
+        payload = {
+            'is_closed': False,
+            'closed_at': None,
+        }
+        if opens_at is not None:
+            payload['opens_at'] = opens_at
+        if closes_at is not None:
+            payload['closes_at'] = closes_at
+        return self.assignment_repo.update_close_state(quiz_uid, classroom_id, **payload)
 
     # ── Quiz creation ─────────────────────────────────────────────────────────
 
