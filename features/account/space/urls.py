@@ -18,6 +18,7 @@ router.register(r'spaces', ViewSet, basename='api_spaces')
 
 urlpatterns = [
     path('mine/', ViewSet.as_view({'get': 'mine', 'patch': 'mine'}), name='space_account_mine'),
+    path('usage/', ViewSet.as_view({'get': 'usage'}), name='space_account_usage'),
     path('change-password/', ViewSet.as_view({'post': 'change_password'}), name='space_change_password'),
     path('register/', SpaceRegisterView.as_view(), name='space_register'),
     path('login/', SpaceLoginView.as_view(), name='space_login'),

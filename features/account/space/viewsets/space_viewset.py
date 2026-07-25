@@ -57,6 +57,19 @@ class ViewSet(UserScopeMixin, BaseModelViewSet):
         space = service.update_mine(request.user, serializer.validated_data)
         return Response(SpaceAccountSerializer(instance=space).data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['get'], url_path='usage')
+    def usage(self, request, *args, **kwargs):
+        """
+        Get storage, API calls, and classroom usage stats for the current Space.
+        """
+        if not request.user or not request.user.is_authenticated:
+            return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from features.account.space.services.usage_service import UsageService
+        usage_service = UsageService()
+        data = usage_service.get_usage(request.user)
+        return Response(data)
+
     @action(detail=False, methods=['post'], url_path='change-password')
     def change_password(self, request, *args, **kwargs):
         serializer = SpaceChangePasswordSerializer(data=request.data)
