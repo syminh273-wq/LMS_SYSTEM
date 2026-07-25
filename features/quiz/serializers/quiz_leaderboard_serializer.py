@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -8,7 +10,7 @@ class QuizLeaderboardAttemptSerializer(serializers.Serializer):
     total_questions = serializers.IntegerField()
     score_pct = serializers.IntegerField()
     time_taken_seconds = serializers.IntegerField()
-    submitted_at = serializers.DateTimeField(allow_null=True)
+    submitted_at = VnDateTimeField(allow_null=True)
 
 
 class QuizLeaderboardEntrySerializer(serializers.Serializer):
@@ -22,7 +24,7 @@ class QuizLeaderboardEntrySerializer(serializers.Serializer):
     best_time_taken_seconds = serializers.IntegerField()
     best_attempt_uid = serializers.CharField(allow_null=True)
     best_attempt_number = serializers.IntegerField()
-    best_submitted_at = serializers.DateTimeField(allow_null=True)
+    best_submitted_at = VnDateTimeField(allow_null=True)
     attempts_count = serializers.IntegerField()
 
 

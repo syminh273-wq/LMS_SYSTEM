@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 class LinkRequestSerializer(serializers.Serializer):
@@ -5,7 +7,7 @@ class LinkRequestSerializer(serializers.Serializer):
     resource_type = serializers.CharField(required=True)
     resource_id = serializers.UUIDField(required=True)
     action = serializers.CharField(required=False, allow_blank=True)
-    expired_at = serializers.DateTimeField(required=False, allow_null=True)
+    expired_at = VnDateTimeField(required=False, allow_null=True)
     max_usage = serializers.IntegerField(required=False, default=0)
     is_active = serializers.BooleanField(required=False, default=True)
     metadata = serializers.DictField(

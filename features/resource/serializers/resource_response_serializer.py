@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 class ResourceResponseSerializer(serializers.Serializer):
@@ -9,5 +11,5 @@ class ResourceResponseSerializer(serializers.Serializer):
     owner_id = serializers.UUIDField(read_only=True)
     owner_type = serializers.CharField(read_only=True)
     metadata = serializers.DictField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
+    updated_at = VnDateTimeField(read_only=True)

@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 class NotificationLogSerializer(serializers.Serializer):
@@ -8,4 +10,4 @@ class NotificationLogSerializer(serializers.Serializer):
     content = serializers.CharField()
     metadata = serializers.CharField()
     is_read = serializers.BooleanField()
-    created_at = serializers.DateTimeField()
+    created_at = VnDateTimeField()

@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from features.account.consumer.models.consumer import Consumer
@@ -13,8 +15,8 @@ class ConsumerAccountSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True)
     avatar_url = serializers.SerializerMethodField()
     role = serializers.CharField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
+    updated_at = VnDateTimeField(read_only=True)
 
     def get_avatar_url(self, obj):
         if not obj.avatar_url:

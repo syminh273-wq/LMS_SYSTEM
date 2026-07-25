@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 from core.serializers.classroom.classroom_response_serializer import ClassroomResponseSerializer
@@ -5,4 +7,4 @@ from core.serializers.classroom.classroom_response_serializer import ClassroomRe
 
 class ClassroomFavoriteResponseSerializer(serializers.Serializer):
     classroom = ClassroomResponseSerializer()
-    created_at = serializers.DateTimeField()
+    created_at = VnDateTimeField()

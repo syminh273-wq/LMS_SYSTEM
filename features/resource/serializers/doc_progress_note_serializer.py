@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -8,8 +10,8 @@ class DocReadingProgressResponseSerializer(serializers.Serializer):
     read_progress = serializers.IntegerField()
     is_completed = serializers.BooleanField()
     note_count = serializers.IntegerField()
-    completed_at = serializers.DateTimeField(allow_null=True, required=False)
-    last_opened_at = serializers.DateTimeField(allow_null=True, required=False)
+    completed_at = VnDateTimeField(allow_null=True, required=False)
+    last_opened_at = VnDateTimeField(allow_null=True, required=False)
 
 
 class DocNoteResponseSerializer(serializers.Serializer):
@@ -23,8 +25,8 @@ class DocNoteResponseSerializer(serializers.Serializer):
     y_pct = serializers.FloatField(allow_null=True, required=False)
     progress_at = serializers.FloatField()
     color = serializers.CharField()
-    created_at = serializers.DateTimeField(allow_null=True, required=False)
-    updated_at = serializers.DateTimeField(allow_null=True, required=False)
+    created_at = VnDateTimeField(allow_null=True, required=False)
+    updated_at = VnDateTimeField(allow_null=True, required=False)
 
 
 class DocNoteCreateRequestSerializer(serializers.Serializer):

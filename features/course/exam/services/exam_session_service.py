@@ -4,6 +4,7 @@ from uuid import uuid4
 from features.course.exam.repositories import ExamRepository, ExamSessionRepository
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.exam.repositories.exam_audit_log_repository import ExamAuditLogRepository
+from core.utils.datetime import now_vn
 
 
 class ExamSessionService:
@@ -31,7 +32,7 @@ class ExamSessionService:
         # Update exam state
         update_data = {
             "is_online_active": True,
-            "opened_at": datetime.utcnow(),
+            "opened_at": now_vn(),
             "late_threshold_seconds": late_threshold_seconds,
             "duration_seconds": effective_duration,
             "status": "ongoing",
@@ -50,7 +51,7 @@ class ExamSessionService:
 
         members = list(self.member_repo.get_members(classroom_uid=exam.classroom_id))
         students = [m for m in members if m.role == 'student' and not m.is_deleted and m.status == 'approved']
-        expires_at = datetime.utcnow() + timedelta(minutes=self.LINK_TTL_MINUTES)
+        expires_at = now_vn() + timedelta(minutes=self.LINK_TTL_MINUTES)
 
         sessions = []
         for student in students:
@@ -104,7 +105,13 @@ class ExamSessionService:
         if session.token_status != 'pending':
             raise ValueError("Session is no longer valid")
 
-        now = datetime.utcnow()
+        now = now_vn()
+
+        if exam.due_date:
+            due_naive = exam.due_date.replace(tzinfo=None) if exam.due_date.tzinfo else exam.due_date
+            if now > due_naive:
+                self.session_repo.update(session, token_status='expired')
+                raise ValueError("This exam has already passed its due date.")
 
         # Check late threshold
         if exam.opened_at and exam.late_threshold_seconds > 0:
@@ -173,7 +180,7 @@ class ExamSessionService:
             raise ValueError("No active exam session. Please join via your exam link.")
         if session.token_status != 'active':
             raise ValueError("Your exam session is no longer active")
-        now = datetime.utcnow()
+        now = now_vn()
         # Allow 30s buffer for network latency
         if session.ends_at and now > (session.ends_at + timedelta(seconds=30)):
             self.session_repo.update(session, token_status='expired')

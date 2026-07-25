@@ -174,6 +174,7 @@ FIREBASE_REGION=asia-southeast1
 | `python manage.py runserver` | Start dev server |
 | `python manage.py sync_cassandra` | Sync Cassandra schema |
 | `python manage.py show_urls` | List all API endpoints |
+| `python manage.py rqworker default` | Run RQ worker (AI quiz generation + delayed auto-close jobs) |
 
 ---
 

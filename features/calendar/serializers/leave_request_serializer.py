@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -19,16 +21,16 @@ class LeaveRequestSerializer(serializers.Serializer):
     classroom_name = serializers.SerializerMethodField()
     event_id = serializers.UUIDField(required=False, allow_null=True)
     event_title = serializers.SerializerMethodField()
-    start_date = serializers.DateTimeField(required=False, allow_null=True)
-    end_date = serializers.DateTimeField(required=False, allow_null=True)
+    start_date = VnDateTimeField(required=False, allow_null=True)
+    end_date = VnDateTimeField(required=False, allow_null=True)
     reason = serializers.CharField()
     evidence_url = serializers.CharField(read_only=True)
     status = serializers.CharField()
     processed_by = serializers.UUIDField(read_only=True)
-    processed_at = serializers.DateTimeField(read_only=True)
+    processed_at = VnDateTimeField(read_only=True)
     rejection_reason = serializers.CharField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
+    updated_at = VnDateTimeField(read_only=True)
 
     def _student_cache(self):
         if self.context is None:
@@ -139,8 +141,8 @@ class LeaveRequestSerializer(serializers.Serializer):
 class LeaveRequestCreateSerializer(serializers.Serializer):
     event_id = serializers.UUIDField(required=False, allow_null=True)
     classroom_id = serializers.UUIDField(required=False, allow_null=True)
-    start_date = serializers.DateTimeField(required=False, allow_null=True)
-    end_date = serializers.DateTimeField(required=False, allow_null=True)
+    start_date = VnDateTimeField(required=False, allow_null=True)
+    end_date = VnDateTimeField(required=False, allow_null=True)
     reason = serializers.CharField(max_length=2000)
     evidence_file = serializers.FileField(required=False, allow_null=True, write_only=True)
 

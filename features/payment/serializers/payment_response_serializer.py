@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 import base64
 import json
 
@@ -24,8 +26,8 @@ class PaymentResponseSerializer(serializers.Serializer):
     pay_url = serializers.CharField(read_only=True)
     result_code = serializers.IntegerField(read_only=True)
     trans_id = serializers.IntegerField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
+    updated_at = VnDateTimeField(read_only=True)
     resource_type = serializers.SerializerMethodField()
     resource_id = serializers.SerializerMethodField()
 

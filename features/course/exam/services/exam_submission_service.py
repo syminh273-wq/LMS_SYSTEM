@@ -64,6 +64,20 @@ class ExamSubmissionService:
         from features.course.exam.services.exam_session_service import ExamSessionService
         ExamSessionService().validate_for_submit(exam.uid, student_id)
 
+    def assert_within_due_date(self, exam):
+        """
+        Block submission if the exam has a `due_date` and it has passed.
+        Online exams are also covered by `assert_online_session`, but the
+        extra guard is necessary for offline exams and for late submits
+        on still-open online sessions.
+        """
+        if not exam.due_date:
+            return
+        now = datetime.utcnow()
+        due_naive = exam.due_date.replace(tzinfo=None) if exam.due_date.tzinfo else exam.due_date
+        if now > due_naive:
+            raise ValueError("This exam has already passed its due date.")
+
     def build_submission_status(self, exam):
         if not exam.due_date:
             return "submitted"
@@ -174,6 +188,7 @@ class ExamSubmissionService:
         self.assert_student_membership(exam.classroom_id, student_id)
         self.assert_camera_session(exam, student_id)
         self.assert_online_session(exam, student_id)
+        self.assert_within_due_date(exam)
 
         submission_type = data.get("submission_type", "file")
         is_mc = submission_type in ("multiple_choice", "online_quiz")

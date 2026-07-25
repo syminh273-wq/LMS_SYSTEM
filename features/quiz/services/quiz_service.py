@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+from django.conf import settings
+
 from core.services.base_service import BaseService
 from core.utils.uuid import uuid7
 from core.search_engine.typesense.indexer import LMSIndexer
@@ -5,6 +9,10 @@ from features.quiz.repositories.quiz_repository import QuizRepository
 from features.quiz.repositories.quiz_question_repository import QuizQuestionRepository
 from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
 from features.quiz.repositories.quiz_log_repository import QuizLogRepository
+
+
+def get_submit_grace_seconds() -> int:
+    return int(getattr(settings, 'QUIZ_SUBMIT_GRACE_SECONDS', 30))
 
 
 class QuizClosedError(Exception):
@@ -54,44 +62,62 @@ class QuizService(BaseService):
         self.assignment_repo.unassign(quiz_uid, classroom_id)
 
     def _is_open(self, assignment, now=None):
-        from datetime import datetime
+        from core.utils.datetime import now_vn
         if assignment is None:
             return True
         if getattr(assignment, 'is_closed', False):
             return False
+        current = now or now_vn()
+        opens_at = getattr(assignment, 'opens_at', None)
+        if opens_at is not None and current < opens_at:
+            return False
         closes_at = getattr(assignment, 'closes_at', None)
-        if closes_at is not None:
-            current = now or datetime.now()
-            if current > closes_at:
-                return False
+        if closes_at is not None and current > closes_at + timedelta(seconds=get_submit_grace_seconds()):
+            return False
         return True
+
+    def is_not_yet_open(self, assignment, now=None):
+        from core.utils.datetime import now_vn
+        if assignment is None:
+            return False
+        opens_at = getattr(assignment, 'opens_at', None)
+        if opens_at is None:
+            return False
+        if getattr(assignment, 'is_closed', False):
+            return False
+        current = now or now_vn()
+        return current < opens_at
 
     def is_assignment_open(self, quiz_uid, classroom_id, now=None):
         assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
         return self._is_open(assignment, now=now)
 
     def get_assignment_status(self, quiz_uid, classroom_id, now=None):
-        from datetime import datetime
+        from core.utils.datetime import now_vn
         assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
-        current = now or datetime.now()
+        current = now or now_vn()
         is_open = self._is_open(assignment, now=current)
         is_closed_flag = bool(getattr(assignment, 'is_closed', False)) if assignment else False
         closes_at = getattr(assignment, 'closes_at', None) if assignment else None
         opens_at = getattr(assignment, 'opens_at', None) if assignment else None
         closed_at = getattr(assignment, 'closed_at', None) if assignment else None
-        is_expired = (closes_at is not None and current > closes_at) and not is_closed_flag
+        grace = timedelta(seconds=get_submit_grace_seconds())
+        is_expired = (closes_at is not None and current > closes_at + grace) and not is_closed_flag
+        is_not_yet_open = (opens_at is not None and current < opens_at) and not is_closed_flag
         return {
             'is_open': is_open,
             'is_closed': is_closed_flag,
             'is_expired': is_expired,
+            'is_not_yet_open': is_not_yet_open,
             'opens_at': opens_at,
             'closes_at': closes_at,
             'closed_at': closed_at,
+            'server_now': current,
         }
 
     def close_assignment(self, quiz_uid, classroom_id, closes_at=None):
-        from datetime import datetime
-        now = datetime.now()
+        from core.utils.datetime import now_vn
+        now = now_vn()
         payload = {
             'is_closed': True,
             'closed_at': now,

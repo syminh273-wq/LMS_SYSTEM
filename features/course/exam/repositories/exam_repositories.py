@@ -61,3 +61,12 @@ class ExamRepository:
         exam.deleted_at = datetime.utcnow()
         exam.save()
         return exam
+
+    def list_active_online_exams(self):
+        """
+        Return all non-deleted online exams (used by the auto-close cron).
+        Filters in Python because Cassandra has no global secondary index
+        on `exam_mode`; dataset is small enough.
+        """
+        qs = list(Exam.objects(is_deleted=False))
+        return [e for e in qs if getattr(e, 'exam_mode', None) == 'online']

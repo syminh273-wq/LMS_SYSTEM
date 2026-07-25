@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -10,8 +12,8 @@ class ConversationSerializer(serializers.Serializer):
     member_count = serializers.IntegerField(default=0)
     last_msg_text = serializers.CharField(default='')
     last_msg_sender = serializers.CharField(default='')
-    last_msg_at = serializers.DateTimeField(allow_null=True, required=False)
-    created_at = serializers.DateTimeField()
+    last_msg_at = VnDateTimeField(allow_null=True, required=False)
+    created_at = VnDateTimeField()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

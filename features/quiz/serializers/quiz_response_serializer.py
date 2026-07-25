@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from core.serializers.fields import VnDateTimeField
 
 
 class QuizQuestionSerializer(serializers.Serializer):
@@ -55,16 +56,18 @@ class QuizPublicDetailResponseSerializer(QuizResponseSerializer):
     is_closed          = serializers.BooleanField(default=False)
     is_open            = serializers.BooleanField(default=True)
     is_expired         = serializers.BooleanField(default=False)
-    opens_at           = serializers.DateTimeField(allow_null=True, required=False)
-    closes_at          = serializers.DateTimeField(allow_null=True, required=False)
-    closed_at          = serializers.DateTimeField(allow_null=True, required=False)
+    is_not_yet_open    = serializers.BooleanField(default=False)
+    opens_at           = VnDateTimeField(allow_null=True, required=False)
+    closes_at          = VnDateTimeField(allow_null=True, required=False)
+    closed_at          = VnDateTimeField(allow_null=True, required=False)
+    server_now         = VnDateTimeField(allow_null=True, required=False)
 
 
 class QuizAssignmentResponseSerializer(serializers.Serializer):
     quiz_id            = serializers.UUIDField(read_only=True)
     classroom_id       = serializers.UUIDField(read_only=True)
     assigned_by        = serializers.UUIDField(read_only=True)
-    assigned_at        = serializers.DateTimeField(read_only=True)
+    assigned_at        = VnDateTimeField(read_only=True)
     time_limit_seconds = serializers.IntegerField(default=0)
     max_attempts       = serializers.IntegerField(default=0)
     shuffle_questions  = serializers.BooleanField(default=False)
@@ -74,9 +77,9 @@ class QuizAssignmentResponseSerializer(serializers.Serializer):
     is_closed          = serializers.BooleanField(default=False)
     is_open            = serializers.BooleanField(default=True)
     is_expired         = serializers.BooleanField(default=False)
-    opens_at           = serializers.DateTimeField(allow_null=True, required=False)
-    closes_at          = serializers.DateTimeField(allow_null=True, required=False)
-    closed_at          = serializers.DateTimeField(allow_null=True, required=False)
+    opens_at           = VnDateTimeField(allow_null=True, required=False)
+    closes_at          = VnDateTimeField(allow_null=True, required=False)
+    closed_at          = VnDateTimeField(allow_null=True, required=False)
 
 
 class QuizLogResponseSerializer(serializers.Serializer):

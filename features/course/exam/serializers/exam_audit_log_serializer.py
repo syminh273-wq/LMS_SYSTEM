@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 import json
 
 from rest_framework import serializers
@@ -7,7 +9,7 @@ class ExamAuditLogEntrySerializer(serializers.Serializer):
     uid = serializers.UUIDField(source="uid", read_only=True)
     event_type = serializers.CharField()
     event_data = serializers.SerializerMethodField()
-    created_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
     student_id = serializers.UUIDField(read_only=True)
 
     def get_event_data(self, obj):

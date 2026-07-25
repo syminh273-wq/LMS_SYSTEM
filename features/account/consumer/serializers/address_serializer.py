@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 from features.account.consumer.models.address import Address
@@ -21,8 +23,8 @@ class AddressReadSerializer(serializers.Serializer):
     ward_code     = serializers.IntegerField()
     ward_name     = serializers.CharField()
     country       = serializers.CharField(default='Việt Nam')
-    created_at    = serializers.DateTimeField(read_only=True)
-    updated_at    = serializers.DateTimeField(read_only=True)
+    created_at    = VnDateTimeField(read_only=True)
+    updated_at    = VnDateTimeField(read_only=True)
 
     @staticmethod
     def from_model(addr: Address) -> dict:

@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -36,8 +38,8 @@ class QuizAssignRequestSerializer(serializers.Serializer):
     shuffle_options    = serializers.BooleanField(required=False, default=False)
     show_explanation   = serializers.BooleanField(required=False, default=True)
     passing_score_pct  = serializers.IntegerField(required=False, default=50, min_value=0, max_value=100)
-    opens_at   = serializers.DateTimeField(required=False, allow_null=True)
-    closes_at  = serializers.DateTimeField(required=False, allow_null=True)
+    opens_at   = VnDateTimeField(required=False, allow_null=True)
+    closes_at  = VnDateTimeField(required=False, allow_null=True)
 
 
 class QuizAssignUpdateRequestSerializer(serializers.Serializer):
@@ -47,17 +49,17 @@ class QuizAssignUpdateRequestSerializer(serializers.Serializer):
     shuffle_options    = serializers.BooleanField(required=False)
     show_explanation   = serializers.BooleanField(required=False)
     passing_score_pct  = serializers.IntegerField(required=False, min_value=0, max_value=100)
-    opens_at   = serializers.DateTimeField(required=False, allow_null=True)
-    closes_at  = serializers.DateTimeField(required=False, allow_null=True)
+    opens_at   = VnDateTimeField(required=False, allow_null=True)
+    closes_at  = VnDateTimeField(required=False, allow_null=True)
 
 
 class QuizCloseRequestSerializer(serializers.Serializer):
-    closes_at = serializers.DateTimeField(required=False, allow_null=True)
+    closes_at = VnDateTimeField(required=False, allow_null=True)
 
 
 class QuizReopenRequestSerializer(serializers.Serializer):
-    opens_at  = serializers.DateTimeField(required=False, allow_null=True)
-    closes_at = serializers.DateTimeField(required=False, allow_null=True)
+    opens_at  = VnDateTimeField(required=False, allow_null=True)
+    closes_at = VnDateTimeField(required=False, allow_null=True)
 
 
 class QuizQuestionUpdateRequestSerializer(serializers.Serializer):

@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -9,7 +11,7 @@ class MessageSerializer(serializers.Serializer):
     sender_id = serializers.UUIDField(allow_null=True, required=False)
     sender_type = serializers.CharField(default='')
     sender_name = serializers.CharField(default='')
-    created_at = serializers.DateTimeField()
+    created_at = VnDateTimeField()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

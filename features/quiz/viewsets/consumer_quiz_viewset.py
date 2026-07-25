@@ -65,13 +65,16 @@ class ConsumerQuizViewSet(ViewSet):
                 data['is_closed'] = status_payload['is_closed']
                 data['is_open'] = status_payload['is_open']
                 data['is_expired'] = status_payload['is_expired']
+                data['is_not_yet_open'] = status_payload.get('is_not_yet_open', False)
                 data['opens_at'] = status_payload['opens_at']
                 data['closes_at'] = status_payload['closes_at']
                 data['closed_at'] = status_payload['closed_at']
+                data['server_now'] = status_payload.get('server_now')
             else:
                 data['is_closed'] = False
                 data['is_open'] = True
                 data['is_expired'] = False
+                data['is_not_yet_open'] = False
 
         return Response(data)
 
@@ -91,11 +94,6 @@ class ConsumerQuizViewSet(ViewSet):
         if not classroom_id:
             return Response({'detail': 'classroom_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
         status_payload = self.service.get_assignment_status(pk, classroom_id)
-        if status_payload['is_open']:
-            return Response(
-                {'detail': 'Bảng vàng chỉ hiển thị khi quiz đã đóng.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         try:
             limit = int(request.query_params.get('limit', 20))
         except (TypeError, ValueError):
@@ -118,11 +116,6 @@ class ConsumerQuizViewSet(ViewSet):
         if not classroom_id:
             return Response({'detail': 'classroom_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
         status_payload = self.service.get_assignment_status(pk, classroom_id)
-        if status_payload['is_open']:
-            return Response(
-                {'detail': 'Bảng vàng chỉ hiển thị khi quiz đã đóng.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         payload = self.leaderboard_service.student_detail(
             quiz_id=pk,
             classroom_id=classroom_id,
@@ -142,9 +135,22 @@ class ConsumerQuizViewSet(ViewSet):
         # Get assignment to read this classroom's settings
         assignment = self.service.get_assignment(pk, classroom_id)
 
+        status_payload = self.service.get_assignment_status(pk, classroom_id)
+        is_not_yet_open = bool(status_payload.get('is_not_yet_open'))
+
+        if assignment is not None and is_not_yet_open:
+            opens_at = status_payload.get('opens_at')
+            return Response(
+                {
+                    'detail': 'Bài quiz chưa mở, vui lòng quay lại sau.',
+                    'reason': 'not_yet_open',
+                    'opens_at': opens_at,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # Guard: bài quiz đã đóng (đóng thủ công hoặc đã quá closes_at)
         if assignment is not None and not self.service.is_assignment_open(pk, classroom_id):
-            status_payload = self.service.get_assignment_status(pk, classroom_id)
             reason = 'đã được giáo viên đóng' if status_payload['is_closed'] else 'đã hết hạn'
             return Response(
                 {'detail': f'Bài quiz {reason}, không thể nộp.'},

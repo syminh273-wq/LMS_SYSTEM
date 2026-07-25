@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.utils.datetime import to_vn_iso
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.exam.serializers import (
     ExamSubmissionRequestSerializer,
@@ -36,16 +37,16 @@ def _serialize_exam(exam):
         "meta": _parse_meta(exam.meta),
         "status": exam.status,
         "is_online_active": bool(exam.is_online_active),
-        "opened_at": exam.opened_at.isoformat() if exam.opened_at else None,
+        "opened_at": to_vn_iso(exam.opened_at),
         "late_threshold_seconds": exam.late_threshold_seconds,
         "camera_required": bool(exam.camera_required),
         "exam_mode": exam.exam_mode,
         "duration_seconds": exam.duration_seconds if exam.duration_seconds else 0,
-        "due_date": exam.due_date.isoformat() if exam.due_date else None,
+        "due_date": to_vn_iso(exam.due_date),
         "max_visibility_breaks": getattr(exam, "max_visibility_breaks", 0) or 0,
         "max_face_warnings": getattr(exam, "max_face_warnings", 0) or 0,
-        "created_at": exam.created_at.isoformat() if exam.created_at else None,
-        "updated_at": exam.updated_at.isoformat() if exam.updated_at else None,
+        "created_at": to_vn_iso(exam.created_at),
+        "updated_at": to_vn_iso(exam.updated_at),
     }
 
 
@@ -61,6 +62,7 @@ def _submission_error_response(exc):
         "No active exam session. Please join via your exam link.",
         "Your exam time has expired",
         "Your exam session is no longer active",
+        "This exam has already passed its due date.",
     }:
         code = status.HTTP_403_FORBIDDEN
     return Response({"error": message}, status=code)
@@ -143,8 +145,8 @@ class ConsumerExamViewSet(ViewSet):
             "session": {
                 "uid": str(session.uid),
                 "token_status": session.token_status,
-                "started_at": session.started_at.isoformat() if session.started_at else None,
-                "ends_at": session.ends_at.isoformat() if session.ends_at else None,
+                "started_at": to_vn_iso(session.started_at),
+                "ends_at": to_vn_iso(session.ends_at),
                 "time_remaining_seconds": time_remaining,
             },
         })
@@ -207,8 +209,8 @@ class ConsumerExamViewSet(ViewSet):
             "uid": str(session.uid),
             "token": session.token,
             "token_status": session.token_status,
-            "started_at": session.started_at.isoformat() if session.started_at else None,
-            "ends_at": session.ends_at.isoformat() if session.ends_at else None,
+            "started_at": to_vn_iso(session.started_at),
+            "ends_at": to_vn_iso(session.ends_at),
             "time_remaining_seconds": time_remaining,
         })
 

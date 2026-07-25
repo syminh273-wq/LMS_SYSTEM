@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from features.account.space.models.space import Space
@@ -33,8 +35,8 @@ class SpaceAccountSerializer(serializers.Serializer):
         required=False
     )
     is_active = serializers.BooleanField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
+    updated_at = VnDateTimeField(read_only=True)
     portfolio = serializers.SerializerMethodField()
 
     def get_portfolio(self, obj):

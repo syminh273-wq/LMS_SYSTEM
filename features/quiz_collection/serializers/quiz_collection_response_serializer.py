@@ -1,17 +1,19 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
 class QuizCollectionItemResponseSerializer(serializers.Serializer):
     quiz_id = serializers.UUIDField(read_only=True)
     order = serializers.IntegerField()
-    added_at = serializers.DateTimeField(read_only=True)
+    added_at = VnDateTimeField(read_only=True)
 
 
 class QuizCollectionAssignmentResponseSerializer(serializers.Serializer):
     collection_id = serializers.UUIDField(read_only=True)
     classroom_id = serializers.UUIDField(read_only=True)
     assigned_by = serializers.UUIDField(read_only=True)
-    assigned_at = serializers.DateTimeField(read_only=True)
+    assigned_at = VnDateTimeField(read_only=True)
 
 
 class QuizCollectionResponseSerializer(serializers.Serializer):
@@ -22,8 +24,8 @@ class QuizCollectionResponseSerializer(serializers.Serializer):
     quiz_count = serializers.IntegerField()
     certificate_id = serializers.UUIDField(allow_null=True, required=False)
     status = serializers.CharField()
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
+    updated_at = VnDateTimeField(read_only=True)
 
 
 class QuizCollectionDetailResponseSerializer(QuizCollectionResponseSerializer):

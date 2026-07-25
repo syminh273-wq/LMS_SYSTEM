@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 class MeetingRoomSerializer(serializers.Serializer):
@@ -11,9 +13,9 @@ class MeetingRoomSerializer(serializers.Serializer):
     status = serializers.CharField(read_only=True)
     max_participants = serializers.IntegerField(default=0)
     participant_count = serializers.IntegerField(read_only=True)
-    started_at = serializers.DateTimeField(read_only=True)
-    ended_at = serializers.DateTimeField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
+    started_at = VnDateTimeField(read_only=True)
+    ended_at = VnDateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
 
 class CreateMeetingRoomRequest(serializers.Serializer):
     classroom_uid = serializers.UUIDField(required=False)

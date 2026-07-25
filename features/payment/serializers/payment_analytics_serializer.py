@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 """Analytics serializers for the space payment dashboard."""
 
 from rest_framework import serializers
@@ -36,8 +38,8 @@ class _ByClassroomSerializer(serializers.Serializer):
 
 
 class _FiltersSerializer(serializers.Serializer):
-    from_ = serializers.DateTimeField(source='from', allow_null=True, required=False)
-    to = serializers.DateTimeField(allow_null=True, required=False)
+    from_ = VnDateTimeField(source='from', allow_null=True, required=False)
+    to = VnDateTimeField(allow_null=True, required=False)
     status = serializers.CharField(allow_null=True, allow_blank=True, required=False)
     resource_id = serializers.CharField(allow_null=True, allow_blank=True, required=False)
     bucket = serializers.CharField()

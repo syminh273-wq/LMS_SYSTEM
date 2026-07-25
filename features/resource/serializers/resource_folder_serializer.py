@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -10,8 +12,8 @@ class ResourceFolderResponseSerializer(serializers.Serializer):
     order_index = serializers.IntegerField(required=False, default=0)
     color = serializers.CharField(allow_blank=True, allow_null=True, required=False)
     is_preview_only = serializers.BooleanField(required=False, default=False)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created_at = VnDateTimeField(read_only=True)
+    updated_at = VnDateTimeField(read_only=True)
 
 
 class ResourceFolderCreateRequestSerializer(serializers.Serializer):

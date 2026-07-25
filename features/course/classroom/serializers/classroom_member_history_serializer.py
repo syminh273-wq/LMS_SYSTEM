@@ -1,3 +1,5 @@
+from core.serializers.fields import VnDateTimeField
+
 from rest_framework import serializers
 
 
@@ -10,8 +12,8 @@ class ClassroomMemberHistorySerializer(serializers.Serializer):
     status = serializers.CharField(read_only=True)
     is_deleted = serializers.BooleanField(read_only=True)
     has_paid = serializers.BooleanField(read_only=True)
-    joined_at = serializers.DateTimeField(read_only=True)
-    paid_at = serializers.DateTimeField(read_only=True)
+    joined_at = VnDateTimeField(read_only=True)
+    paid_at = VnDateTimeField(read_only=True)
 
     def get_classroom_uid(self, obj):
         return str(getattr(obj, 'classroom_uid', ''))
