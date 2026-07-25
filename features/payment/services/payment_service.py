@@ -1,12 +1,15 @@
 import base64
 import json
 import logging
+from datetime import datetime, timezone
 from core.utils.uuid import uuid7
 from features.payment.enums import PaymentStatus
 from features.payment.repositories import PaymentRepository
 from features.payment.services.momo_service import MoMoService
 
 logger = logging.getLogger(__name__)
+
+PENDING_TTL_SECONDS = 15 * 60
 
 
 class PaymentService:
@@ -15,9 +18,45 @@ class PaymentService:
         self.momo = MoMoService()
 
     def initiate(self, consumer_id, amount: int, order_info: str, resource_type: str, resource_id: str) -> dict:
+        existing = self.repo.find_existing_for_resource(
+            consumer_id=consumer_id,
+            resource_type=resource_type,
+            resource_id=str(resource_id),
+        )
+        if existing:
+            if existing.status == PaymentStatus.COMPLETED.value:
+                return self._reuse_response(existing, status='completed')
+            if existing.status == PaymentStatus.PENDING.value:
+                created = getattr(existing, 'created_at', None)
+                age = (datetime.now(timezone.utc) - created).total_seconds() if created else 0
+                if age < PENDING_TTL_SECONDS:
+                    return self._reuse_response(existing, status='pending')
+
         order_id = str(uuid7())
 
-        meta = {"consumer_id": str(consumer_id), "resource_type": resource_type, "resource_id": str(resource_id)}
+        teacher_id = None
+        if resource_type == 'classroom':
+            try:
+                from features.course.classroom.repositories import Repository
+                classroom = Repository().find(str(resource_id))
+                teacher_id = str(getattr(classroom, 'teacher_id', '')) or None
+            except Exception:
+                teacher_id = None
+        elif resource_type == 'course':
+            try:
+                from features.course.repositories import CourseRepository
+                course = CourseRepository().find(str(resource_id))
+                teacher_id = str(getattr(course, 'teacher_id', '') or getattr(course, 'space_id', '') or '') or None
+            except Exception:
+                teacher_id = None
+
+        meta = {
+            "consumer_id": str(consumer_id),
+            "resource_type": resource_type,
+            "resource_id": str(resource_id),
+        }
+        if teacher_id:
+            meta["teacher_id"] = teacher_id
         extra_data = base64.b64encode(json.dumps(meta).encode()).decode()
 
         result = self.momo.create_payment(
@@ -31,8 +70,8 @@ class PaymentService:
             raise ValueError(result.get('message', 'MoMo payment creation failed'))
 
         self.repo.create(
-            bucket=0,
             consumer_id=consumer_id,
+            teacher_id=teacher_id,
             order_id=order_id,
             request_id=result.get('request_id', ''),
             amount=amount,
@@ -47,6 +86,16 @@ class PaymentService:
             "pay_url": result.get('payUrl', ''),
             "deeplink": result.get('deeplink', ''),
             "qr_code_url": result.get('qrCodeUrl', ''),
+            "status": PaymentStatus.PENDING.value,
+        }
+
+    def _reuse_response(self, payment, status: str) -> dict:
+        return {
+            "order_id": payment.order_id,
+            "pay_url": payment.pay_url or '',
+            "deeplink": '',
+            "qr_code_url": '',
+            "status": status,
         }
 
     def handle_ipn(self, data: dict) -> None:

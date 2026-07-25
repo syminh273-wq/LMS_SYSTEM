@@ -12,7 +12,7 @@ class MeetingRoomRepository(BaseRepository):
         return self.model.objects.filter(classroom_uid=classroom_uid, is_deleted=False)
 
     def get_active_rooms(self):
-        return self.model.objects.filter(bucket=0, status='active', is_deleted=False)
+        return self.model.objects.filter(status='active', is_deleted=False)
 
     def increment_participant(self, room_uid):
         room = self.find(str(room_uid))

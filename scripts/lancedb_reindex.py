@@ -24,7 +24,7 @@ _INDEXABLE = {'.pdf', '.txt', '.md', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '
 
 pipeline = RAGPipeline()
 
-resources = list(Resource.objects.filter(bucket=0, owner_type='classroom').all())
+resources = list(Resource.objects.filter(owner_type='classroom').all())
 indexable = [r for r in resources if not r.is_deleted and f".{r.file_type.lower()}" in _INDEXABLE]
 
 print(f"Total classroom resources : {len(resources)}")

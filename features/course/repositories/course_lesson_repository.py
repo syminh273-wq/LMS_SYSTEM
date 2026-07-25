@@ -7,12 +7,11 @@ class CourseLessonRepository(BaseRepository):
 
     def get_by_course(self, course_uid):
         return self.filter(
-            bucket=0, course_uid=course_uid, is_deleted=False
+            course_uid=course_uid, is_deleted=False
         ).order_by('order_index', 'uid')
 
     def get_preview_lessons(self, course_uid):
         return self.filter(
-            bucket=0,
             course_uid=course_uid,
             is_preview=True,
             is_published=True,
@@ -21,7 +20,6 @@ class CourseLessonRepository(BaseRepository):
 
     def get_published_lessons(self, course_uid):
         return self.filter(
-            bucket=0,
             course_uid=course_uid,
             is_published=True,
             is_deleted=False,

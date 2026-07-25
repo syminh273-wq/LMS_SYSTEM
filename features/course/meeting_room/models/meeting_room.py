@@ -4,8 +4,7 @@ from core.utils.uuid import uuid7
 
 
 class MeetingRoom(BaseTimeStampModel):
-    bucket = columns.Integer(partition_key=True, default=0)
-    uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
+    uid = columns.UUID(primary_key=True, default=uuid7)
 
     classroom_uid = columns.UUID(index=True, required=False)   # optional link to classroom
     title = columns.Text(required=True)

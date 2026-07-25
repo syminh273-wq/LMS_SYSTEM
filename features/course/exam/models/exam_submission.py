@@ -5,12 +5,9 @@ from core.utils.uuid import uuid7
 
 
 class ExamSubmission(BaseTimeStampModel):
-    bucket = columns.Integer(partition_key=True, default=0)
-
     uid = columns.UUID(
         primary_key=True,
         default=uuid7,
-        clustering_order="DESC",
     )
 
     exam_id      = columns.UUID(index=True, required=True)

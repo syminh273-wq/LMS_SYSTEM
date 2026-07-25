@@ -9,7 +9,6 @@ class UserProfile(BaseTimeStampModel):
     Bucket 0 enables global queries (e.g. for discovery).
     """
 
-    bucket       = columns.Integer(partition_key=True, default=0)
     owner_id     = columns.UUID(primary_key=True, required=True)
 
     owner_type   = columns.Text(required=True)        # 'consumer' | 'space'

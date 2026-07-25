@@ -79,8 +79,8 @@ ViewSet → Service → Repository → Cassandra Model
 
 ## Cassandra Conventions
 
-- **Partition key**: `bucket` (Integer, default `0`)
-- **Clustering key**: `uid` (UUID v7, `DESC`)
+- **Partition key**: natural column (e.g. `uid`, `owner_id`, `user_id`, `course_uid`, `event_type`, `level`). No synthetic `bucket` column.
+- **Clustering key**: `uid` (UUID v7, `DESC`) or other domain column as needed.
 - **Soft delete**: always use `is_deleted = True` + `deleted_at`, never hard delete
 - **No foreign keys**: store related UIDs as plain `UUID` columns
 - **Indexes**: add secondary index on frequently filtered columns (`teacher_id`, `owner_id`, `email`)

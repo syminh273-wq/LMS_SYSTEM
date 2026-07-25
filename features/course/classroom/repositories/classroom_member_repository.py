@@ -57,3 +57,7 @@ class ClassroomMemberRepository(BaseRepository):
         if not m or m.is_deleted:
             return None
         return m if (m.has_paid and m.status == 'approved') else None
+
+    def get_history_by_member(self, member_id, limit: int = 50):
+        """All classroom memberships (approved + pending + soft-deleted) for a user, newest first."""
+        return self.model.objects.filter(member_id=member_id).limit(limit)

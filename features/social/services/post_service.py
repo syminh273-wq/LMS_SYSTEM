@@ -57,7 +57,7 @@ class PostService:
             except (ValueError, TypeError):
                 continue
             try:
-                rows = list(UserProfile.objects.filter(bucket=0, owner_id=owner_uuid).limit(1))
+                rows = list(UserProfile.objects.filter(owner_id=owner_uuid).limit(1))
             except Exception:
                 continue
             if rows and rows[0].avatar_url:
@@ -184,7 +184,7 @@ class PostService:
 
     def get_feed(self, requester_uid, limit: int = 20, before: str | None = None) -> list[dict]:
         """Public feed — all public posts across all users, newest first."""
-        qs = ConsumerPost.objects.filter(bucket=0, is_deleted=False)
+        qs = ConsumerPost.objects.filter(is_deleted=False)
         if before:
             try:
                 qs = qs.filter(created_at__lt=datetime.fromisoformat(before))
@@ -206,11 +206,11 @@ class PostService:
             return []
 
         # We can't easily do a multi-user 'IN' query with Cassandra effectively for a feed
-        # So we fetch a few from each or use the global bucket and filter.
-        # For simplicity and performance with small following lists, we fetch from the global bucket
+        # So we fetch a few from each or use the global partition and filter.
+        # For simplicity and performance with small following lists, we fetch from the global partition
         # but filter for the ones we follow.
 
-        qs = ConsumerPost.objects.filter(bucket=0, is_deleted=False).limit(limit * 5)
+        qs = ConsumerPost.objects.filter(is_deleted=False).limit(limit * 5)
         posts_raw = list(qs)
 
         followed_set = {str(uid) for uid in followed_uids}
@@ -222,7 +222,7 @@ class PostService:
 
     def get_my_posts(self, consumer_uid, limit: int = 20, before: str | None = None) -> list[dict]:
         """All posts by a specific user (visible to themselves)."""
-        qs = ConsumerPost.objects.filter(bucket=0, consumer_uid=uuid.UUID(str(consumer_uid)), is_deleted=False)
+        qs = ConsumerPost.objects.filter(consumer_uid=uuid.UUID(str(consumer_uid)), is_deleted=False)
         if before:
             try:
                 qs = qs.filter(created_at__lt=datetime.fromisoformat(before))
@@ -236,7 +236,7 @@ class PostService:
         """Posts by user visible to requester (filters by visibility)."""
         is_owner = str(consumer_uid) == str(requester_uid)
         posts_raw = list(
-            ConsumerPost.objects.filter(bucket=0, consumer_uid=uuid.UUID(str(consumer_uid)), is_deleted=False).limit(limit * 2)
+            ConsumerPost.objects.filter(consumer_uid=uuid.UUID(str(consumer_uid)), is_deleted=False).limit(limit * 2)
         )
         if is_owner:
             posts = posts_raw[:limit]
@@ -249,7 +249,7 @@ class PostService:
 
     def get_post(self, post_uid: str) -> ConsumerPost | None:
         try:
-            results = list(ConsumerPost.objects.filter(bucket=0, uid=uuid.UUID(post_uid)).limit(1))
+            results = list(ConsumerPost.objects.filter(uid=uuid.UUID(post_uid)).limit(1))
             return results[0] if results else None
         except Exception:
             return None

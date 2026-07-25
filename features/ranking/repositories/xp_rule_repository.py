@@ -6,10 +6,10 @@ class XPRuleRepository(BaseRepository):
     model = XPRule
 
     def get(self, event_type):
-        return self.model.objects(bucket=0, event_type=event_type).first()
+        return self.model.objects(event_type=event_type).first()
 
     def all_active(self):
-        rows = list(self.model.objects(bucket=0))
+        rows = list(self.model.objects.all())
         return [r for r in rows if r.is_active]
 
     def get_amount(self, event_type, default=0):
@@ -27,7 +27,6 @@ class XPRuleRepository(BaseRepository):
             existing.save()
             return existing
         return self.model.create(
-            bucket=0,
             event_type=event_type,
             xp_amount=int(xp_amount),
             is_active=bool(is_active),

@@ -6,7 +6,11 @@ class CourseRepository(BaseRepository):
     model = Course
 
     def get_published_courses(self):
-        return self.filter(bucket=0, status='published', is_deleted=False).order_by('uid')
+        return sorted(
+            list(self.filter(status='published', is_deleted=False)),
+            key=lambda c: c.uid,
+            reverse=True,
+        )
 
     def get_by_teacher(self, teacher_id):
         return self.filter(teacher_id=teacher_id, is_deleted=False)

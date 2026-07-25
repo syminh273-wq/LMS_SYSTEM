@@ -7,8 +7,7 @@ class Certificate(BaseTimeStampModel):
     """
     Teacher-owned certificate template. Reusable across many collections.
     """
-    bucket = columns.Integer(partition_key=True, default=0)
-    uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
+    uid = columns.UUID(primary_key=True, default=uuid7)
 
     created_by = columns.UUID(index=True, required=True)
     name = columns.Text(required=True)

@@ -402,6 +402,41 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         """GET /api/v1/consumer/course/classrooms/{uid}/access/ — poll endpoint for checkout flow."""
         return Response(Service().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
 
+    @action(detail=False, methods=['get'], url_path='me/history')
+    def me_history(self, request):
+        """GET /api/v1/consumer/course/classrooms/me/history/?limit=50
+
+        Returns every join event the current user has with any classroom,
+        including soft-deleted and rejected ones, with classroom name + status.
+        Newest first.
+        """
+        from features.course.classroom.serializers.classroom_member_history_serializer import ClassroomMemberHistorySerializer
+        try:
+            limit = int(request.query_params.get('limit') or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        limit = max(1, min(limit, 200))
+
+        members = list(ClassroomMemberRepository().get_history_by_member(request.user.uid, limit=limit))
+        members.sort(key=lambda m: getattr(m, 'joined_at', None) or getattr(m, 'updated_at', None) or 0, reverse=True)
+
+        service = Service()
+        items = []
+        for m in members:
+            classroom_name = ''
+            teacher_name = ''
+            try:
+                c = service.find(str(m.classroom_uid))
+                classroom_name = getattr(c, 'name', '') or ''
+                teacher_name = getattr(c, 'teacher_name', '') or ''
+            except Exception:
+                pass
+            items.append(ClassroomMemberHistorySerializer(
+                m,
+                context={'classroom_name': classroom_name, 'teacher_name': teacher_name},
+            ).data)
+        return Response(items)
+
     @action(detail=True, methods=['get'], url_path='preview-folder')
     def preview_folder(self, request, pk=None):
         """GET /api/v1/consumer/course/classrooms/{uid}/preview-folder/ — always accessible."""

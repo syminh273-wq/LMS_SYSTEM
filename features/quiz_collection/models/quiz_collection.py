@@ -8,8 +8,7 @@ class QuizCollection(BaseTimeStampModel):
     Teacher-owned group of Quizzes. Lives in the teacher's global library.
     Assigned to classrooms via QuizCollectionAssignment.
     """
-    bucket = columns.Integer(partition_key=True, default=0)
-    uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
+    uid = columns.UUID(primary_key=True, default=uuid7)
 
     created_by = columns.UUID(index=True, required=True)
     title = columns.Text(required=True)

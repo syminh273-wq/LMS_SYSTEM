@@ -11,6 +11,7 @@ from features.payment.repositories import PaymentRepository
 
 
 class PaymentViewSet(BaseModelViewSet):
+    """Consumer payment history + initiate MoMo payment."""
     http_method_names = ['get', 'post']
 
     def get_queryset(self):
@@ -20,8 +21,31 @@ class PaymentViewSet(BaseModelViewSet):
         return PaymentResponseSerializer
 
     def list(self, request, *args, **kwargs):
+        """GET /api/v1/consumer/payment/
+        Query params: ?status=completed&resource_type=classroom&limit=50
+        """
         payments = list(self.get_queryset())
+        status_filter = (request.query_params.get('status') or '').strip().lower()
+        if status_filter:
+            payments = [p for p in payments if (p.status or '').lower() == status_filter]
+        resource_type = (request.query_params.get('resource_type') or '').strip().lower()
+        if resource_type:
+            from features.payment.serializers.payment_response_serializer import decode_meta
+            payments = [p for p in payments if (decode_meta(getattr(p, 'extra_data', '')).get('resource_type') or '').lower() == resource_type]
+        try:
+            limit = int(request.query_params.get('limit') or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        payments = payments[:max(1, min(limit, 200))]
         return Response(PaymentResponseSerializer(payments, many=True).data)
+
+    @action(detail=False, methods=['get'], url_path=r'by-order/(?P<order_id>[^/.]+)')
+    def find_by_order(self, request, order_id=None):
+        """GET /api/v1/consumer/payment/by-order/{order_id}/ — lookup one payment by order id (scoped to caller)."""
+        payment = PaymentRepository().get_by_order_id(order_id)
+        if not payment or str(payment.consumer_id) != str(request.user.uid):
+            return Response({'error': 'Không tìm thấy đơn hàng.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(PaymentResponseSerializer(payment).data)
 
     @action(detail=False, methods=['post'], url_path='create')
     def initiate(self, request):

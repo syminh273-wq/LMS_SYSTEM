@@ -14,7 +14,7 @@ class ExamSubmissionRepository:
         except ValueError:
             return None
 
-        return ExamSubmission.objects(bucket=0, uid=submission_uid, is_deleted=False).first()
+        return ExamSubmission.objects(uid=submission_uid, is_deleted=False).first()
 
     def list_by_exam(self, exam_id):
         return ExamSubmission.objects(exam_id=exam_id, is_deleted=False)

@@ -46,8 +46,7 @@ def main():
     # 3. Create table directly
     session.execute("""
         CREATE TABLE IF NOT EXISTS user_profiles (
-            bucket           int,
-            owner_id         uuid,
+            owner_id         uuid PRIMARY KEY,
             owner_type       text,
             avatar_url       text,
             cover_url        text,
@@ -61,8 +60,7 @@ def main():
             posts_count      int,
             followers_count  int,
             following_count  int,
-            updated_at       timestamp,
-            PRIMARY KEY (bucket, owner_id)
+            updated_at       timestamp
         )
     """)
     print('[OK] table=user_profiles created')

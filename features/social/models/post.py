@@ -8,14 +8,13 @@ class ConsumerPost(BaseTimeStampModel):
     """
     Posts created by consumers (students).
     Partition by consumer_uid → get all posts by a user.
-    Bucket 0 allows scanning all public posts for the feed.
+    Global feed scans all partitions and filters in Python.
     """
 
-    bucket       = columns.Integer(partition_key=True, default=0)
+    consumer_uid = columns.UUID(partition_key=True, primary_key=True, required=True)
     created_at   = columns.DateTime(primary_key=True, clustering_order='DESC', default=datetime.utcnow)
-    uid          = columns.UUID(primary_key=True, default=uuid7, clustering_order='DESC')
+    uid          = columns.UUID(primary_key=True, default=uuid7)
 
-    consumer_uid   = columns.UUID(index=True, required=True)
     author_name    = columns.Text(default='')    # snapshot
     author_avatar  = columns.Text(default='')    # snapshot
 

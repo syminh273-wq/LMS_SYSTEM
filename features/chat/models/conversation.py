@@ -4,8 +4,7 @@ from core.utils.uuid import uuid7
 
 
 class Conversation(BaseTimeStampModel):
-    bucket = columns.Integer(partition_key=True, default=0)
-    uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
+    uid = columns.UUID(primary_key=True, default=uuid7)
     type = columns.Text(default='channel')             # 'channel' | 'direct'
     classroom_uid = columns.UUID(index=True, required=False)
     name = columns.Text(default='')

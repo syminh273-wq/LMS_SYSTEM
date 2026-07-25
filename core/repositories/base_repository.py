@@ -67,11 +67,7 @@ class BaseRepository:
 
     def find(self, uid: Any):
         if self._is_cassandra:
-            # Use filter().first() instead of get() to avoid field mapping issues
-            # when partition key (bucket) is missing in query
             lookup = {'uid': uid}
-            if 'bucket' in self.model._columns:
-                lookup['bucket'] = 0
 
             instance = self._qs().filter(**lookup).first()
             if not instance:

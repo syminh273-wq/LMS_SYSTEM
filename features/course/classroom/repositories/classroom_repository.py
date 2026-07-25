@@ -5,8 +5,12 @@ class Repository(BaseRepository):
     model = Classroom
 
     def get_active_classrooms(self):
-        # We must filter by bucket to use ORDER BY uid in Cassandra
-        return self.filter(bucket=0, status='active', is_deleted=False).order_by('uid')
+        # ORDER BY requires a partition-level query; fetch all active then sort in memory
+        return sorted(
+            list(self.filter(status='active', is_deleted=False)),
+            key=lambda c: c.uid,
+            reverse=True,
+        )
 
     def get_by_teacher(self, teacher_id):
         # Global filter without order_by will work fine

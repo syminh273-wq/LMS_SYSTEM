@@ -6,7 +6,7 @@ class ProfileRepository:
     def get_by_owner(self, owner_id):
         if isinstance(owner_id, str):
             owner_id = uuid.UUID(owner_id)
-        rows = list(UserProfile.objects.filter(bucket=0, owner_id=owner_id).limit(1))
+        rows = list(UserProfile.objects.filter(owner_id=owner_id).limit(1))
         return rows[0] if rows else None
 
     def get_or_create(self, owner_id, owner_type: str) -> UserProfile:
@@ -16,7 +16,6 @@ class ProfileRepository:
         if existing:
             return existing
         return UserProfile.create(
-            bucket=0,
             owner_id=owner_id,
             owner_type=owner_type,
         )

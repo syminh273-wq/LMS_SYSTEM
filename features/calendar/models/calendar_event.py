@@ -3,8 +3,7 @@ from cassandra.cqlengine import columns
 from core.models.cassandra import BaseTimeStampModel
 
 class CalendarEvent(BaseTimeStampModel):
-    bucket = columns.Integer(partition_key=True, default=0)
-    uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
+    uid = columns.UUID(primary_key=True, default=uuid7)
     
     # Types: class, exam, deadline, study_session
     type = columns.Text(index=True, required=True)

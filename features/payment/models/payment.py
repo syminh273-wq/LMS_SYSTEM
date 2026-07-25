@@ -9,16 +9,16 @@ from features.payment.enums import PaymentStatus
 class Payment(BaseTimeStampModel):
     __table_name__ = 'payments'
 
-    bucket = columns.Integer(partition_key=True, default=0)
-    uid = columns.UUID(primary_key=True, default=uuid7, clustering_order='DESC')
+    uid = columns.UUID(primary_key=True, default=uuid7)
 
     consumer_id = columns.UUID(index=True, required=True)
+    teacher_id = columns.UUID(index=True, required=False)  # populated for classroom payments so space (teacher) can query their own revenue
     order_id = columns.Text(index=True, required=True)   # unique per transaction
     request_id = columns.Text(default='')
 
     amount = columns.BigInt(required=True)               # VND
     order_info = columns.Text(default='')
-    extra_data = columns.Text(default='')                # base64 JSON: {consumer_id, resource_type, resource_id}
+    extra_data = columns.Text(default='')                # base64 JSON: {consumer_id, resource_type, resource_id, teacher_id}
 
     status = columns.Text(default=PaymentStatus.PENDING.value, index=True)
     pay_url = columns.Text(default='')                   # MoMo redirect URL

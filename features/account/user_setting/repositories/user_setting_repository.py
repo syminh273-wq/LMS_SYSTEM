@@ -6,11 +6,11 @@ class UserSettingRepository(BaseRepository):
 
     def get_by_key(self, user_id, key):
         """Retrieve a specific setting for a user."""
-        return self._qs().filter(bucket=0, user_id=user_id, key=key).first()
+        return self._qs().filter(user_id=user_id, key=key).first()
 
     def get_all_for_user(self, user_id):
         """Retrieve all settings for a user."""
-        return self._qs().filter(bucket=0, user_id=user_id).all()
+        return self._qs().filter(user_id=user_id).all()
 
     def set_value(self, user_id, user_type, key, value):
         """Create or update a setting."""

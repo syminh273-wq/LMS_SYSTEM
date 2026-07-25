@@ -1,7 +1,7 @@
 """Default XP rules. Run via `python manage.py seed_xp_rules` (TODO) or
 inserted lazily on first read.
 
-Stored in `ranking_xp_rules` (bucket=0). The XPService reads these per
+Stored in `ranking_xp_rules`. The XPService reads these per
 event; if a rule is missing, the event still works as long as the caller
 passes `delta_xp` explicitly.
 """

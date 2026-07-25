@@ -62,7 +62,7 @@ def find_conversation_with_target(user_uid, target_uid):
 
 def list_direct_conversations(user_uid) -> list[dict]:
     uid = uuid.UUID(str(user_uid))
-    all_qs = Conversation.objects.filter(bucket=0, type='direct', is_deleted=False).allow_filtering()
+    all_qs = Conversation.objects.filter(type='direct', is_deleted=False).allow_filtering()
     direct_a = list(all_qs.filter(direct_a_id=uid))
     direct_b = list(all_qs.filter(direct_b_id=uid))
     convs = direct_a + direct_b
@@ -96,7 +96,7 @@ def list_direct_conversations(user_uid) -> list[dict]:
 def create_message(conversation_uid, sender_id, sender_name, sender_type: str,
                    content: str, msg_type: str = 'text',
                    resource_uid=None, resource_url='', resource_name='', resource_size=0) -> dict:
-    conv = list(Conversation.objects.filter(bucket=0, uid=uuid.UUID(str(conversation_uid)), is_deleted=False).limit(1))
+    conv = list(Conversation.objects.filter(uid=uuid.UUID(str(conversation_uid)), is_deleted=False).limit(1))
     if not conv:
         raise ValueError('Conversation not found')
     conv = conv[0]

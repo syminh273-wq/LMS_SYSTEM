@@ -8,8 +8,7 @@ from core.utils.uuid import uuid7
 
 class AIConversationSession(DjangoCassandraModel):
     """Session metadata only. Messages are stored in chat_messages (sender_type='ai'|'user')."""
-    bucket       = columns.Integer(partition_key=True, default=0)
-    session_id   = columns.UUID(primary_key=True, default=uuid7, clustering_order="DESC")
+    session_id   = columns.UUID(primary_key=True, default=uuid7)
     user_id      = columns.UUID(index=True)
     classroom_id = columns.UUID(index=True, required=False)
     title        = columns.Text(default='')

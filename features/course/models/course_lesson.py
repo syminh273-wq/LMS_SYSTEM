@@ -4,8 +4,7 @@ from core.utils.uuid import uuid7
 
 
 class CourseLesson(BaseTimeStampModel):
-    bucket = columns.Integer(partition_key=True, default=0)
-    course_uid = columns.UUID(primary_key=True, clustering_order="ASC")
+    course_uid = columns.UUID(partition_key=True, primary_key=True)
     order_index = columns.Integer(primary_key=True, default=0, clustering_order="ASC")
     uid = columns.UUID(primary_key=True, default=uuid7, clustering_order="ASC")
     title = columns.Text(required=True)

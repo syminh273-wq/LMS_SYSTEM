@@ -18,7 +18,6 @@ class AIConversationSessionRepository:
 
     def create(self, user_id, classroom_id=None) -> AIConversationSession:
         kwargs = {
-            'bucket': 0,
             'user_id': self._safe_uuid(user_id),
             'title': '',
             'created_at': datetime.utcnow(),
@@ -33,7 +32,6 @@ class AIConversationSessionRepository:
         if not uid:
             return None
         return AIConversationSession.objects.filter(
-            bucket=0,
             session_id=uid,
         ).allow_filtering().first()
 
@@ -44,7 +42,6 @@ class AIConversationSessionRepository:
             return []
         return list(
             AIConversationSession.objects.filter(
-                bucket=0,
                 user_id=u_uid,
                 classroom_id=c_uid,
                 is_deleted=False,
@@ -56,7 +53,6 @@ class AIConversationSessionRepository:
         if not uid:
             return
         AIConversationSession.objects.filter(
-            bucket=0,
             session_id=uid,
         ).update(title=title[:80])
 
@@ -65,7 +61,6 @@ class AIConversationSessionRepository:
         if not uid:
             return
         AIConversationSession.objects.filter(
-            bucket=0,
             session_id=uid,
         ).update(updated_at=datetime.utcnow())
 
@@ -74,7 +69,6 @@ class AIConversationSessionRepository:
         if not uid:
             return
         AIConversationSession.objects.filter(
-            bucket=0,
             session_id=uid,
         ).update(
             is_deleted=True,

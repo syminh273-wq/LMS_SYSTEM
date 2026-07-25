@@ -26,7 +26,7 @@ class ResourceRepository(BaseRepository):
         except ValueError as exc:
             raise self.model.DoesNotExist(f'{self.model.__name__} not found.') from exc
 
-        resource = self.model.objects(bucket=0, uid=resource_uid).first()
+        resource = self.model.objects(uid=resource_uid).first()
 
         if not resource or resource.is_deleted:
             raise self.model.DoesNotExist(f'{self.model.__name__} not found.')
@@ -54,9 +54,9 @@ class ResourceRepository(BaseRepository):
         }
         update_data['updated_at'] = datetime.now()
 
-        self.model.objects(bucket=0, uid=resource.uid).update(**update_data)
+        self.model.objects(uid=resource.uid).update(**update_data)
 
-        return self.model.objects(bucket=0, uid=resource.uid).first()
+        return self.model.objects(uid=resource.uid).first()
 
     def bulk_update_positions(self, items):
         """items: iterable of {'uid', 'folder_id'?, 'order_index'}"""
@@ -68,9 +68,9 @@ class ResourceRepository(BaseRepository):
             update_kwargs = {'order_index': int(item.get('order_index', 0))}
             if 'folder_id' in item:
                 update_kwargs['folder_id'] = item['folder_id'] if item['folder_id'] else None
-            self.model.objects(bucket=0, uid=uid).update(**update_kwargs)
+            self.model.objects(uid=uid).update(**update_kwargs)
 
     def clear_folder_for_resources(self, folder_id):
         """When a folder is deleted, move all its children docs to root (folder_id = None)."""
         for r in self.filter(folder_id=folder_id, is_deleted=False):
-            self.model.objects(bucket=0, uid=r.uid).update(folder_id=None, updated_at=datetime.now())
+            self.model.objects(uid=r.uid).update(folder_id=None, updated_at=datetime.now())

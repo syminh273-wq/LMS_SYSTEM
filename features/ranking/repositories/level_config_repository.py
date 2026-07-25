@@ -6,10 +6,10 @@ class LevelConfigRepository(BaseRepository):
     model = LevelConfig
 
     def all_levels(self):
-        return sorted(list(self.model.objects(bucket=0)), key=lambda r: r.level)
+        return sorted(list(self.model.objects.all()), key=lambda r: r.level)
 
     def get(self, level):
-        return self.model.objects(bucket=0, level=level).first()
+        return self.model.objects(level=level).first()
 
     def upsert(self, level, required_xp, title='', color='blue'):
         existing = self.get(level)
@@ -19,5 +19,5 @@ class LevelConfigRepository(BaseRepository):
             existing.color = color
             existing.save()
             return existing
-        return self.model.create(bucket=0, level=level, required_xp=required_xp,
+        return self.model.create(level=level, required_xp=required_xp,
                                  title=title, color=color)

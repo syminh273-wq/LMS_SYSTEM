@@ -14,7 +14,7 @@ class ExamRepository:
         except ValueError:
             return None
 
-        return Exam.objects(bucket=0, uid=exam_uid, is_deleted=False).first()
+        return Exam.objects(uid=exam_uid, is_deleted=False).first()
 
     def list_by_teacher(self, teacher_id, status=None, exam_mode=None):
         qs = list(Exam.objects(teacher_id=teacher_id, is_deleted=False))
