@@ -217,8 +217,17 @@ class ClassroomMemberService:
         from features.notification.services.notification_service import NotificationService
         classroom = Service().find(str(classroom_uid))
         if not classroom or not classroom.teacher_id:
+            logger.warning(
+                f"[ClassroomMember] _notify_teacher_pending: classroom not found or no teacher_id. "
+                f"classroom_uid={classroom_uid}, classroom={classroom}, "
+                f"teacher_id={getattr(classroom, 'teacher_id', None)}"
+            )
             return
-        NotificationService().send_notification(
+        logger.info(
+            f"[ClassroomMember] Sending join notification to teacher_id={classroom.teacher_id} "
+            f"for classroom={classroom.name} (uid={classroom.uid}), student={student_name}"
+        )
+        result = NotificationService().send_notification(
             target_uid=classroom.teacher_id,
             notify_type='student_join_request',
             title='Yêu cầu tham gia lớp học',
@@ -229,6 +238,10 @@ class ClassroomMemberService:
                 'student_uid': str(user.uid),
                 'student_name': student_name,
             }
+        )
+        logger.info(
+            f"[ClassroomMember] Notification result: uid={getattr(result, 'uid', None)}, "
+            f"firebase_path=notifications/{classroom.teacher_id}/{getattr(result, 'uid', None)}"
         )
 
     def leave(self, classroom_uid, member_id):

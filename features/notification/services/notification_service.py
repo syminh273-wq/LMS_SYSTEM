@@ -1,9 +1,13 @@
 import json
+import logging
 import uuid
 from features.notification.models.notification_log import NotificationLog
 from core.notification.services.notification_service import NotificationService as FirebaseNotificationService
 from core.notification.enums.notification_provider import NotificationProvider
 from core.firebase.client.firebase_app import FirebaseApp
+
+logger = logging.getLogger(__name__)
+
 
 class NotificationService:
     def __init__(self):
@@ -22,6 +26,10 @@ class NotificationService:
             content=content,
             metadata=json.dumps(metadata) if metadata else None
         )
+        logger.info(
+            f"[NotificationService] Saved to Cassandra: uid={log.uid}, "
+            f"target_uid={target_uid}, type={notify_type}"
+        )
 
         # Push to Firebase using notification uid as key so is_read can be updated later
         # Path: notifications/{target_uid}/{notification_uid}
@@ -35,7 +43,10 @@ class NotificationService:
             "is_read": "false",
             "created_at": log.created_at.isoformat()
         }
-        self.firebase_service.set_message(channel, firebase_data)
+        success = self.firebase_service.set_message(channel, firebase_data)
+        logger.info(
+            f"[NotificationService] Firebase push: channel={channel}, success={success}"
+        )
 
         return log
 

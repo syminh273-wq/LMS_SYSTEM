@@ -20,5 +20,6 @@ class Space(AbstractAuthModel):
     learning_certificates = columns.List(columns.Text, default=[])
     contact_information = columns.Map(columns.Text, columns.Text, default={})
     is_active = columns.Boolean(default=True)
+    plan = columns.Text(default='free')
 
     # is_deleted, deleted_at, created_at, updated_at → BaseTimeStampModel
