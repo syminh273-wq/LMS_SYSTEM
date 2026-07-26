@@ -1,5 +1,7 @@
-from .course import Course
-from .course_lesson import CourseLesson
-from .course_enrollment import CourseEnrollment
+from .course_enrollment_by_consumer import CourseEnrollmentByConsumer
+from .course_enrollment_by_course import CourseEnrollmentByCourse
 
-__all__ = ['Course', 'CourseLesson', 'CourseEnrollment']
+__all__ = [
+    'CourseEnrollmentByConsumer',
+    'CourseEnrollmentByCourse',
+]

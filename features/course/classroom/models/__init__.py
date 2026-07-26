@@ -1,7 +1,8 @@
 from .classroom import Classroom
-from .classroom_member import ClassroomMember
-from .classroom_activity_log import ClassroomActivityLog
-from .teacher_contact import TeacherContact
-from .classroom_blacklist import ClassroomBlacklist
+from .teacher_blacklist import GLOBAL_SENTINEL, TeacherBlacklist
 
-__all__ = ['Classroom', 'ClassroomMember', 'ClassroomActivityLog', 'TeacherContact', 'ClassroomBlacklist']
+__all__ = [
+    'Classroom',
+    'TeacherBlacklist',
+    'GLOBAL_SENTINEL',
+]

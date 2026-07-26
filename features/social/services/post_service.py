@@ -3,20 +3,15 @@ import uuid
 from datetime import datetime
 
 from core.storages.storage_service import storage_service
-from features.social.models import ConsumerPost, PostLike, PostComment, UserProfile
+from features.social.models import SocialPost, SocialPostLike, SocialPostComment, SocialProfile
 from features.social.services.follow_service import FollowService
 from features.social.services.profile_service import ProfileService
 
 
 class PostService:
 
-    # ── Serialize helpers ─────────────────────────────────────────────────────
-
     @staticmethod
     def _coerce_image_urls(data: dict) -> list[str]:
-        """Normalize image URLs from request: accept 'image_urls' (list or JSON string)
-        and 'image_url' (single string). Returns deduped list preserving order, with
-        image_url inserted at the front if not already present."""
         raw = data.get('image_urls')
         urls: list[str] = []
         if isinstance(raw, str):
@@ -36,18 +31,12 @@ class PostService:
 
     @staticmethod
     def _resolve_avatar_url(value: str) -> str:
-        """Convert a stored avatar (object key, relative path, or full URL) into
-        a public URL. Mirrors the helper used by account/space serializers so
-        the social feed returns renderable avatar URLs regardless of upload flow."""
         if not value:
             return ''
         return storage_service.get_public_url(value)
 
     @staticmethod
     def _profile_avatar_map(owner_ids: list) -> dict:
-        """Batch-fetch avatar URLs from the social UserProfile table for any owners
-        whose Post/Comment was created with an empty author_avatar. Returns a map
-        of owner_id(str) -> raw avatar value (object key or full URL)."""
         if not owner_ids:
             return {}
         result: dict[str, str] = {}
@@ -57,7 +46,7 @@ class PostService:
             except (ValueError, TypeError):
                 continue
             try:
-                rows = list(UserProfile.objects.filter(owner_id=owner_uuid).limit(1))
+                rows = list(SocialProfile.objects.filter(owner_id=owner_uuid).limit(1))
             except Exception:
                 continue
             if rows and rows[0].avatar_url:
@@ -66,15 +55,13 @@ class PostService:
 
     @staticmethod
     def _backfill_avatar(stored: str, owner_id, profile_avatars: dict) -> str:
-        """If `stored` is empty, fall back to the social UserProfile avatar; then
-        run the value through the public URL resolver."""
         value = (stored or '').strip()
         if not value and owner_id is not None:
             value = (profile_avatars.get(str(owner_id)) or '').strip()
         return PostService._resolve_avatar_url(value)
 
     @staticmethod
-    def _serialize_post(p: ConsumerPost, liked_by_me: bool = False,
+    def _serialize_post(p: SocialPost, liked_by_me: bool = False,
                         profile_avatars: dict | None = None) -> dict:
         raw_tags = list(p.classroom_tags or [])
         image_urls = list(p.image_urls or [])
@@ -82,14 +69,14 @@ class PostService:
             image_urls = [p.image_url]
         profile_avatars = profile_avatars or {}
         author_avatar = PostService._backfill_avatar(
-            p.author_avatar, p.consumer_uid, profile_avatars
+            p.owner_avatar, p.owner_id, profile_avatars
         )
         return {
             'uid':            str(p.uid),
-            'consumer_uid':   str(p.consumer_uid),
-            'author_name':    p.author_name or '',
+            'owner_id':       str(p.owner_id),
+            'owner_type':     p.owner_type or 'consumer',
+            'author_name':    p.owner_name or '',
             'author_avatar':  author_avatar,
-            'author_type':    p.author_type or 'consumer',
             'space_uid':      str(p.space_uid) if p.space_uid else None,
             'content':        p.content or '',
             'emotion':        p.emotion or '',
@@ -104,25 +91,24 @@ class PostService:
         }
 
     @staticmethod
-    def _serialize_comment(c: PostComment, profile_avatars: dict | None = None) -> dict:
+    def _serialize_comment(c: SocialPostComment, profile_avatars: dict | None = None) -> dict:
         profile_avatars = profile_avatars or {}
         author_avatar = PostService._backfill_avatar(
-            c.author_avatar, c.consumer_uid, profile_avatars
+            c.owner_avatar, c.owner_id, profile_avatars
         )
         return {
             'uid':           str(c.uid),
             'post_uid':      str(c.post_uid),
-            'consumer_uid':  str(c.consumer_uid),
-            'author_name':   c.author_name or '',
+            'owner_id':      str(c.owner_id),
+            'owner_type':    c.owner_type or 'consumer',
+            'author_name':   c.owner_name or '',
             'author_avatar': author_avatar,
             'content':       c.content or '',
             'created_at':    c.created_at.isoformat() if c.created_at else None,
         }
 
-    # ── Posts ─────────────────────────────────────────────────────────────────
-
-    def create_post(self, consumer_uid, author_name: str, author_avatar: str, data: dict,
-                    author_type: str = 'consumer', space_uid=None) -> dict:
+    def create_post(self, owner_id, owner_name: str, owner_avatar: str, data: dict,
+                    owner_type: str = 'consumer', space_uid=None) -> dict:
         raw_tags = data.get('classroom_tags') or data.get('classroom_tag') or []
         if isinstance(raw_tags, str):
             raw_tags = [raw_tags]
@@ -139,17 +125,17 @@ class PostService:
         image_url_first = image_urls[0] if image_urls else ''
 
         space_uuid = None
-        if author_type == 'space' and space_uid:
+        if owner_type == 'space' and space_uid:
             try:
                 space_uuid = uuid.UUID(str(space_uid))
             except (ValueError, TypeError):
                 space_uuid = None
 
-        post = ConsumerPost.create(
-            consumer_uid=uuid.UUID(str(consumer_uid)),
-            author_name=author_name,
-            author_avatar=author_avatar,
-            author_type=author_type,
+        post = SocialPost.create(
+            owner_id=uuid.UUID(str(owner_id)),
+            owner_type=owner_type,
+            owner_name=owner_name,
+            owner_avatar=owner_avatar,
             space_uid=space_uuid,
             content=data.get('content', ''),
             emotion=data.get('emotion', ''),
@@ -160,13 +146,12 @@ class PostService:
             created_at=datetime.utcnow(),
         )
         try:
-            ProfileService().increment_posts(consumer_uid, 1)
+            ProfileService().increment_posts(owner_id, 1)
         except Exception:
             pass
         return self._serialize_post(post)
 
     def upload_post_images(self, files, owner_id: str) -> tuple[list[str], list[dict]]:
-        """Upload multiple files to R2 under posts/{owner_id}/. Returns (urls, errors)."""
         urls: list[str] = []
         errors: list[dict] = []
         for f in files:
@@ -183,8 +168,7 @@ class PostService:
         return urls, errors
 
     def get_feed(self, requester_uid, limit: int = 20, before: str | None = None) -> list[dict]:
-        """Public feed — all public posts across all users, newest first."""
-        qs = ConsumerPost.objects.filter(is_deleted=False)
+        qs = SocialPost.objects.filter(is_deleted=False)
         if before:
             try:
                 qs = qs.filter(created_at__lt=datetime.fromisoformat(before))
@@ -194,49 +178,41 @@ class PostService:
         posts = [p for p in posts if p.visibility == 'public'][:limit]
 
         liked_set = self._liked_set(requester_uid, [p.uid for p in posts])
-        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        profile_avatars = self._profile_avatar_map([p.owner_id for p in posts])
         return [self._serialize_post(p, str(p.uid) in liked_set, profile_avatars) for p in posts]
 
     def get_following_feed(self, requester_uid, limit: int = 20) -> list[dict]:
-        """Feed from people the user is following."""
         following = FollowService().get_following(requester_uid, limit=200)
-        followed_uids = [uuid.UUID(f['consumer_uid']) for f in following]
+        followed_uids = [uuid.UUID(f['owner_id']) for f in following]
 
         if not followed_uids:
             return []
 
-        # We can't easily do a multi-user 'IN' query with Cassandra effectively for a feed
-        # So we fetch a few from each or use the global partition and filter.
-        # For simplicity and performance with small following lists, we fetch from the global partition
-        # but filter for the ones we follow.
-
-        qs = ConsumerPost.objects.filter(is_deleted=False).limit(limit * 5)
+        qs = SocialPost.objects.filter(is_deleted=False).limit(limit * 5)
         posts_raw = list(qs)
 
         followed_set = {str(uid) for uid in followed_uids}
-        posts = [p for p in posts_raw if str(p.consumer_uid) in followed_set][:limit]
+        posts = [p for p in posts_raw if str(p.owner_id) in followed_set][:limit]
 
         liked_set = self._liked_set(requester_uid, [p.uid for p in posts])
-        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        profile_avatars = self._profile_avatar_map([p.owner_id for p in posts])
         return [self._serialize_post(p, str(p.uid) in liked_set, profile_avatars) for p in posts]
 
-    def get_my_posts(self, consumer_uid, limit: int = 20, before: str | None = None) -> list[dict]:
-        """All posts by a specific user (visible to themselves)."""
-        qs = ConsumerPost.objects.filter(consumer_uid=uuid.UUID(str(consumer_uid)), is_deleted=False)
+    def get_my_posts(self, owner_id, limit: int = 20, before: str | None = None) -> list[dict]:
+        qs = SocialPost.objects.filter(owner_id=uuid.UUID(str(owner_id)), is_deleted=False)
         if before:
             try:
                 qs = qs.filter(created_at__lt=datetime.fromisoformat(before))
             except Exception:
                 pass
         posts = list(qs.limit(limit))
-        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        profile_avatars = self._profile_avatar_map([p.owner_id for p in posts])
         return [self._serialize_post(p, profile_avatars=profile_avatars) for p in posts]
 
-    def get_user_posts(self, consumer_uid, requester_uid, limit: int = 20) -> list[dict]:
-        """Posts by user visible to requester (filters by visibility)."""
-        is_owner = str(consumer_uid) == str(requester_uid)
+    def get_user_posts(self, owner_id, requester_uid, limit: int = 20) -> list[dict]:
+        is_owner = str(owner_id) == str(requester_uid)
         posts_raw = list(
-            ConsumerPost.objects.filter(consumer_uid=uuid.UUID(str(consumer_uid)), is_deleted=False).limit(limit * 2)
+            SocialPost.objects.filter(owner_id=uuid.UUID(str(owner_id)), is_deleted=False).limit(limit * 2)
         )
         if is_owner:
             posts = posts_raw[:limit]
@@ -244,33 +220,31 @@ class PostService:
             posts = [p for p in posts_raw if p.visibility == 'public'][:limit]
 
         liked_set = self._liked_set(requester_uid, [p.uid for p in posts])
-        profile_avatars = self._profile_avatar_map([p.consumer_uid for p in posts])
+        profile_avatars = self._profile_avatar_map([p.owner_id for p in posts])
         return [self._serialize_post(p, str(p.uid) in liked_set, profile_avatars) for p in posts]
 
-    def get_post(self, post_uid: str) -> ConsumerPost | None:
+    def get_post(self, post_uid: str) -> SocialPost | None:
         try:
-            results = list(ConsumerPost.objects.filter(uid=uuid.UUID(post_uid)).limit(1))
+            results = list(SocialPost.objects.filter(uid=uuid.UUID(post_uid)).limit(1))
             return results[0] if results else None
         except Exception:
             return None
 
-    def delete_post(self, post_uid: str, consumer_uid) -> bool:
+    def delete_post(self, post_uid: str, owner_id) -> bool:
         post = self.get_post(post_uid)
-        if not post or str(post.consumer_uid) != str(consumer_uid):
+        if not post or str(post.owner_id) != str(owner_id):
             return False
         post.update(is_deleted=True)
         try:
-            ProfileService().increment_posts(consumer_uid, -1)
+            ProfileService().increment_posts(owner_id, -1)
         except Exception:
             pass
         return True
 
-    # ── Likes ─────────────────────────────────────────────────────────────────
-
-    def toggle_like(self, post_uid: str, consumer_uid) -> dict:
+    def toggle_like(self, post_uid: str, owner_id) -> dict:
         p_uid = uuid.UUID(post_uid)
-        c_uid = uuid.UUID(str(consumer_uid))
-        existing = list(PostLike.objects.filter(post_uid=p_uid, consumer_uid=c_uid).limit(1))
+        o_uid = uuid.UUID(str(owner_id))
+        existing = list(SocialPostLike.objects.filter(post_uid=p_uid, owner_id=o_uid).limit(1))
 
         post = self.get_post(post_uid)
         if not post:
@@ -282,56 +256,54 @@ class PostService:
             post.update(likes_count=new_count)
             return {'liked': False, 'likes_count': new_count}
         else:
-            PostLike.create(post_uid=p_uid, consumer_uid=c_uid)
+            SocialPostLike.create(post_uid=p_uid, owner_id=o_uid)
             new_count = int(post.likes_count or 0) + 1
             post.update(likes_count=new_count)
             return {'liked': True, 'likes_count': new_count}
 
-    def _liked_set(self, consumer_uid, post_uids: list) -> set:
-        if not post_uids or not consumer_uid:
+    def _liked_set(self, owner_id, post_uids: list) -> set:
+        if not post_uids or not owner_id:
             return set()
         result = set()
-        c_uid = uuid.UUID(str(consumer_uid))
+        o_uid = uuid.UUID(str(owner_id))
         for p_uid in post_uids:
-            rows = list(PostLike.objects.filter(post_uid=p_uid, consumer_uid=c_uid).limit(1))
+            rows = list(SocialPostLike.objects.filter(post_uid=p_uid, owner_id=o_uid).limit(1))
             if rows:
                 result.add(str(p_uid))
         return result
 
-    # ── Comments ──────────────────────────────────────────────────────────────
-
     def get_comments(self, post_uid: str, limit: int = 30) -> list[dict]:
         comments = list(
-            PostComment.objects.filter(post_uid=uuid.UUID(post_uid), is_deleted=False).limit(limit)
+            SocialPostComment.objects.filter(post_uid=uuid.UUID(post_uid), is_deleted=False).limit(limit)
         )
-        profile_avatars = self._profile_avatar_map([c.consumer_uid for c in comments])
+        profile_avatars = self._profile_avatar_map([c.owner_id for c in comments])
         return [self._serialize_comment(c, profile_avatars) for c in comments]
 
-    def add_comment(self, post_uid: str, consumer_uid, author_name: str, author_avatar: str, content: str) -> dict:
+    def add_comment(self, post_uid: str, owner_id, owner_name: str, owner_avatar: str, content: str) -> dict:
         p_uid = uuid.UUID(post_uid)
-        comment = PostComment.create(
+        comment = SocialPostComment.create(
             post_uid=p_uid,
-            consumer_uid=uuid.UUID(str(consumer_uid)),
-            author_name=author_name,
-            author_avatar=author_avatar,
+            owner_id=uuid.UUID(str(owner_id)),
+            owner_type='consumer',
+            owner_name=owner_name,
+            owner_avatar=owner_avatar,
             content=content,
             created_at=datetime.utcnow(),
         )
-        # Increment comments count
         post = self.get_post(post_uid)
         if post:
             post.update(comments_count=int(post.comments_count or 0) + 1)
         return self._serialize_comment(comment)
 
-    def delete_comment(self, post_uid: str, comment_uid: str, consumer_uid) -> bool:
+    def delete_comment(self, post_uid: str, comment_uid: str, owner_id) -> bool:
         try:
             rows = list(
-                PostComment.objects.filter(post_uid=uuid.UUID(post_uid), uid=uuid.UUID(comment_uid)).limit(1)
+                SocialPostComment.objects.filter(post_uid=uuid.UUID(post_uid), uid=uuid.UUID(comment_uid)).limit(1)
             )
             if not rows:
                 return False
             c = rows[0]
-            if str(c.consumer_uid) != str(consumer_uid):
+            if str(c.owner_id) != str(owner_id):
                 return False
             c.update(is_deleted=True)
             post = self.get_post(post_uid)

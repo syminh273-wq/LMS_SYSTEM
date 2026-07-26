@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from core.storages.storage_service import storage_service
 from features.account.consumer.repositories import ConsumerRepository
 from features.account.space.repositories import Repository as SpaceRepository
-from features.social.models import UserFollow
+from features.social.models import SocialFollow
 from features.social.repositories.profile_repository import ProfileRepository
 
 
@@ -40,9 +40,9 @@ class SuggestedUsersView(APIView):
 
         try:
             following_rows = list(
-                UserFollow.objects.filter(follower_uid=current_uid).limit(500)
+                SocialFollow.objects.filter(follower_id=current_uid).limit(500)
             )
-            following_uids = {str(f.followed_uid) for f in following_rows}
+            following_uids = {str(f.followed_id) for f in following_rows}
         except Exception:
             following_uids = set()
 

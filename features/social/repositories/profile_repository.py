@@ -1,26 +1,26 @@
 import uuid
-from features.social.models.user_profile import UserProfile
+from features.social.models.social_profile import SocialProfile
 
 
 class ProfileRepository:
     def get_by_owner(self, owner_id):
         if isinstance(owner_id, str):
             owner_id = uuid.UUID(owner_id)
-        rows = list(UserProfile.objects.filter(owner_id=owner_id).limit(1))
+        rows = list(SocialProfile.objects.filter(owner_id=owner_id).limit(1))
         return rows[0] if rows else None
 
-    def get_or_create(self, owner_id, owner_type: str) -> UserProfile:
+    def get_or_create(self, owner_id, owner_type: str) -> SocialProfile:
         if isinstance(owner_id, str):
             owner_id = uuid.UUID(owner_id)
         existing = self.get_by_owner(owner_id)
         if existing:
             return existing
-        return UserProfile.create(
+        return SocialProfile.create(
             owner_id=owner_id,
             owner_type=owner_type,
         )
 
-    def update(self, profile: UserProfile, data: dict) -> UserProfile:
+    def update(self, profile: SocialProfile, data: dict) -> SocialProfile:
         from datetime import datetime
         allowed = {
             'avatar_url', 'cover_url', 'bio', 'major', 'department',

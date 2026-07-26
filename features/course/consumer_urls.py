@@ -5,11 +5,9 @@ from features.course.exam.viewsets import ConsumerExamViewSet
 from features.course.exam.viewsets.consumer_exam_event_viewset import (
     ConsumerExamEventViewSet,
 )
-from features.course.viewsets import ConsumerCourseViewSet
 
 router = DefaultRouter()
 router.register(r'classrooms', ConsumerClassroomViewSet, basename='consumer-classroom')
-router.register(r'courses', ConsumerCourseViewSet, basename='consumer-course')
 
 _consumer_classroom = ConsumerClassroomViewSet
 
@@ -22,7 +20,6 @@ urlpatterns = [
     path('exam-sessions/<uuid:session_uid>/events/', ConsumerExamEventViewSet.as_view({'post': 'record_event'})),
     path('exam-sessions/<uuid:session_uid>/audit-log/me/', ConsumerExamViewSet.as_view({'get': 'my_audit_log'})),
     path('exams/<uuid:exam_uid>/sessions/me/', ConsumerExamViewSet.as_view({'get': 'my_session'})),
-    # SSE streaming AI bot (manual route — pk used as positional kwarg from router)
     path('classrooms/<str:pk>/ask-stream/',
          _consumer_classroom.as_view({'post': 'ask_stream'}),
          name='consumer-classroom-ask-stream'),

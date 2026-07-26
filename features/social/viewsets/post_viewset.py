@@ -16,9 +16,6 @@ def _resolve_avatar_url(value: str) -> str:
 
 
 def _profile_avatar(user) -> str:
-    """Best-effort avatar lookup from the social UserProfile table. Returns the
-    raw stored value (object key, /media/... or full URL); caller must run it
-    through the public URL resolver."""
     try:
         owner_type = 'space' if isinstance(user, Space) else 'consumer'
         profile = ProfileService().get_or_create_for_user(user)
@@ -28,9 +25,6 @@ def _profile_avatar(user) -> str:
 
 
 def _author_info(user):
-    """Return (display_name, avatar_url_already_resolved) for the given user.
-    Avatar is resolved through storage_service so the value can be persisted
-    directly into Post/Comment without re-conversion."""
     name = getattr(user, 'full_name', '') or getattr(user, 'username', '') or ''
     raw_avatar = getattr(user, 'avatar_url', '') or ''
     if not raw_avatar:
@@ -38,8 +32,7 @@ def _author_info(user):
     return name, _resolve_avatar_url(raw_avatar)
 
 
-def _detect_author_type(user) -> str:
-    """Detect if request.user is a Space (teacher) or Consumer (student)."""
+def _detect_owner_type(user) -> str:
     cls_name = type(user).__name__
     if cls_name == 'Space':
         return 'space'
@@ -76,18 +69,16 @@ class MyPostsView(APIView):
 
 
 class UserPostsView(APIView):
-    """GET /api/v1/consumer/social/posts/user/<consumer_uid>/"""
+    """GET /api/v1/consumer/social/posts/user/<owner_id>/"""
 
-    def get(self, request, consumer_uid=None):
+    def get(self, request, owner_id=None):
         limit = min(int(request.query_params.get('limit', 20)), 50)
-        posts = PostService().get_user_posts(consumer_uid, request.user.uid, limit=limit)
+        posts = PostService().get_user_posts(owner_id, request.user.uid, limit=limit)
         return Response(posts)
 
 
 class PostListCreateView(APIView):
-    """
-    POST /api/v1/consumer/social/posts/   — create post
-    """
+    """POST /api/v1/consumer/social/posts/   — create post"""
 
     def post(self, request):
         content   = (request.data.get('content') or '').strip()
@@ -103,12 +94,12 @@ class PostListCreateView(APIView):
             return Response({'error': 'visibility không hợp lệ'}, status=status.HTTP_400_BAD_REQUEST)
 
         name, avatar = _author_info(request.user)
-        author_type = _detect_author_type(request.user)
-        space_uid = request.user.uid if author_type == 'space' else None
+        owner_type = _detect_owner_type(request.user)
+        space_uid = request.user.uid if owner_type == 'space' else None
         post = PostService().create_post(
-            consumer_uid=request.user.uid,
-            author_name=name,
-            author_avatar=avatar,
+            owner_id=request.user.uid,
+            owner_name=name,
+            owner_avatar=avatar,
             data={
                 'content': content,
                 'emotion': emotion,
@@ -117,7 +108,7 @@ class PostListCreateView(APIView):
                 'visibility': visibility,
                 'classroom_tags': classroom_tags,
             },
-            author_type=author_type,
+            owner_type=owner_type,
             space_uid=space_uid,
         )
         return Response(post, status=status.HTTP_201_CREATED)
@@ -131,7 +122,7 @@ class PostDetailView(APIView):
         post = svc.get_post(uid)
         if not post or post.is_deleted:
             return Response({'error': 'Không tìm thấy bài đăng'}, status=status.HTTP_404_NOT_FOUND)
-        profile_avatars = svc._profile_avatar_map([post.consumer_uid])
+        profile_avatars = svc._profile_avatar_map([post.owner_id])
         return Response(svc._serialize_post(post, profile_avatars=profile_avatars))
 
     def delete(self, request, uid=None):
@@ -153,10 +144,7 @@ class PostLikeView(APIView):
 
 
 class PostCommentView(APIView):
-    """
-    GET  /api/v1/consumer/social/posts/<uid>/comments/
-    POST /api/v1/consumer/social/posts/<uid>/comments/
-    """
+    """GET/POST /api/v1/consumer/social/posts/<uid>/comments/"""
 
     def get(self, request, uid=None):
         limit    = min(int(request.query_params.get('limit', 30)), 100)

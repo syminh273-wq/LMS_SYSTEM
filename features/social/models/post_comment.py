@@ -4,9 +4,9 @@ from core.models.cassandra import BaseTimeStampModel
 from core.utils.uuid import uuid7
 
 
-class PostComment(BaseTimeStampModel):
+class SocialPostComment(BaseTimeStampModel):
     """
-    Comments on a post.
+    Comments on a social post.
     Partition by post_uid → all comments for a post in one query.
     """
 
@@ -14,12 +14,13 @@ class PostComment(BaseTimeStampModel):
     created_at    = columns.DateTime(primary_key=True, clustering_order='ASC', default=datetime.utcnow)
     uid           = columns.UUID(primary_key=True, default=uuid7, clustering_order='ASC')
 
-    consumer_uid  = columns.UUID(required=True)
-    author_name   = columns.Text(default='')
-    author_avatar = columns.Text(default='')
+    owner_id      = columns.UUID(required=True)
+    owner_type    = columns.Text(default='consumer')
+    owner_name    = columns.Text(default='')
+    owner_avatar  = columns.Text(default='')
     content       = columns.Text(default='')
 
-    __table_name__ = 'post_comments'
+    __table_name__ = 'social_post_comments'
 
     class Meta:
         get_pk_field = 'uid'

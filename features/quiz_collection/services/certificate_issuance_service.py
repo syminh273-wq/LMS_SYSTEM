@@ -7,7 +7,6 @@ from uuid import UUID
 
 from features.quiz_collection.repositories import (
     QuizCollectionRepository,
-    QuizCollectionItemRepository,
     QuizCollectionAssignmentRepository,
     CertificateRepository,
     IssuedCertificateRepository,
@@ -94,7 +93,6 @@ class CertificateIssuanceService:
 
     def __init__(self):
         self.collection_repo = QuizCollectionRepository()
-        self.item_repo = QuizCollectionItemRepository()
         self.assignment_repo = QuizCollectionAssignmentRepository()
         self.certificate_repo = CertificateRepository()
         self.issued_repo = IssuedCertificateRepository()
@@ -125,13 +123,13 @@ class CertificateIssuanceService:
         for assignment in assignments:
             collection_id = str(assignment.collection_id)
             try:
-                collection = self.collection_repo.find(collection_id)
+                collection = self.collection_repo.get(collection_id)
             except Exception as exc:
                 logger.warning(f"[Certificate] Could not load collection {collection_id}: {exc}")
                 continue
 
             if just_submitted_quiz_id is not None:
-                if str(just_submitted_quiz_id) not in self.item_repo.get_quiz_ids(collection_id):
+                if str(just_submitted_quiz_id) not in [str(q) for q in (collection.item_quiz_ids or [])]:
                     continue
 
             self._ensure_all_quiz_assignments(collection_id, classroom_id, collection)
@@ -196,7 +194,7 @@ class CertificateIssuanceService:
     def _ensure_all_quiz_assignments(self, collection_id, classroom_id, collection) -> None:
         """Make sure every quiz in the collection has a quiz_assignments row."""
         try:
-            quiz_ids = self.item_repo.get_quiz_ids(collection_id)
+            quiz_ids = list(collection.item_quiz_ids or [])
         except Exception as exc:
             logger.warning(f"[Certificate] Could not list quiz items for {collection_id}: {exc}")
             return
@@ -207,7 +205,10 @@ class CertificateIssuanceService:
         from features.quiz.repositories.quiz_log_repository import QuizLogRepository
         from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
 
-        quiz_ids = self.item_repo.get_quiz_ids(collection_id)
+        collection = self.collection_repo.get(collection_id)
+        if not collection:
+            return False
+        quiz_ids = list(collection.item_quiz_ids or [])
         if not quiz_ids:
             return False
 
@@ -235,12 +236,9 @@ class CertificateIssuanceService:
     def get_student_progress(self, collection_id, classroom_id, student_id) -> dict:
         from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
 
-        try:
-            collection = self.collection_repo.find(collection_id)
-        except Exception:
-            collection = None
+        collection = self.collection_repo.get(collection_id)
 
-        quiz_ids = self.item_repo.get_quiz_ids(collection_id)
+        quiz_ids = list(collection.item_quiz_ids or []) if collection else []
         total = len(quiz_ids)
         if total == 0:
             return {
@@ -427,7 +425,7 @@ class CertificateIssuanceService:
         try:
             for cid in coll_ids:
                 try:
-                    c = self.collection_repo.find(cid)
+                    c = self.collection_repo.get(cid)
                     out[cid] = c
                 except Exception:
                     continue

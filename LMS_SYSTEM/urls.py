@@ -5,7 +5,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from core.views.ws_test_view import test_chat_view
 from core.views.search_api import SpaceSearchAPIView, SearchHealthAPIView
-from features.course.viewsets import PublicCourseViewSet
 from features.account.space.viewsets.public_teacher_view import PublicTeacherView
 
 urlpatterns = [
@@ -16,7 +15,6 @@ urlpatterns = [
     path('api/v1/account/user-settings/', include('features.account.user_setting.urls')),
     path('api/v1/account/addresses/', include('features.account.address_urls')),
     path('api/v1/space/course/', include('features.course.urls')),
-    path('api/v1/sharing/', include('features.sharing.urls')),
     path('api/v1/resource/', include('features.resource.urls')),
     path('api/v1/chat/', include('features.chat.urls')),
     path('api/v1/space/quiz/', include('features.quiz.urls')),
@@ -39,7 +37,9 @@ urlpatterns = [
     path('api/v1/space/ranking/', include('features.ranking.space_urls')),
     path('api/v1/public/', include('core.urls')),
     # Public course preview (no auth) — must be inside /api/v1/public/
-    path('api/v1/public/course/preview/<str:code>/', PublicCourseViewSet.as_view(), name='public-course-preview'),
+    # PublicCourseViewSet removed in Phase 3 (course_courses dropped).
+    # TODO: re-implement as a no-op stub or via classroom preview.
+    # path('api/v1/public/course/preview/<str:code>/', PublicCourseViewSet.as_view(), name='public-course-preview'),
     path('api/v1/public/teachers/<uuid:uid>/', PublicTeacherView.as_view(), name='public-teacher'),
     path('api/v1/space/search/', SpaceSearchAPIView.as_view(), name='space-search'),
     path('api/v1/space/search/health/', SearchHealthAPIView.as_view(), name='search-health'),
