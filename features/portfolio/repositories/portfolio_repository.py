@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from core.repositories.base_repository import BaseRepository
+from core.utils.uuid import uuid7
 from features.portfolio.models import Portfolio
 
 
@@ -23,7 +24,7 @@ class PortfolioRepository(BaseRepository):
         instance.save()
         return instance
 
-    def upsert(self, owner_id, owner_type, key, value, is_public=True, display_order=0, uid=None):
+    def upsert(self, owner_id, owner_type, key, value, is_public=True, display_order=0, uid=None, metadata=None):
         if uid:
             try:
                 instance = self.find(uid)
@@ -33,6 +34,8 @@ class PortfolioRepository(BaseRepository):
                 instance.value = value
                 instance.is_public = is_public
                 instance.display_order = display_order
+                if metadata is not None:
+                    instance.metadata = metadata
                 instance.updated_at = datetime.utcnow()
                 instance.save()
                 return instance
@@ -40,13 +43,14 @@ class PortfolioRepository(BaseRepository):
                 pass
 
         return Portfolio.create(
-            uid=uuid.uuid4(),
+            uid=uuid7(),
             owner_id=owner_id,
             owner_type=owner_type,
             key=key,
             value=value,
             is_public=is_public,
             display_order=display_order,
+            metadata=metadata or {},
             updated_at=datetime.utcnow(),
         )
 

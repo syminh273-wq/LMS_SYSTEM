@@ -22,8 +22,6 @@ from features.course.classroom.services import Service, ClassroomAIService
 from features.course.classroom.services.classroom_doc_service import ClassroomDocService
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
-from features.sharing.serializers.link_response_serializer import LinkResponseSerializer
-from features.sharing.services import LinkService
 
 class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     serializer_class = ClassroomResponseSerializer
@@ -106,26 +104,10 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     @action(detail=True, methods=['get'])
     def sharing_link(self, request, uid=None):
         classroom = Service().find(uid)
-        link_service = LinkService()
-        
-        # Find link by resource_id
-        links = link_service.repository.get_by_resource('classroom', classroom.uid)
-        link = links.first() if links else None
-        
-        if not link:
-            # Fallback: create one if missing for some reason
-            link = link_service.create_link({
-                'code': classroom.pid,
-                'resource_type': 'classroom',
-                'resource_id': classroom.uid,
-                'action': 'join',
-                'metadata': {'name': classroom.name}
-            })
-        
-        # Lazy load QR
-        link_service.get_or_create_qr_code(link)
-
-        return Response(LinkResponseSerializer(link).data)
+        return Response({
+            'code': classroom.pid,
+            'url': f'/join/{classroom.pid}',
+        })
 
     # ── Documents (LanceDB) ───────────────────────────────────────────────────
 
@@ -327,25 +309,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
         folder = folder_service.repository.find(folder_uid)
         return Response(ResourceFolderResponseSerializer(folder).data)
-
-    # ── Teacher: view student progress + notes ────────────────────────────────
-
-    @action(detail=True, methods=['get'], url_path=r'docs/(?P<resource_uid>[^/.]+)/students-progress')
-    def doc_students_progress(self, request, uid=None, resource_uid=None):
-        """GET /api/v1/space/course/classrooms/{uid}/docs/{resource_uid}/students-progress/"""
-        if not isinstance(request.user, Space):
-            raise PermissionDenied("Only teachers can view student progress.")
-        from features.course.classroom.services.doc_progress_helpers import list_progress_for_resource_all_students
-        return Response(list_progress_for_resource_all_students(str(uid), resource_uid))
-
-    @action(detail=True, methods=['get'], url_path=r'docs/(?P<resource_uid>[^/.]+)/student-notes')
-    def doc_student_notes(self, request, uid=None, resource_uid=None):
-        """GET /api/v1/space/course/classrooms/{uid}/docs/{resource_uid}/student-notes/?student_id=..."""
-        if not isinstance(request.user, Space):
-            raise PermissionDenied("Only teachers can view student notes.")
-        student_id = request.query_params.get('student_id')
-        from features.course.classroom.services.doc_progress_helpers import list_notes_for_resource
-        return Response(list_notes_for_resource(resource_uid, student_id=student_id))
 
     def docs_delete(self, request, uid=None, resource_uid=None):
         """DELETE /classrooms/{uid}/docs/{resource_uid}/"""

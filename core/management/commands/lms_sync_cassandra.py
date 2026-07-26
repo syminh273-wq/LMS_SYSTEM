@@ -18,6 +18,49 @@ from features.social.models import (
 )
 from features.chat.models import Conversation, ConversationMember, Message
 from features.account.consumer.models.address import Address
+from features.account.consumer.models.consumer import Consumer
+from features.account.space.models.space import Space
+from features.account.otp.models.otp_record import OTPRecord
+from features.account.user_setting.models.user_setting import UserSetting
+from features.ai.models.ai_conversation_session import AIConversationSession
+from features.calendar.models.attendance import Attendance
+from features.calendar.models.calendar_event import CalendarEvent
+from features.calendar.models.leave_request import LeaveRequest
+from features.course.classroom.models.classroom import Classroom
+from features.course.classroom.models.classroom_activity_log import ClassroomActivityLog
+from features.course.classroom.models.classroom_blacklist import ClassroomBlacklist
+from features.course.classroom.models.classroom_member import ClassroomMember
+from features.course.classroom.models.teacher_contact import TeacherContact
+from features.course.classroom.models.teacher_global_blacklist import TeacherGlobalBlacklist
+from features.course.exam.models.exam import Exam
+from features.course.exam.models.exam_event_log import ExamEventLog
+from features.course.exam.models.exam_session import ExamSession
+from features.course.exam.models.exam_submission import ExamSubmission
+from features.course.meeting_room.models.meeting_room import MeetingRoom
+from features.course.meeting_room.models.meeting_room_participant import MeetingRoomParticipant
+from features.course.models.course import Course
+from features.course.models.course_enrollment_by_consumer import CourseEnrollmentByConsumer
+from features.course.models.course_enrollment_by_course import CourseEnrollmentByCourse
+from features.course.models.course_lesson import CourseLesson
+from features.face.models.face_embedding import FaceEmbedding
+from features.notification.models.notification_log import NotificationLog
+from features.payment.models.payment import Payment
+from features.portfolio.models.portfolio import Portfolio
+from features.quiz.models.quiz import Quiz
+from features.quiz.models.quiz_assignment import QuizAssignment
+from features.quiz.models.quiz_log import QuizLog
+from features.quiz.models.quiz_question import QuizQuestion
+from features.quiz_collection.models.certificate import Certificate
+from features.quiz_collection.models.issued_certificate import IssuedCertificate
+from features.quiz_collection.models.quiz_collection import QuizCollection
+from features.quiz_collection.models.quiz_collection_assignment import QuizCollectionAssignment
+from features.quiz_collection.models.quiz_collection_item import QuizCollectionItem
+from features.ranking.models.achievement import StudentAchievement
+from features.ranking.models.student_xp import StudentXP
+from features.ranking.models.xp_transaction import XPTransaction
+from features.resource.models.resource import Resource
+from features.resource.models.resource_folder import ResourceFolder
+from core.models.social_account import SocialAccount
 
 
 def _cassandra_cfg():
@@ -129,16 +172,88 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f'keyspace check: {e}'))
 
         models = [
-            ('social.UserProfile',     UserProfile),
-            ('social.ConsumerPost',    ConsumerPost),
-            ('social.PostLike',        PostLike),
-            ('social.PostComment',     PostComment),
-            ('social.UserFollow',      UserFollow),
-            ('social.ClassroomFavorite', ClassroomFavorite),
-            ('chat.Conversation',      Conversation),
-            ('chat.ConversationMember', ConversationMember),
-            ('chat.Message',           Message),
-            ('account.Address',        Address),
+            # core
+            ('core.SocialAccount',                   SocialAccount),
+
+            # account
+            ('account.Consumer',                     Consumer),
+            ('account.Space',                        Space),
+            ('account.Address',                      Address),
+            ('account.OTPRecord',                    OTPRecord),
+            ('account.UserSetting',                  UserSetting),
+
+            # ai
+            ('ai.AIConversationSession',             AIConversationSession),
+
+            # calendar
+            ('calendar.CalendarEvent',               CalendarEvent),
+            ('calendar.Attendance',                  Attendance),
+            ('calendar.LeaveRequest',                LeaveRequest),
+
+            # chat
+            ('chat.Conversation',                    Conversation),
+            ('chat.ConversationMember',              ConversationMember),
+            ('chat.Message',                         Message),
+
+            # course
+            ('course.Course',                        Course),
+            ('course.CourseLesson',                  CourseLesson),
+            ('course.CourseEnrollmentByConsumer',    CourseEnrollmentByConsumer),
+            ('course.CourseEnrollmentByCourse',      CourseEnrollmentByCourse),
+            ('course.Classroom',                     Classroom),
+            ('course.ClassroomMember',               ClassroomMember),
+            ('course.ClassroomActivityLog',          ClassroomActivityLog),
+            ('course.ClassroomBlacklist',            ClassroomBlacklist),
+            ('course.TeacherContact',                TeacherContact),
+            ('course.TeacherGlobalBlacklist',        TeacherGlobalBlacklist),
+            ('course.Exam',                          Exam),
+            ('course.ExamSession',                   ExamSession),
+            ('course.ExamSubmission',                ExamSubmission),
+            ('course.ExamEventLog',                  ExamEventLog),
+            ('course.MeetingRoom',                   MeetingRoom),
+            ('course.MeetingRoomParticipant',        MeetingRoomParticipant),
+
+            # face
+            ('face.FaceEmbedding',                   FaceEmbedding),
+
+            # notification
+            ('notification.NotificationLog',         NotificationLog),
+
+            # payment
+            ('payment.Payment',                      Payment),
+
+            # portfolio
+            ('portfolio.Portfolio',                  Portfolio),
+
+            # quiz
+            ('quiz.Quiz',                            Quiz),
+            ('quiz.QuizQuestion',                    QuizQuestion),
+            ('quiz.QuizAssignment',                  QuizAssignment),
+            ('quiz.QuizLog',                         QuizLog),
+
+            # quiz_collection
+            ('quiz_collection.QuizCollection',       QuizCollection),
+            ('quiz_collection.QuizCollectionItem',   QuizCollectionItem),
+            ('quiz_collection.QuizCollectionAssignment', QuizCollectionAssignment),
+            ('quiz_collection.Certificate',          Certificate),
+            ('quiz_collection.IssuedCertificate',    IssuedCertificate),
+
+            # ranking
+            ('ranking.StudentXP',                    StudentXP),
+            ('ranking.XPTransaction',                XPTransaction),
+            ('ranking.StudentAchievement',           StudentAchievement),
+
+            # resource
+            ('resource.Resource',                    Resource),
+            ('resource.ResourceFolder',              ResourceFolder),
+
+            # social
+            ('social.UserProfile',                   UserProfile),
+            ('social.ConsumerPost',                  ConsumerPost),
+            ('social.PostLike',                      PostLike),
+            ('social.PostComment',                   PostComment),
+            ('social.UserFollow',                    UserFollow),
+            ('social.ClassroomFavorite',             ClassroomFavorite),
         ]
 
         for label, model in models:

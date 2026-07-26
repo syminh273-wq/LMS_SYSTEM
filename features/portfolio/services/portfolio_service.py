@@ -8,7 +8,41 @@ from features.portfolio.repositories import PortfolioRepository
 
 
 class PortfolioService:
-    SINGLE_KEYS = {'intro'}
+    """
+    Polymorphic key-value profile service.
+
+    Một service duy nhất phục vụ 3 use cases:
+      1. get_mine(user) / get_public(...)  — portfolio công khai (rich entries)
+      2. get_profile_settings(user)        — thay thế StudentProfileService
+      3. get_social_profile(owner_id, ...)  — thay thế phần bio/skills/social của UserProfile
+    """
+
+    SINGLE_KEYS = Portfolio.SINGLE_KEYS
+    RICH_KEYS = Portfolio.RICH_KEYS
+    PRIVACY_KEYS = Portfolio.PRIVACY_KEYS
+    APPEARANCE_KEYS = Portfolio.APPEARANCE_KEYS
+    PROFILE_KEYS = Portfolio.PROFILE_KEYS
+
+    PROFILE_SETTINGS_DEFAULTS = {
+        'bio': '',
+        'city': '',
+        'country': 'Việt Nam',
+        'theme_color': 'indigo',
+        'cover_style': 'gradient',
+        'cover_value': '',
+        'show_stats': True,
+        'show_classrooms': True,
+        'show_grades': True,
+        'show_badges': True,
+        'show_address': True,
+        'show_links': True,
+        'show_hobbies': True,
+        'show_certificates': True,
+        'show_activity': False,
+        'show_contact': False,
+        'sections_order': ['classrooms', 'grades', 'certificates', 'about'],
+        'profile_visibility': 'class_only',
+    }
 
     def __init__(self):
         self.repository = PortfolioRepository()
@@ -53,6 +87,103 @@ class PortfolioService:
             except (ValueError, TypeError, AttributeError):
                 raise exceptions.ValidationError({'owner_id': 'Invalid owner id.'})
         return self.list_for_owner(owner_id, owner_type, include_private=False)
+
+    def get_profile_settings(self, user) -> dict:
+        owner_id, owner_type = self.resolve_owner(user)
+        return self._build_profile_settings(owner_id, owner_type, include_private=True)
+
+    def get_profile_settings_or_public(self, owner_id) -> dict:
+        try:
+            oid = uuid.UUID(str(owner_id))
+        except (ValueError, TypeError, AttributeError):
+            return dict(self.PROFILE_SETTINGS_DEFAULTS, consumer_uid=str(owner_id), address='', updated_at=None)
+        for owner_type in Portfolio.OWNER_TYPES:
+            data = self._build_profile_settings(oid, owner_type, include_private=False)
+            rows = self.repository.list_by_owner(oid, owner_type, include_private=False)
+            if rows:
+                return data
+        return dict(self.PROFILE_SETTINGS_DEFAULTS, consumer_uid=str(oid), address='', updated_at=None)
+
+    def _build_profile_settings(self, owner_id, owner_type, include_private: bool) -> dict:
+        rows = self.repository.list_by_owner(owner_id, owner_type, include_private=include_private)
+        by_key = {r.key: r for r in rows}
+
+        result = dict(self.PROFILE_SETTINGS_DEFAULTS)
+        result['consumer_uid'] = str(owner_id)
+
+        for key, default in self.PROFILE_SETTINGS_DEFAULTS.items():
+            row = by_key.get(key)
+            if row is None:
+                continue
+            try:
+                parsed = json.loads(row.value)
+            except (TypeError, json.JSONDecodeError):
+                parsed = default
+            if isinstance(default, bool):
+                result[key] = bool(parsed)
+            elif isinstance(default, list):
+                result[key] = parsed if isinstance(parsed, list) else default
+            elif isinstance(default, dict):
+                result[key] = parsed if isinstance(parsed, dict) else default
+            else:
+                result[key] = parsed
+
+        result['address'] = ''
+        latest = max(
+            (getattr(r, 'updated_at', None) for r in rows if getattr(r, 'updated_at', None)),
+            default=None,
+        )
+        result['updated_at'] = latest.isoformat() if latest else None
+
+        return result
+
+    def get_social_profile(self, owner_id, owner_type: str) -> dict:
+        if isinstance(owner_id, str):
+            try:
+                owner_id = uuid.UUID(owner_id)
+            except (ValueError, TypeError, AttributeError):
+                return {}
+        rows = self.repository.list_by_owner(owner_id, owner_type, include_private=True)
+        by_key = {r.key: r for r in rows}
+        result = {}
+        for key in self.PROFILE_KEYS:
+            row = by_key.get(key)
+            if row is None:
+                continue
+            try:
+                result[key] = json.loads(row.value)
+            except (TypeError, json.JSONDecodeError):
+                result[key] = row.value
+        return result
+
+    def update_profile_settings(self, user, data: dict) -> dict:
+        owner_id, owner_type = self.resolve_owner(user)
+        allowed = set(self.PROFILE_SETTINGS_DEFAULTS.keys()) - {'consumer_uid'}
+        clean = {}
+        for k, v in data.items():
+            if k in allowed:
+                clean[k] = v
+
+        for field in ('sections_order',):
+            if field in clean and not isinstance(clean[field], str):
+                clean[field] = json.dumps(clean[field], ensure_ascii=False)
+
+        for key, value in clean.items():
+            if isinstance(value, (dict, list)):
+                value_str = json.dumps(value, ensure_ascii=False)
+            elif isinstance(value, bool):
+                value_str = json.dumps(value)
+            else:
+                value_str = str(value)
+            self.repository.upsert(
+                owner_id=owner_id,
+                owner_type=owner_type,
+                key=key,
+                value=value_str,
+                is_public=(key not in self.PRIVACY_KEYS),
+            )
+
+        return self.get_profile_settings(user)
 
     def upsert_entry(self, user, data: dict):
         owner_id, owner_type = self.resolve_owner(user)
@@ -144,10 +275,11 @@ class PortfolioService:
         sorted_rows = sorted(rows, key=lambda r: (r.display_order, r.uid))
         for row in sorted_rows:
             item = self._serialize_row(row)
-            if row.key in self.SINGLE_KEYS:
-                grouped[row.key] = item
-            elif row.key in grouped:
-                grouped[row.key].append(item)
+            if row.key in self.RICH_KEYS:
+                if row.key == 'intro':
+                    grouped['intro'] = item
+                elif row.key in grouped:
+                    grouped[row.key].append(item)
         return grouped
 
     def _serialize_row(self, row):

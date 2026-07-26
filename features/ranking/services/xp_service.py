@@ -5,9 +5,9 @@ import logging
 from datetime import datetime, date
 from uuid import UUID
 
+from features.ranking.constants import XP_DESCRIPTIONS, get_xp_amount
 from features.ranking.repositories.student_xp_repository import StudentXPRepository
 from features.ranking.repositories.xp_transaction_repository import XPTransactionRepository
-from features.ranking.repositories.xp_rule_repository import XPRuleRepository
 from features.ranking.services.level_math import (
     required_xp_for_level,
     level_for_xp,
@@ -20,12 +20,6 @@ class XPService:
     def __init__(self):
         self.xp_repo = StudentXPRepository()
         self.tx_repo = XPTransactionRepository()
-        self.rule_repo = XPRuleRepository()
-        try:
-            from features.ranking.defaults import seed_default_rules
-            seed_default_rules(self.rule_repo)
-        except Exception:
-            pass
 
     def _safe_uuid(self, val):
         if val is None:
@@ -66,9 +60,12 @@ class XPService:
         cid = self._safe_uuid(classroom_id) if classroom_id is not None else None
 
         if delta_xp is None:
-            delta_xp = self.rule_repo.get_amount(event_type, default=0)
+            delta_xp = get_xp_amount(event_type)
         if not delta_xp:
             return None
+
+        if not description:
+            description = XP_DESCRIPTIONS.get(event_type, event_type)
 
         try:
             delta_xp = int(delta_xp)
