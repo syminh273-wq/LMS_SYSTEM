@@ -16,9 +16,9 @@ class ConsumerFaceViewSet(ViewSet):
 
     def enroll(self, request):
         """
-        POST /api/v1/consumer/face/enroll/
-        Body: { "image": "<base64 jpeg/png>" }
-        Registers (or re-registers) the student's face.
+        Register (or re-register) the student's face.
+        @param image: base64 jpeg/png
+        @return: message, enrolled_at
         """
         image = request.data.get("image")
         if not image:
@@ -39,9 +39,9 @@ class ConsumerFaceViewSet(ViewSet):
 
     def verify(self, request, exam_uid=None):
         """
-        POST /api/v1/consumer/face/exams/<exam_uid>/verify/
-        Body: { "image": "<base64>" }
-        One-shot REST verification (use WebSocket for continuous monitoring).
+        One-shot face verification for an exam session (use WebSocket for continuous monitoring).
+        @param image: base64 image
+        @return: verification result
         """
         image = request.data.get("image")
         if not image:
@@ -60,16 +60,16 @@ class ConsumerFaceViewSet(ViewSet):
 
     def enrollment_status(self, request):
         """
-        GET /api/v1/consumer/face/enroll/
-        Returns whether the student has an active enrollment.
+        Check whether the student has an active face enrollment.
+        @return: enrolled
         """
         embedding = self.service.get_active_embedding(request.user.uid)
         return Response({"enrolled": embedding is not None})
 
     def classroom_session_status(self, request, classroom_uid=None):
         """
-        GET /api/v1/consumer/face/classrooms/<classroom_uid>/verify/
-        Returns current classroom face-session status (valid for 8 h).
+        Get the current classroom face-session status (valid for 8 h).
+        @return: session status
         """
         result = self.service.get_classroom_session(
             student_id=request.user.uid,
@@ -79,9 +79,9 @@ class ConsumerFaceViewSet(ViewSet):
 
     def verify_for_classroom(self, request, classroom_uid=None):
         """
-        POST /api/v1/consumer/face/classrooms/<classroom_uid>/verify/
-        Body: { "image": "<base64>" }
-        Verifies identity for classroom entry and marks is_verified=True on success.
+        Verify identity for classroom entry; marks is_verified=True on success.
+        @param image: base64 image
+        @return: verification result
         """
         image = request.data.get("image")
         if not image:

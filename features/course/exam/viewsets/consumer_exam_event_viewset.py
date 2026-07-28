@@ -12,13 +12,10 @@ logger = logging.getLogger(__name__)
 
 class ConsumerExamEventViewSet(ViewSet):
     """
-    Endpoint used by the student exam-session page to record proctoring events:
-
-      POST /api/v1/consumer/course/exam-sessions/<session_uid>/events/
-      body: { event_type, event_data? }
-
-    Returns:
-      { logged, warning, count, max, remaining, force_submitted, submission }
+    Record a proctoring event from the student exam-session page.
+    @param event_type: type of the proctoring event
+    @param event_data: extra event payload (optional)
+    @return: logged, warning, count, max, remaining, force_submitted, submission
     """
 
     def __init__(self, **kwargs):

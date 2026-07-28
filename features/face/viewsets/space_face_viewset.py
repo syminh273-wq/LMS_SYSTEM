@@ -32,16 +32,16 @@ class SpaceFaceViewSet(ViewSet):
 
     def exam_logs(self, request, exam_uid=None):
         """
-        GET /api/v1/space/face/exams/<exam_uid>/logs/
-        Returns all verification events for an exam.
+        List all face-verification events for an exam.
+        @return: verification events
         """
         logs = self.service.get_exam_logs(exam_id=exam_uid)
         return Response([_serialize_log(log) for log in logs])
 
     def student_logs(self, request, exam_uid=None, student_uid=None):
         """
-        GET /api/v1/space/face/exams/<exam_uid>/students/<student_uid>/logs/
-        Returns verification events for a single student in an exam.
+        List face-verification events for a single student in an exam.
+        @return: verification events
         """
         logs = self.service.get_student_exam_logs(
             exam_id=exam_uid, student_id=student_uid

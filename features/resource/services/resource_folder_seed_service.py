@@ -1,5 +1,5 @@
 from features.resource.repositories.resource_folder_repository import ResourceFolderRepository
-from features.course.exam.constants import (
+from features.course.exam.enums import (
     EXAM_ROOT_FOLDER_NAME,
     EXAM_SUBFOLDER_NAMES,
     DOCS_ROOT_FOLDER_NAME,
@@ -77,7 +77,7 @@ class ResourceFolderSeedService:
     def resolve_exam_sub_folder(self, classroom_id, exam_period):
         if not exam_period:
             return None
-        from features.course.exam.constants import EXAM_PERIOD_TO_FOLDER_NAME
+        from features.course.exam.enums import EXAM_PERIOD_TO_FOLDER_NAME
         folder_name = EXAM_PERIOD_TO_FOLDER_NAME.get(exam_period)
         if not folder_name:
             return None

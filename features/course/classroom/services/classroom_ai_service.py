@@ -18,7 +18,6 @@ Mode handling
   free    — LLM thuần, không retrieval (chat tự do)
 """
 
-import base64
 import json
 from typing import Generator
 
@@ -26,10 +25,7 @@ from core.ai.langchain.agent import LMSAgent
 from core.ai.langchain.tools import build_langchain_tools
 from core.ai.llm.services.ai_client import AIClient
 from core.ai.rag.services.rag_pipeline import RAGPipeline
-from core.ai.stt import WhisperClient
 from core.ai.tools.tool_executor import LMSToolExecutor
-from core.ai.tts import TTSClient
-from features.account.user_setting.services.user_setting_service import UserSettingService
 from features.ai.services.ai_conversation_session_service import AIConversationSessionService
 
 # Module-level singleton — tránh re-instantiate RAGPipeline (giữ _store_cache)
@@ -62,20 +58,6 @@ _FREE_MODE_SYSTEM_PROMPT = (
 class ClassroomAIService:
     def __init__(self):
         self.session_service = AIConversationSessionService()
-        self.setting_service = UserSettingService()
-
-    # ── STT / TTS helpers ─────────────────────────────────────────────────────
-
-    def transcribe_audio(self, audio_file):
-        if not audio_file:
-            return None
-        return WhisperClient.transcribe_file(audio_file)
-
-    def synthesize_text(self, text, user_id=None):
-        voice = None
-        if user_id:
-            voice = self.setting_service.get_setting(user_id, "voice_name")
-        return TTSClient.synthesize(text, voice=voice)
 
     # ── Session ───────────────────────────────────────────────────────────────
 
@@ -109,12 +91,8 @@ class ClassroomAIService:
               doc    → RAGPipeline.ask_stream (retrieve + LLM stream)
               manage → LMSAgent.ask_stream (tool-calling agent)
               free   → AIClient.chat_stream (raw LLM)
-          3. Nếu user bật voice → yield 'audio' event với MP3 base64
-          4. Always yield 'data: [DONE]\\n\\n' cuối cùng
+          3. Always yield 'data: [DONE]\\n\\n' cuối cùng
         """
-        is_voice_enabled = self.setting_service.get_setting(user_id, "is_voice_enabled", "false").lower() == "true"
-        voice_name = self.setting_service.get_setting(user_id, "voice_name")
-
         yield self._sse({"type": "session_id", "session_id": session_id, "transcript": question})
 
         full_response: list = []
@@ -165,14 +143,6 @@ class ClassroomAIService:
             # Yield sources cuối cùng (doc mode)
             if sources_payload:
                 yield self._sse({"type": "sources", "data": sources_payload})
-
-            # TTS nếu user bật voice
-            if is_voice_enabled and mode != "manage":
-                full_text = "".join(full_response).strip()
-                if full_text:
-                    audio_chunk = self._generate_tts_chunk(full_text, voice=voice_name)
-                    if audio_chunk:
-                        yield audio_chunk
 
             # Lưu lịch sử hội thoại
             full_answer = "".join(full_response).strip()
@@ -229,12 +199,3 @@ class ClassroomAIService:
     @staticmethod
     def _sse(payload: dict) -> str:
         return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-
-    def _generate_tts_chunk(self, text, voice=None):
-        try:
-            audio_bytes = TTSClient.synthesize(text, voice=voice)
-            audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-            return self._sse({"type": "audio", "audio": audio_b64})
-        except Exception as exc:
-            print(f"[TTS] Error: {exc}")
-            return None

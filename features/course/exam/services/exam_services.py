@@ -70,7 +70,7 @@ class ExamService:
             data["body"] = ""
 
             try:
-                from features.course.exam.constants import FOLDER_NAME_TO_EXAM_PERIOD, EXAM_PERIODS
+                from features.course.exam.enums import FOLDER_NAME_TO_EXAM_PERIOD, EXAM_PERIODS
                 if not data.get("exam_period") or data["exam_period"] not in EXAM_PERIODS:
                     folder_id = getattr(resource, "folder_id", None)
                     if folder_id:
@@ -146,7 +146,7 @@ class ExamService:
         from uuid import UUID
         from features.resource.services.resource_service import ResourceService
         from features.resource.services.resource_folder_seed_service import ResourceFolderSeedService
-        from features.course.exam.constants import EXAM_PERIOD_TO_FOLDER_NAME, EXAM_PERIODS
+        from features.course.exam.enums import EXAM_PERIOD_TO_FOLDER_NAME, EXAM_PERIODS
 
         raw_classroom_id = data.get("classroom_id")
         if not raw_classroom_id:
@@ -193,7 +193,7 @@ class ExamService:
     def _maybe_move_resource_to_folder(self, data):
         from uuid import UUID
         from features.resource.repositories import ResourceRepository, ResourceFolderRepository
-        from features.course.exam.constants import FOLDER_NAME_TO_EXAM_PERIOD, EXAM_PERIODS
+        from features.course.exam.enums import FOLDER_NAME_TO_EXAM_PERIOD, EXAM_PERIODS
 
         ref_id = data.get("ref_id")
         if not ref_id:

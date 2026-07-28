@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, date
 from uuid import UUID
 
-from features.ranking.constants import XP_DESCRIPTIONS, get_xp_amount
+from features.ranking.enums import XP_DESCRIPTIONS, get_xp_amount
 from features.ranking.repositories.student_xp_repository import StudentXPRepository
 from features.ranking.repositories.xp_transaction_repository import XPTransactionRepository
 from features.ranking.services.level_math import (

@@ -31,7 +31,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
     pagination_class = StandardResultsSetPagination
 
     def list(self, request):
-        """GET /api/v1/consumer/course/classrooms/ — chỉ trả về lớp đã tham gia."""
+        """
+        List classrooms the current student has joined.
+        @return: joined classrooms
+        """
         uids = ClassroomMemberService().get_joined_classroom_uids(request.user.uid)
         service = Service()
         classrooms = []
@@ -51,11 +54,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=False, methods=['get'], url_path='by-teacher')
     def by_teacher(self, request):
-        """GET /api/v1/consumer/course/classrooms/by-teacher/?teacher_id=<uid>
-
-        Lightweight, public-safe listing for a teacher profile page. Returns
-        only `active` + `public` classrooms (visibility_type='public'), sorted
-        newest first. No teacher-only fields are exposed.
+        """
+        List a teacher's public, active classrooms for their public profile page.
+        @param teacher_id: teacher uid
+        @return: public-safe classroom summaries, newest first
         """
         teacher_id_raw = (request.query_params.get('teacher_id') or '').strip()
         if not teacher_id_raw:
@@ -97,13 +99,12 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=False, methods=['get'], url_path='discover')
     def discover(self, request):
-        """GET /api/v1/consumer/course/classrooms/discover/
-
-        Public classroom catalog for the consumer Discover page.
-        Query params:
-            category    (optional) — math, physics, ... see CATEGORY_CHOICES
-            pricing_type (optional) — 'free' or 'paid'
-            search      (optional) — substring match on name + description
+        """
+        List public classrooms for the consumer Discover catalog.
+        @param category: filter by category (optional)
+        @param pricing_type: 'free' or 'paid' (optional)
+        @param search: substring match on name/description (optional)
+        @return: discoverable classrooms
         """
         category = (request.query_params.get('category') or '').strip().lower() or None
         pricing_type = (request.query_params.get('pricing_type') or '').strip().lower() or None
@@ -146,13 +147,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=False, methods=['post'], url_path='quick-join')
     def quick_join(self, request):
-        """POST /api/v1/consumer/course/classrooms/quick-join/  body: {classroom_uid}
-
-        Public-classroom quick join. Returns the same shape as `join_by_code`:
-            Free  → { joined: true, classroom_uid, membership_status: 'approved' }
-            Paid  → { requires_payment: true, pay_url, order_id, amount, classroom_uid }
-            Private → 403
-            Already member → { joined: true, classroom_uid, membership_status: 'approved' }
+        """
+        Join a public classroom without an invite code.
+        @param classroom_uid: the classroom to join
+        @return: join result — joined status, or payment info if the classroom is paid
         """
         from features.course.classroom.repositories import Repository as ClassroomRepo
         from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
@@ -222,7 +220,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
         })
 
     def retrieve(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/"""
+        """
+        Get a classroom's detail, scoped to the current student's access/membership.
+        @return: classroom detail with access/membership flags
+        """
         from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
         from features.social.services.classroom_favorite_service import ClassroomFavoriteService
         import uuid as _uuid
@@ -291,7 +292,11 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=False, methods=['post'], url_path='join')
     def join_by_code(self, request):
-        """POST /api/v1/consumer/course/classrooms/join/  body: {"code": "ABCDEF"}"""
+        """
+        Join a classroom using its invite code.
+        @param code: the classroom invite code
+        @return: join result
+        """
         code = (request.data.get('code') or '').strip().upper()
         if not code:
             return Response({'error': 'Mã lớp không được để trống.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -339,11 +344,13 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['post'], url_path='checkout')
     def checkout(self, request, pk=None):
-        """POST /api/v1/consumer/course/classrooms/{uid}/checkout/ — initiate MoMo for a paid classroom.
+        """
+        Initiate MoMo payment for a paid classroom.
 
         Member + teacher notification are deferred to the MoMo IPN success path
         (`ClassroomMemberService.mark_paid_pending`). This endpoint only ensures
         a PENDING payment exists and returns the MoMo pay_url.
+        @return: classroom_uid, amount, pay_url, order_id
         """
         from features.course.classroom.repositories import Repository
         from features.payment.enums import PaymentStatus
@@ -399,16 +406,18 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='access')
     def access(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/access/ — poll endpoint for checkout flow."""
+        """
+        Poll access status for a classroom during the checkout flow.
+        @return: access status
+        """
         return Response(Service().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
 
     @action(detail=False, methods=['get'], url_path='me/history')
     def me_history(self, request):
-        """GET /api/v1/consumer/course/classrooms/me/history/?limit=50
-
-        Returns every join event the current user has with any classroom,
-        including soft-deleted and rejected ones, with classroom name + status.
-        Newest first.
+        """
+        List every join event the current student has with any classroom, newest first.
+        @param limit: max entries, default 50
+        @return: join history, including soft-deleted and rejected entries
         """
         from features.course.classroom.serializers.classroom_member_history_serializer import ClassroomMemberHistorySerializer
         try:
@@ -439,7 +448,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='preview-folder')
     def preview_folder(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/preview-folder/ — always accessible."""
+        """
+        Get the preview folder and its documents for a classroom. Always accessible.
+        @return: folder, docs
+        """
         from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
         from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
 
@@ -454,10 +466,9 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='preview')
     def preview(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/preview/
-
-        Landing page payload: classroom info, preview folder + docs, and the
-        action the consumer should take (join / checkout / none).
+        """
+        Get the classroom landing-page payload for a prospective student.
+        @return: classroom info, preview folder + docs, next action (join/checkout/none)
         """
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.course.classroom.repositories import Repository as ClassroomRepo
@@ -490,7 +501,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'])
     def conversation(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/conversation/"""
+        """
+        Get (or auto-create) the channel conversation for this classroom.
+        @return: conversation
+        """
         conv = ConversationService().get_or_create_channel(
             classroom_uid=uuid.UUID(str(pk)),
             created_by_id=request.user.uid,
@@ -523,7 +537,11 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask')
     def ask(self, request, pk=None):
-        """POST /api/v1/consumer/course/classrooms/{uid}/ask/"""
+        """
+        Ask the classroom AI a question and get a synchronous answer.
+        @param question: the question text
+        @return: answer, tool_calls, session_id
+        """
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         question = (request.data.get('question') or '').strip()
@@ -552,22 +570,17 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask-stream')
     def ask_stream(self, request, pk=None):
-        """POST /api/v1/consumer/course/classrooms/{uid}/ask-stream/ — SSE streaming RAG Q&A."""
+        """
+        Ask the classroom AI a question and stream the answer via SSE.
+        @param question: the question text
+        @return: text/event-stream response
+        """
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
-        
-        ai_service = ClassroomAIService()
-        
-        # Handle Audio STT
-        audio_file = request.FILES.get('audio')
-        if audio_file:
-            try:
-                question = ai_service.transcribe_audio(audio_file)
-            except Exception as exc:
-                return Response({'error': f'Không thể nhận dạng giọng nói: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            question = (request.data.get('question') or '').strip()
 
+        ai_service = ClassroomAIService()
+
+        question = (request.data.get('question') or '').strip()
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -599,7 +612,12 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='docs')
     def docs(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/docs/"""
+        """
+        List documents for a classroom the student is a member of.
+        @param section: filter by section (optional)
+        @param folder_id: filter by folder (optional)
+        @return: documents
+        """
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
@@ -616,11 +634,13 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='docs/tree')
     def docs_tree(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/docs/tree/ — read-only mirror.
+        """
+        List folder tree and documents, scoped to the student's paid access.
 
         Paid + non-member → only preview folder + preview docs.
         Paid + member   → full tree.
         Free            → full tree (no member check).
+        @return: folders, root docs, preview_only flag
         """
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
@@ -662,15 +682,16 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='active-session')
     def active_session(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/active-session/
-        Tự động tiếp tục session gần nhất hoặc tạo mới, trả về cả ID và lịch sử tin nhắn.
+        """
+        Continue the student's most recent AI session or create a new one.
+        @return: session_id, messages
         """
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
 
         session_id = _ai_session_service.ensure_session(None, request.user.uid, str(pk))
         messages = _ai_session_service.get_display_messages(session_id)
-        
+
         return Response({
             'session_id': session_id,
             'messages': messages
@@ -678,11 +699,10 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['post'], url_path='ai-session')
     def ai_session(self, request, pk=None):
-        """POST /api/v1/consumer/course/classrooms/{uid}/ai-session/
-
-        No body           → create new session
-        { session_id }    → clear old session + create new
-        Returns { session_id }
+        """
+        Create a new AI session, or clear and replace an existing one.
+        @param session_id: existing session to clear (optional)
+        @return: session_id
         """
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
@@ -700,8 +720,9 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='ai-sessions')
     def ai_sessions(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/ai-sessions/
-        List all sessions for this user in this classroom.
+        """
+        List all AI sessions for the current student in this classroom.
+        @return: list of sessions
         """
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
@@ -712,7 +733,11 @@ class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
 
     @action(detail=True, methods=['get'], url_path='ai-session/history')
     def ai_session_history(self, request, pk=None):
-        """GET /api/v1/consumer/course/classrooms/{uid}/ai-session/history/?session_id=xxx"""
+        """
+        Get the message history for an AI session.
+        @param session_id: the session to fetch history for
+        @return: session_id, messages
+        """
         if not self._check_member(pk, request.user.uid):
             return Response({'error': 'Bạn chưa là thành viên của lớp học này.'}, status=status.HTTP_403_FORBIDDEN)
         session_id = (request.query_params.get('session_id') or '').strip()

@@ -2,7 +2,7 @@ import base64
 import json
 import uuid
 
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -71,7 +71,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     def update(self, request, *args, **kwargs):
         service = Service()
         instance = service.find(kwargs['uid'])
-        
+
         # Ownership check
         if not isinstance(request.user, Space) or instance.teacher_id != request.user.uid:
             raise PermissionDenied("You do not have permission to update this classroom.")
@@ -84,7 +84,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     def destroy(self, request, *args, **kwargs):
         service = Service()
         instance = service.find(kwargs['uid'])
-        
+
         # Ownership check
         if not isinstance(request.user, Space) or instance.teacher_id != request.user.uid:
             raise PermissionDenied("You do not have permission to delete this classroom.")
@@ -114,17 +114,12 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     @action(detail=True, methods=['post', 'get'], url_path='docs')
     def docs(self, request, uid=None):
         """
-        POST /classrooms/{uid}/docs/  — upload a document and index it in LanceDB.
-          Form fields:
-            file       (required) — PDF, TXT, or MD
-            section    (optional) — category label, e.g. "week1", "lecture", …
-            folder_id  (optional) — UUID of the destination folder
-            order_index (optional) — int position within folder
-
-        GET  /classrooms/{uid}/docs/  — list all documents for this classroom.
-          Query params:
-            section    (optional) — filter by section label
-            folder_id  (optional) — filter by folder (omit/empty = root)
+        Upload a document (POST) or list documents (GET) for a classroom.
+        @param file: uploaded document, PDF/TXT/MD (POST, required)
+        @param section: category label (optional)
+        @param folder_id: destination/filter folder uid (optional)
+        @param order_index: position within folder (POST, optional)
+        @return: created document, or list of documents
         """
         doc_service = ClassroomDocService()
 
@@ -182,7 +177,10 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='docs/tree')
     def docs_tree(self, request, uid=None):
-        """GET /classrooms/{uid}/docs/tree/ — folders + root-level docs."""
+        """
+        List the folder tree and root-level documents for a classroom.
+        @return: folders, root-level docs, preview folder uid
+        """
         from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
         tree = ClassroomDocService().list_tree(classroom_uid=str(uid))
         return Response({
@@ -193,9 +191,10 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='docs/reorder')
     def docs_reorder(self, request, uid=None):
-        """POST /classrooms/{uid}/docs/reorder/ — bulk update folder_id + order_index.
-
-        Body: { items: [{ uid, folder_id?, order_index? }, ...] }
+        """
+        Bulk update folder_id and order_index for a set of documents.
+        @param items: list of {uid, folder_id?, order_index?}
+        @return: reorder result
         """
         items = request.data.get('items') or []
         if not isinstance(items, list):
@@ -205,8 +204,11 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['get', 'post'], url_path='folders')
     def folders(self, request, uid=None):
-        """GET  /classrooms/{uid}/folders/        — list folders (tree).
-           POST /classrooms/{uid}/folders/        — create folder.
+        """
+        List (GET) or create (POST) folders for a classroom.
+        @param name: folder name (POST, required)
+        @param parent_folder_id: parent folder uid (POST, optional)
+        @return: folder tree, or the created folder
         """
         from features.resource.serializers.resource_folder_serializer import (
             ResourceFolderCreateRequestSerializer,
@@ -252,7 +254,10 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['patch', 'delete'], url_path='folders/(?P<folder_uid>[^/.]+)')
     def folder_detail(self, request, uid=None, folder_uid=None):
-        """PATCH/DELETE /classrooms/{uid}/folders/{folder_uid}/"""
+        """
+        Update (PATCH) or delete (DELETE) a folder.
+        @return: updated folder, or no content
+        """
         from features.resource.serializers.resource_folder_serializer import (
             ResourceFolderResponseSerializer,
             ResourceFolderUpdateRequestSerializer,
@@ -311,7 +316,10 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         return Response(ResourceFolderResponseSerializer(folder).data)
 
     def docs_delete(self, request, uid=None, resource_uid=None):
-        """DELETE /classrooms/{uid}/docs/{resource_uid}/"""
+        """
+        Delete a document from a classroom.
+        @return: no content
+        """
         if not isinstance(request.user, Space):
             raise PermissionDenied("Only teachers can delete documents.")
 
@@ -337,10 +345,11 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
     @action(detail=True, methods=['get'], url_path='activity')
     def activity(self, request, uid=None):
         """
-        GET /classrooms/{uid}/activity/
-          ?level=major|detail   (default: major)
-          &limit=50
-          &before=<iso_datetime>
+        List classroom activity log entries.
+        @param level: 'major' or 'detail', default 'major'
+        @param limit: max entries, default 50
+        @param before: iso datetime cursor
+        @return: activity log entries
         """
         from datetime import datetime as dt
         log_level = request.query_params.get('level', 'major')
@@ -381,7 +390,11 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask')
     def ask(self, request, uid=None):
-        """POST /classrooms/{uid}/ask/ — synchronous RAG Q&A against classroom docs."""
+        """
+        Ask the classroom AI a question and get a synchronous answer.
+        @param question: the question text
+        @return: answer, tool_calls, session_id
+        """
         question = (request.data.get('question') or '').strip()
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
@@ -413,19 +426,14 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask-stream')
     def ask_stream(self, request, uid=None):
-        """POST /classrooms/{uid}/ask-stream/ — SSE streaming RAG Q&A."""
+        """
+        Ask the classroom AI a question and stream the answer via SSE.
+        @param question: the question text
+        @return: text/event-stream response
+        """
         ai_service = ClassroomAIService()
 
-        # Handle Audio STT
-        audio_file = request.FILES.get('audio')
-        if audio_file:
-            try:
-                question = ai_service.transcribe_audio(audio_file)
-            except Exception as exc:
-                return Response({'error': f'Không thể nhận dạng giọng nói: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            question = (request.data.get('question') or '').strip()
-
+        question = (request.data.get('question') or '').strip()
         if not question:
             return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -453,24 +461,11 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         resp['X-Accel-Buffering'] = 'no'
         return resp
 
-    @action(detail=True, methods=['post'], url_path='tts')
-    def tts(self, request, uid=None):
-        """POST /classrooms/{uid}/tts/ — convert text answer to MP3 audio."""
-        text = (request.data.get('text') or '').strip()
-        if not text:
-            return Response({'error': 'text không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            mp3_bytes = ClassroomAIService().synthesize_text(text, user_id=request.user.uid)
-        except Exception as exc:
-            return Response({'error': f'TTS thất bại: {exc}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return HttpResponse(mp3_bytes, content_type='audio/mpeg')
-
     @action(detail=True, methods=['get'], url_path='active-session')
     def active_session(self, request, uid=None):
-        """GET /classrooms/{uid}/active-session/
-        Automatically continue the most recent session or create a new one.
+        """
+        Continue the most recent AI session or create a new one.
+        @return: session_id, messages
         """
         session_id = _ai_session_service.ensure_session(None, request.user.uid, str(uid))
         messages = _ai_session_service.get_display_messages(session_id)
@@ -481,8 +476,10 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ai-session')
     def ai_session(self, request, uid=None):
-        """POST /classrooms/{uid}/ai-session/
-        Create new session or clear existing one.
+        """
+        Create a new AI session, or clear and replace an existing one.
+        @param session_id: existing session to clear (optional)
+        @return: session_id
         """
         old_sid = (request.data.get('session_id') or '').strip()
         if old_sid and _ai_session_service.session_exists(old_sid):
@@ -497,8 +494,9 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='ai-sessions')
     def ai_sessions(self, request, uid=None):
-        """GET /classrooms/{uid}/ai-sessions/
+        """
         List all AI sessions for this teacher in this classroom.
+        @return: list of sessions
         """
         sessions = _ai_session_service.list_sessions(
             user_id=request.user.uid, classroom_id=str(uid)
@@ -507,7 +505,11 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='ai-session/history')
     def ai_session_history(self, request, uid=None):
-        """GET /classrooms/{uid}/ai-session/history/?session_id=xxx"""
+        """
+        Get the message history for an AI session.
+        @param session_id: the session to fetch history for
+        @return: session_id, messages
+        """
         session_id = (request.query_params.get('session_id') or '').strip()
         if not session_id or not _ai_session_service.session_exists(session_id):
             return Response({'error': 'Session không hợp lệ.'}, status=status.HTTP_404_NOT_FOUND)

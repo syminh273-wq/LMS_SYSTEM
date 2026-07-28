@@ -1,0 +1,43 @@
+from django.urls import path
+from features.social.views.post_views import (
+    FeedView, FollowingFeedView, MyPostsView, UserPostsView,
+    PostListCreateView, PostDetailView,
+    PostLikeView, PostCommentView, PostCommentDeleteView,
+)
+from features.social.views.post_image_views import PostImageUploadView
+from features.social.views.follow_views import (
+    FollowToggleView, FollowingListView, FollowersListView, FollowStatusView,
+)
+from features.social.views.profile_views import (
+    MyProfileView, PublicProfileView,
+    ProfileAvatarUploadView, ProfileCoverUploadView,
+)
+from features.social.views.classroom_favorite_views import (
+    ClassroomFavoriteToggleView, ClassroomFavoriteStatusView, ClassroomFavoriteListView,
+)
+from features.social.views.suggestions_views import SuggestedUsersView
+
+urlpatterns = [
+    path('feed/',                                  FeedView.as_view(),              name='social-feed'),
+    path('feed/following/',                        FollowingFeedView.as_view(),      name='social-feed-following'),
+    path('posts/',                                 PostListCreateView.as_view(),     name='social-posts'),
+    path('posts/upload-images/',                   PostImageUploadView.as_view(),    name='social-post-upload-images'),
+    path('posts/mine/',                            MyPostsView.as_view(),            name='social-my-posts'),
+    path('posts/user/<str:owner_id>/',             UserPostsView.as_view(),          name='social-user-posts'),
+    path('posts/<str:uid>/',                       PostDetailView.as_view(),         name='social-post-detail'),
+    path('posts/<str:uid>/like/',                  PostLikeView.as_view(),           name='social-post-like'),
+    path('posts/<str:uid>/comments/',              PostCommentView.as_view(),        name='social-post-comments'),
+    path('posts/<str:uid>/comments/<str:cuid>/',   PostCommentDeleteView.as_view(),  name='social-comment-delete'),
+    path('follow/<str:target_uid>/',               FollowToggleView.as_view(),       name='social-follow-toggle'),
+    path('follow/status/<str:target_uid>/',        FollowStatusView.as_view(),       name='social-follow-status'),
+    path('following/',                             FollowingListView.as_view(),      name='social-following-list'),
+    path('followers/',                             FollowersListView.as_view(),      name='social-followers-list'),
+    path('profile/me/',                            MyProfileView.as_view(),                  name='social-profile-me'),
+    path('profile/me/avatar/',                     ProfileAvatarUploadView.as_view(),        name='social-profile-avatar'),
+    path('profile/me/cover/',                      ProfileCoverUploadView.as_view(),         name='social-profile-cover'),
+    path('profile/<str:owner_id>/',                PublicProfileView.as_view(),              name='social-profile-public'),
+    path('classrooms/favorites/',                  ClassroomFavoriteListView.as_view(),  name='social-classroom-favorites'),
+    path('classrooms/<str:classroom_uid>/favorite/',         ClassroomFavoriteToggleView.as_view(), name='social-classroom-favorite'),
+    path('classrooms/<str:classroom_uid>/favorite/status/',  ClassroomFavoriteStatusView.as_view(), name='social-classroom-favorite-status'),
+    path('suggestions/',                           SuggestedUsersView.as_view(),          name='social-suggestions'),
+]

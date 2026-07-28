@@ -20,8 +20,11 @@ class SpacePaymentViewSet(ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
-        """GET /api/v1/space/payment/
-        Query params: ?status=completed&limit=50
+        """
+        List payments received for classrooms this teacher owns.
+        @param status: filter by payment status (optional)
+        @param limit: max entries, default 50
+        @return: list of payments
         """
         teacher_id = request.user.uid
         status_filter = (request.query_params.get('status') or '').strip().lower() or None
@@ -39,14 +42,14 @@ class SpacePaymentViewSet(ViewSet):
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):
-        """GET /api/v1/space/payment/summary/
-
-        Query params:
-            from  (ISO date, optional)
-            to    (ISO date, optional)
-            status (completed|pending|failed|cancelled)
-            resource_id (classroom uid)
-            bucket (day|week|month) — auto when omitted
+        """
+        Get a payment analytics summary for this teacher, bucketed over time.
+        @param from: ISO date range start (optional)
+        @param to: ISO date range end (optional)
+        @param status: completed|pending|failed|cancelled (optional)
+        @param resource_id: classroom uid (optional)
+        @param bucket: day|week|month, auto when omitted
+        @return: payment analytics summary
         """
         teacher_id = request.user.uid
 

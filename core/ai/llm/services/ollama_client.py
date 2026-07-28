@@ -92,6 +92,7 @@ class OllamaClient:
         Like chat_sync but if `validator(raw_text)` returns False,
         retry with the next model in the chain. Stops as soon as one
         model returns content that passes the validator.
+        @params:messages
         """
         if models is None:
             models = cls.TEXT_MODELS
