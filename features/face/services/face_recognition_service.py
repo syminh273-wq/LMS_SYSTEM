@@ -8,7 +8,8 @@ from datetime import datetime
 import requests
 from django.conf import settings
 
-from features.face.models import FaceEmbedding, FaceVerificationLog
+from features.face.models import FaceEmbedding
+from features.course.exam.repositories.exam_event_log_repository import ExamEventLogRepository
 
 logger = logging.getLogger(__name__)
 
@@ -109,29 +110,18 @@ class FaceRecognitionService:
     # ── Logging ────────────────────────────────────────────────────────────
 
     def _log(self, student_id, exam_id, result: dict):
-        try:
-            FaceVerificationLog.create(
-                exam_id=exam_id,
-                student_id=student_id,
-                camera_open=result.get("camera_open", False),
-                recognized=result.get("recognized", False),
-                multiple_faces=result.get("multiple_faces", False),
-                face_count=result.get("face_count", 0),
-                similarity=result.get("similarity", 0.0),
-                verified_at=datetime.now(),
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save verification log: {e}")
+        ExamEventLogRepository().log_face(
+            exam_id=exam_id,
+            student_id=student_id,
+            result=result,
+            verified_at=datetime.now(),
+        )
 
     def get_exam_logs(self, exam_id) -> list:
-        logs = FaceVerificationLog.objects.filter(exam_id=exam_id)
-        return list(logs)
+        return ExamEventLogRepository().get_face_logs_for_exam(exam_id)
 
     def get_student_exam_logs(self, exam_id, student_id) -> list:
-        logs = FaceVerificationLog.objects.filter(
-            exam_id=exam_id, student_id=student_id
-        ).allow_filtering()
-        return list(logs)
+        return ExamEventLogRepository().get_face_logs_for_student(exam_id, student_id)
 
     # ── Classroom session ──────────────────────────────────────────────────
 

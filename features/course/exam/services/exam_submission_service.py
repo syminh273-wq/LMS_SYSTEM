@@ -46,15 +46,26 @@ class ExamSubmissionService:
         if not exam.camera_required:
             return
         from datetime import timedelta
-        from features.face.models import FaceVerificationLog
+        from features.course.exam.repositories.exam_event_log_repository import ExamEventLogRepository
         recent_cutoff = datetime.utcnow() - timedelta(minutes=2)
-        logs = list(FaceVerificationLog.objects.filter(exam_id=exam.uid, student_id=student_id).allow_filtering())
+        logs = ExamEventLogRepository().get_face_logs_for_student(exam.uid, student_id)
         if not logs:
             raise ValueError("Camera monitoring is required for this exam. Please enable your camera.")
-        recent_recognized = any(
-            log.recognized and log.verified_at and log.verified_at >= recent_cutoff
-            for log in logs
-        )
+        recent_recognized = False
+        for log in logs:
+            data = ExamEventLogRepository.parse_event_data(log)
+            verified_at_raw = data.get("verified_at")
+            if not data.get("recognized") or not verified_at_raw:
+                continue
+            try:
+                verified_at = datetime.fromisoformat(verified_at_raw)
+            except Exception:
+                continue
+            if verified_at.tzinfo:
+                verified_at = verified_at.replace(tzinfo=None)
+            if verified_at >= recent_cutoff:
+                recent_recognized = True
+                break
         if not recent_recognized:
             raise ValueError("Camera verification has stopped. Please ensure your face is visible before submitting.")
 
@@ -243,13 +254,13 @@ class ExamSubmissionService:
 
         # Audit log
         try:
-            from features.course.exam.repositories.exam_audit_log_repository import ExamAuditLogRepository
+            from features.course.exam.repositories.exam_event_log_repository import ExamEventLogRepository
             now_ts = datetime.utcnow()
             is_timeout = bool(
                 session_for_audit and session_for_audit.ends_at and
                 now_ts > session_for_audit.ends_at
             )
-            ExamAuditLogRepository().log(
+            ExamEventLogRepository().log_audit(
                 exam_id=exam.uid,
                 student_id=student_id,
                 event_type='timeout_submit' if is_timeout else 'submitted',

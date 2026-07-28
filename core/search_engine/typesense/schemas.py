@@ -134,19 +134,3 @@ TypesenseSchema.register('lms_resource', {
     ],
     'default_sorting_field': 'created_at',
 })
-
-TypesenseSchema.register('lms_teacher_contact', {
-    'name': 'lms_teacher_contact',
-    'fields': [
-        {'name': 'id',             'type': 'string'},
-        {'name': 'teacher_id',     'type': 'string', 'facet': True},
-        {'name': 'consumer_uid',   'type': 'string'},
-        {'name': 'consumer_name',  'type': 'string', 'locale': 'vi', 'infix': True},
-        {'name': 'first_name',     'type': 'string', 'locale': 'vi', 'infix': True, 'optional': True},
-        {'name': 'last_name',      'type': 'string', 'locale': 'vi', 'infix': True, 'optional': True},
-        {'name': 'consumer_email', 'type': 'string', 'infix': True},
-        {'name': 'consumer_avatar','type': 'string', 'index': False, 'optional': True},
-        {'name': 'first_joined_at','type': 'int64'},
-    ],
-    'default_sorting_field': 'first_joined_at',
-})

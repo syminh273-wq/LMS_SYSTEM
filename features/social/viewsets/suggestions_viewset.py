@@ -40,7 +40,7 @@ class SuggestedUsersView(APIView):
 
         try:
             following_rows = list(
-                SocialFollow.objects.filter(follower_id=current_uid).limit(500)
+                SocialFollow.objects.filter(uid=current_uid).limit(500)
             )
             following_uids = {str(f.followed_id) for f in following_rows}
         except Exception:

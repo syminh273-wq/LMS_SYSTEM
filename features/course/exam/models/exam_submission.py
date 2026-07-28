@@ -15,8 +15,8 @@ class ExamSubmission(BaseTimeStampModel):
     student_id   = columns.UUID(index=True, required=True)
 
     # ── Submission type ────────────────────────────────────────────────────────
-    # "multiple_choice" → ref_id = quiz_plays.uid  (auto-graded MC exam)
-    # "online_quiz"     → ref_id = quiz_plays.uid  (online session MC exam)
+    # "multiple_choice" → ref_id = quiz_logs.uid   (auto-graded MC exam)
+    # "online_quiz"     → ref_id = quiz_logs.uid   (online session MC exam)
     # "file"            → ref_id = resource.uid    (file/pdf/image upload)
     # "essay"           → ref_id = null            (text answer)
     submission_type = columns.Text(default="file")

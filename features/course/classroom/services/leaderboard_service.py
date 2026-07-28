@@ -91,17 +91,6 @@ class LeaderboardService:
         """Return {student_id: (avg_best_score_pct, distinct_quiz_count)}."""
         best_per_quiz = defaultdict(lambda: defaultdict(int))
         try:
-            attempts = self.repo.iter_quiz_attempts(classroom_id)
-        except Exception:
-            attempts = []
-        for a in attempts:
-            sid = str(a.student_id)
-            qid = str(a.quiz_id)
-            score = int(getattr(a, 'score_pct', 0) or 0)
-            if score > best_per_quiz[sid][qid]:
-                best_per_quiz[sid][qid] = score
-
-        try:
             logs = self.repo.iter_quiz_logs(classroom_id)
         except Exception:
             logs = []

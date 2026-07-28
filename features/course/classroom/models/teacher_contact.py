@@ -14,15 +14,13 @@ class TeacherContact(DjangoCassandraModel):
     Query: "all students who ever studied with teacher X" — full partition
     scan is acceptable because partition size is bounded by the teacher's
     historical student count.
+
+    Identity fields (name/email/avatar) are NOT stored here — lookup from
+    Consumer via consumer_uid at render time.
     """
     teacher_id    = columns.UUID(partition_key=True)
     consumer_uid  = columns.UUID(primary_key=True, clustering_order="ASC")
 
-    consumer_name   = columns.Text(default='')
-    first_name      = columns.Text(default='')
-    last_name       = columns.Text(default='')
-    consumer_email  = columns.Text(default='')
-    consumer_avatar = columns.Text(default='')
     first_joined_at = columns.DateTime(default=datetime.utcnow)
 
     last_contact_at  = columns.DateTime(default=datetime.utcnow)

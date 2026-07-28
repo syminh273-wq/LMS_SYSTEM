@@ -1,0 +1,1066 @@
+// LMS Backend — Cassandra Schema (DBML)
+// Source of truth: features/*/models/*.py
+// 47 tables vật lý (Cassandra không có FK, các Ref chỉ là LOGICAL relationship)
+//
+// Quy ước:
+//   PK  = partition_key, CK = clustering_key
+//   owner_id + owner_type pattern → trỏ về Space.uid (type='space') hoặc Consumer.uid (type='consumer')
+//   >  = Ref đi từ FK column trỏ về PK column
+//   -  = dotted line (logical ref, không enforce)
+// = Cassandra không cascade, application tự xử lý
+
+Project lms_backend {
+  database_type: 'Cassandra'
+}
+
+// =============================================================================
+// CORE (1) — SocialAccount
+// =============================================================================
+
+Table core_social_accounts {
+  // Link OAuth provider (Google/Facebook/...) với user nội bộ
+
+  provider Text [pk, note: 'partition_key, required']
+  provider_id Text [pk, note: 'clustering_key, required']
+  user_uid UUID [note: 'indexed — Space.uid hoặc Consumer.uid']
+  user_type Text [note: 'indexed — "space" hoặc "consumer"']
+  email Text [note: 'indexed']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// ACCOUNT (6)
+// =============================================================================
+
+Table account_consumers {
+  // Tài khoản học sinh
+
+  uid UUID [pk]
+  pid Text [note: 'indexed, default generate_pid']
+  username Text [note: 'indexed, default ""']
+  email Text [note: 'indexed, default ""']
+  first_name Text [default: '']
+  last_name Text [default: '']
+  full_name Text [default: '']
+  phone Text [default: '']
+  avatar_url Text [default: '']
+  role Text [note: 'indexed, default "student"']
+  password Text [default: '']
+  is_verified Boolean [default: false]
+  is_active Boolean [default: true]
+  last_login DateTime [note: 'optional']
+  verified_at DateTime [note: 'optional']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table account_spaces {
+  // Tài khoản giáo viên / brand
+
+  uid UUID [pk]
+  pid Text [note: 'indexed']
+  email Text [note: 'indexed']
+  full_name Text [default: '']
+  name Text [default: '']
+  slug Text [note: 'indexed, default ""']
+  description Text [default: '']
+  logo_url Text [default: '']
+  cover_url Text [default: '']
+  hometown Text [default: '']
+  date_of_birth Date [note: 'optional']
+  avatar_url Text [default: '']
+  learning_certificates Text[] [default: `[]`]
+  contact_information Json [note: 'Map<Text,Text>, default {}']
+  password Text [default: '']
+  is_verified Boolean [default: false]
+  is_active Boolean [default: true]
+  last_login DateTime [note: 'optional']
+  verified_at DateTime [note: 'optional']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table account_addresses {
+  // Sổ địa chỉ — 1 user : 1 address
+
+  uid UUID [pk]
+  owner_id UUID [note: 'indexed, required — Space.uid hoặc Consumer.uid']
+  owner_type Text [note: 'indexed, required — "space" hoặc "consumer"']
+  type Text [note: 'required: home/work/billing/other']
+  label Text [default: '']
+  line1 Text [default: '']
+  line2 Text [default: '']
+  province_code Integer [note: 'required']
+  province_name Text [note: 'required']
+  ward_code Integer [note: 'required']
+  ward_name Text [note: 'required']
+  country Text [default: 'Việt Nam']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table account_otp_records {
+  // OTP state per (user, user_type)
+
+  user_uid UUID [pk, note: 'partition_key, required']
+  user_type Text [pk, note: 'clustering_key, required']
+  otp_code Text [default: '']
+  email Text [note: 'indexed, default ""']
+  expires_at DateTime [note: 'optional']
+  reset_token UUID [note: 'indexed, optional']
+  reset_expires_at DateTime [note: 'optional']
+  is_otp_verified Boolean [default: false]
+  is_reset_used Boolean [default: false]
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table user_settings {
+  // Per-user key-value settings (notification, theme, ...)
+
+  user_id UUID [pk, note: 'partition_key, required']
+  key Text [pk, note: 'clustering_key, required']
+  user_type Text [note: 'indexed, required']
+  value Text [note: 'nullable']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table portfolios {
+  // Polymorphic key-value profile (bio, social links, privacy, layout)
+
+  uid UUID [pk]
+  owner_id UUID [pk, note: 'partition_key, required — Space.uid hoặc Consumer.uid']
+  owner_type Text [pk, note: 'partition_key, required — "space" hoặc "consumer"']
+  key Text [pk, note: 'clustering_key, required']
+  value Text [default: '{}', note: 'JSON']
+  is_public Boolean [default: true]
+  display_order Integer [default: 0]
+  metadata Json [note: 'Map<Text,Text>, default {}']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// USER PROFILE (1) — Social identity + counters
+// =============================================================================
+
+Table user_profiles {
+  // Avatar/cover + counters (posts/followers/following) — lookup từ Space/Consumer
+
+  owner_id UUID [pk, note: 'required — Space.uid hoặc Consumer.uid']
+  owner_type Text [note: 'required — "space" hoặc "consumer"']
+  avatar_url Text [default: '']
+  cover_url Text [default: '']
+  posts_count Integer [default: 0]
+  followers_count Integer [default: 0]
+  following_count Integer [default: 0]
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// CHAT (3)
+// =============================================================================
+
+Table chat_conversations {
+  // Phòng chat channel/direct
+
+  uid UUID [pk]
+  type Text [default: 'channel', note: '"channel" hoặc "direct"']
+  classroom_uid UUID [note: 'indexed, optional — Classroom.uid']
+  name Text [default: '']
+  description Text [default: '']
+  direct_a_id UUID [note: 'indexed, optional — smaller UUID']
+  direct_b_id UUID [note: 'indexed, optional — larger UUID']
+  pair_key Text [note: 'indexed, default ""']
+  member_count Integer [default: 0]
+  last_msg_at DateTime [note: 'optional']
+  last_msg_text Text [default: '']
+  last_msg_sender Text [default: '']
+  created_by_id UUID [note: 'optional — Space.uid hoặc Consumer.uid']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table chat_conversation_members {
+  // Thành viên phòng chat
+
+  conversation_uid UUID [pk, note: 'partition_key — Conversation.uid']
+  member_id UUID [pk, note: 'clustering_key — Space.uid hoặc Consumer.uid']
+  member_type Text [default: 'consumer', note: '"space" hoặc "consumer"']
+  member_name Text [default: '']
+  member_avatar Text [default: '']
+  joined_at DateTime [default: `now()`]
+  last_seen_at DateTime [note: 'optional']
+  last_read_msg_uid UUID [note: 'optional — Message.uid']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table chat_messages {
+  // Tin nhắn
+
+  conversation_uid UUID [pk, note: 'partition_key — Conversation.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  msg_type Text [default: 'text', note: 'text/image/video/audio/pdf/file']
+  content Text [default: '']
+  sender_id UUID [note: 'optional — Space.uid hoặc Consumer.uid']
+  sender_type Text [default: '']
+  sender_name Text [default: '']
+  resource_uid UUID [note: 'optional — Resource.uid']
+  resource_url Text [default: '']
+  resource_name Text [default: '']
+  resource_size BigInt [default: 0]
+  reply_to_uid UUID [note: 'optional — Message.uid']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// CALENDAR (3)
+// =============================================================================
+
+Table calendar_events {
+  // Sự kiện lịch (class/exam/deadline/study_session)
+
+  uid UUID [pk, note: 'default uuid7']
+  type Text [note: 'indexed, required — class/exam/deadline/study_session']
+  title Text [note: 'required']
+  description Text [default: '']
+  start_time DateTime [note: 'required']
+  end_time DateTime [note: 'required']
+  classroom_id UUID [note: 'indexed, optional — Classroom.uid']
+  space_id UUID [note: 'indexed, required — Space.uid']
+  owner_id UUID [note: 'indexed, required — teacher (Space.uid) who created']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table calendar_attendances {
+  // Điểm danh per (event, user)
+
+  event_id UUID [pk, note: 'partition_key, required — CalendarEvent.uid']
+  user_id UUID [pk, note: 'clustering_key, required — Space.uid hoặc Consumer.uid']
+  status Text [note: 'indexed, default "absent"']
+  joined_at DateTime [note: 'optional']
+  left_at DateTime [note: 'optional']
+  date Date [note: 'indexed']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table calendar_leave_requests {
+  // Đơn xin nghỉ
+
+  uid UUID [pk, note: 'default uuid7']
+  student_id UUID [note: 'indexed, required — Consumer.uid']
+  space_id UUID [note: 'indexed, required — Space.uid']
+  classroom_id UUID [note: 'indexed, optional — Classroom.uid']
+  event_id UUID [note: 'indexed, optional — CalendarEvent.uid']
+  start_date DateTime [note: 'optional']
+  end_date DateTime [note: 'optional']
+  reason Text [note: 'required']
+  evidence_url Text [note: 'optional — R2 URL']
+  status Text [note: 'indexed, default "pending" — pending/approved/rejected']
+  processed_by UUID [note: 'optional — Space.uid']
+  processed_at DateTime [note: 'optional']
+  rejection_reason Text [note: 'optional']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// CLASSROOM (5)
+// =============================================================================
+
+Table account_classrooms {
+  // Lớp học
+
+  uid UUID [pk, note: 'default uuid7']
+  pid Text [note: 'indexed']
+  name Text [note: 'required']
+  description Text [default: '']
+  teacher_id UUID [note: 'indexed, required — Space.uid']
+  max_students Integer [default: 0]
+  status Text [default: 'active']
+  pricing_type Text [note: 'indexed, default "free"']
+  price_vnd BigInt [default: 0]
+  category Text [note: 'indexed, default "other"']
+  visibility_type Text [note: 'indexed, default "public"']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table course_classroom_members {
+  // Thành viên lớp (student/teacher, pending/approved, paid status)
+
+  member_id UUID [pk, note: 'partition_key — Space.uid hoặc Consumer.uid']
+  classroom_uid UUID [pk, note: 'clustering_key DESC, indexed — Classroom.uid']
+  member_type Text [default: 'consumer', note: '"space" hoặc "consumer"']
+  member_name Text [default: '']
+  member_avatar Text [default: '']
+  role Text [default: 'student', note: 'teacher/student']
+  joined_at DateTime [default: `now()`]
+  status Text [default: 'approved', note: 'pending/approved']
+  is_deleted Boolean [default: false]
+  is_verified Boolean [default: false]
+  verified_at DateTime [note: 'optional']
+  has_paid Boolean [note: 'indexed, default false']
+  paid_at DateTime [note: 'optional']
+  created_at DateTime
+  updated_at DateTime
+  deleted_at DateTime [note: 'optional']
+}
+
+Table classroom_activity_logs {
+  // Audit trail cho mọi sự kiện trong lớp (major/detail, actor/target/metadata)
+
+  classroom_uid UUID [pk, note: 'partition_key, required — Classroom.uid']
+  created_at DateTime [pk, note: 'clustering_key DESC, default now']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  log_level Text [note: 'required — major/detail']
+  event_type Text [note: 'required']
+  actor_id UUID [note: 'required — Space.uid hoặc Consumer.uid']
+  actor_name Text [default: '']
+  actor_role Text [default: '', note: 'teacher/student/system']
+  target_id UUID [note: 'optional — uid của entity liên quan']
+  target_name Text [default: '', note: 'snapshot']
+  metadata Text [default: '{}', note: 'JSON']
+}
+
+Table course_teacher_contacts {
+  // Lightweight contact history — 1 row per (teacher, student). Identity lookup qua consumer_uid → Consumer
+
+  teacher_id UUID [pk, note: 'partition_key — Space.uid']
+  consumer_uid UUID [pk, note: 'clustering_key ASC — Consumer.uid']
+  first_joined_at DateTime [default: `now()`]
+  last_contact_at DateTime [default: `now()`]
+  last_contact_type Text [default: 'joined']
+  last_contact_ref_id UUID [note: 'optional — Exam.uid']
+  contact_count Integer [default: 1]
+}
+
+Table course_blacklists {
+  // Unified blacklist — classroom_uid=GLOBAL_SENTINEL → teacher-wide, ngược lại per-classroom
+
+  teacher_id UUID [pk, note: 'partition_key, required — Space.uid']
+  classroom_uid UUID [pk, note: 'clustering_key, default GLOBAL_SENTINEL']
+  consumer_uid UUID [pk, note: 'clustering_key DESC, default uuid7 — Consumer.uid']
+  reason Text [default: '']
+  added_by UUID [note: 'optional — Space.uid']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// EXAM (4)
+// =============================================================================
+
+Table course_exams {
+  // Bài kiểm tra (assignment/quiz, online/offline, anti-cheat config)
+
+  uid UUID [pk, note: 'default uuid7']
+  classroom_id UUID [note: 'indexed, required — Classroom.uid']
+  teacher_id UUID [note: 'indexed, required — Space.uid']
+  title Text [note: 'required']
+  description Text [default: '']
+  content_type Text [note: 'required — markdown/quiz/file/pdf/image']
+  body Text [default: '', note: 'inline content (markdown)']
+  ref_id UUID [note: 'optional — polymorphic FK: Quiz.uid hoặc Resource.uid']
+  meta Text [default: '{}', note: 'JSON']
+  status Text [default: 'draft']
+  is_deleted Boolean [default: false]
+  due_date DateTime [note: 'optional']
+  exam_type Text [default: 'assignment', note: 'assignment/quiz']
+  exam_period Text [note: 'indexed, default "regular" — regular/midterm/final']
+  max_grade Float [default: 10.0]
+  camera_required Boolean [default: false]
+  exam_mode Text [default: 'offline']
+  duration_seconds Integer [default: 0]
+  is_online_active Boolean [default: false]
+  opened_at DateTime [note: 'optional']
+  late_threshold_seconds Integer [default: 0]
+  max_visibility_breaks Integer [default: 3]
+  max_face_warnings Integer [default: 0]
+  deleted_at DateTime [note: 'optional']
+  created_at DateTime
+  updated_at DateTime
+}
+
+Table course_exam_submissions {
+  // Bài nộp (MC/online_quiz/file/essay, manual/AI grading, anti-cheat flags)
+
+  uid UUID [pk, note: 'default uuid7']
+  exam_id UUID [note: 'indexed, required — Exam.uid']
+  classroom_id UUID [note: 'indexed, required — Classroom.uid']
+  student_id UUID [note: 'indexed, required — Consumer.uid']
+  submission_type Text [default: 'file', note: 'multiple_choice/online_quiz/file/essay']
+  ref_id UUID [note: 'optional — polymorphic FK']
+  content Text [default: '']
+  meta Text [default: '{}', note: 'JSON']
+  status Text [default: 'submitted']
+  submitted_at DateTime [note: 'required']
+  grade Float [note: 'optional']
+  max_grade Float [note: 'optional']
+  passed Boolean [note: 'optional']
+  feedback Text [default: '']
+  graded_by UUID [note: 'optional — Space.uid']
+  graded_at DateTime [note: 'optional']
+  grading_method Text [default: 'manual']
+  returned_at DateTime [note: 'optional']
+  ai_model Text [default: '']
+  ai_rubric Text [default: '']
+  ai_reason Text [default: '']
+  ai_breakdown Text [default: '']
+  ai_sources Text [default: '']
+  ai_confidence Float [note: 'optional']
+  is_effective Boolean [default: false]
+  force_submitted Boolean [default: false]
+  force_submit_reason Text [default: '']
+  force_submitted_at DateTime [note: 'optional']
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+  created_at DateTime
+  updated_at DateTime
+}
+
+Table course_exam_sessions {
+  // Phiên thi (token, TTL, anti-cheat counters)
+
+  uid UUID [pk, note: 'default uuid7']
+  exam_id UUID [note: 'indexed, required — Exam.uid']
+  student_id UUID [note: 'indexed, required — Consumer.uid']
+  token Text [note: 'indexed, optional']
+  token_status Text [default: 'pending', note: 'pending/active/expired/completed']
+  token_expires_at DateTime [note: 'optional']
+  started_at DateTime [note: 'optional']
+  ends_at DateTime [note: 'optional']
+  visibility_breaks_count Integer [default: 0]
+  face_warnings_count Integer [default: 0]
+  last_event_at DateTime [note: 'optional']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table exam_event_logs {
+  // Unified event log per exam (audit + face telemetry)
+
+  exam_id UUID [pk, note: 'partition_key, required — Exam.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  student_id UUID [note: 'indexed, required — Consumer.uid']
+  event_kind Text [note: 'required — audit/face']
+  event_type Text [note: 'required']
+  event_data Text [default: '{}', note: 'JSON']
+  created_at DateTime [default: `now()`]
+}
+
+// =============================================================================
+// MEETING ROOM (2)
+// =============================================================================
+
+Table course_meeting_rooms {
+  // Phòng họp online (waiting/active/ended)
+
+  uid UUID [pk, note: 'default uuid7']
+  classroom_uid UUID [note: 'indexed, optional — Classroom.uid']
+  title Text [note: 'required']
+  description Text [default: '']
+  host_id UUID [note: 'indexed, required — Space.uid hoặc Consumer.uid']
+  host_type Text [default: 'space', note: 'space/consumer']
+  host_name Text [default: '']
+  status Text [default: 'waiting', note: 'waiting/active/ended']
+  max_participants Integer [default: 0, note: '0=unlimited']
+  participant_count Integer [default: 0]
+  started_at DateTime [note: 'optional']
+  ended_at DateTime [note: 'optional']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table course_meeting_room_participants {
+  // Người tham gia phòng họp
+
+  room_uid UUID [pk, note: 'partition_key — MeetingRoom.uid']
+  participant_id UUID [pk, note: 'clustering_key DESC — Space.uid hoặc Consumer.uid']
+  participant_type Text [default: 'consumer', note: 'space/consumer']
+  participant_name Text [default: '']
+  participant_avatar Text [default: '']
+  role Text [default: 'participant', note: 'host/participant']
+  joined_at DateTime [default: `now()`]
+  left_at DateTime [note: 'optional']
+  is_deleted Boolean [default: false]
+  created_at DateTime
+  updated_at DateTime
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// QUIZ (4)
+// =============================================================================
+
+Table quiz_quizzes {
+  // Đề quiz master (teacher-owned, không thuộc classroom nào)
+
+  uid UUID [pk, note: 'default uuid7']
+  created_by UUID [note: 'indexed, required — Space.uid']
+  resource_id UUID [note: 'indexed, optional — Resource.uid']
+  title Text [note: 'required']
+  description Text [default: '']
+  questions_count Integer [default: 0]
+  status Text [default: 'draft', note: 'draft/published/archived']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table quiz_questions {
+  // Câu hỏi MCQ thuộc Quiz
+
+  quiz_id UUID [pk, note: 'partition_key, required — Quiz.uid']
+  uid UUID [pk, note: 'clustering_key ASC, default uuid7']
+  question_text Text [note: 'required']
+  option_a Text [note: 'required']
+  option_b Text [note: 'required']
+  option_c Text [note: 'required']
+  option_d Text [note: 'required']
+  correct_answer Text [note: 'required — a/b/c/d']
+  explanation Text [default: '']
+  order Integer [default: 0]
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table quiz_assignments {
+  // Gán Quiz vào Classroom (time_limit, attempts, shuffle, close window)
+
+  quiz_id UUID [pk, note: 'partition_key, required — Quiz.uid']
+  classroom_id UUID [pk, note: 'clustering_key ASC, required — Classroom.uid']
+  assigned_by UUID [note: 'required — Space.uid']
+  time_limit_seconds Integer [default: 0]
+  max_attempts Integer [default: 0]
+  shuffle_questions Boolean [default: false]
+  shuffle_options Boolean [default: false]
+  show_explanation Boolean [default: true]
+  passing_score_pct Integer [default: 50]
+  is_closed Boolean [default: false]
+  opens_at DateTime [note: 'optional']
+  closes_at DateTime [note: 'optional']
+  closed_at DateTime [note: 'optional']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table quiz_logs {
+  // Lượt làm quiz của student (game/exam source)
+
+  quiz_id UUID [pk, note: 'partition_key, required — Quiz.uid']
+  classroom_id UUID [pk, note: 'partition_key, required — Classroom.uid']
+  student_id UUID [pk, note: 'clustering_key ASC, required — Consumer.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  source Text [default: 'game', note: 'game/exam']
+  exam_id UUID [note: 'optional — Exam.uid']
+  answers Json [note: 'Map<Text,Text>, default {}']
+  time_taken_seconds Integer [default: 0]
+  submitted_at DateTime [default: `now()`]
+  attempt_number Integer [default: 1]
+  score Integer [default: 0, note: 'correct_count']
+  total_questions Integer [default: 0]
+  score_pct Integer [default: 0]
+  graded_at DateTime [note: 'optional']
+  created_at DateTime
+  updated_at DateTime
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// QUIZ COLLECTION (4)
+// =============================================================================
+
+Table quiz_collections {
+  // Bộ sưu tập quiz (teacher-owned, embedded item_quiz_ids)
+
+  uid UUID [pk, note: 'default uuid7']
+  created_by UUID [note: 'indexed, required — Space.uid']
+  title Text [note: 'required']
+  description Text [default: '']
+  quiz_count Integer [default: 0]
+  certificate_id UUID [note: 'indexed, optional — Certificate.uid']
+  status Text [default: 'draft']
+  item_quiz_ids UUID[] [default: `[]`, note: 'embedded list of Quiz.uid']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table quiz_collection_assignments {
+  // Gán QuizCollection vào Classroom
+
+  collection_id UUID [pk, note: 'partition_key, required — QuizCollection.uid']
+  classroom_id UUID [pk, note: 'clustering_key ASC, required — Classroom.uid']
+  assigned_by UUID [note: 'required — Space.uid']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table certificates {
+  // Template chứng chỉ (reusable across many collections)
+
+  uid UUID [pk, note: 'default uuid7']
+  created_by UUID [note: 'indexed, required — Space.uid']
+  name Text [note: 'required']
+  description Text [default: '']
+  template_url Text [note: 'optional']
+  is_active Boolean [default: true]
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table issued_certificates {
+  // Chứng chỉ đã phát cho student (1 row per collection×classroom×student)
+
+  student_id UUID [pk, note: 'partition_key, required — Consumer.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  certificate_id UUID [note: 'indexed, required — Certificate.uid']
+  collection_id UUID [note: 'indexed, required — QuizCollection.uid']
+  classroom_id UUID [note: 'indexed, required — Classroom.uid']
+  issued_by UUID [note: 'required — Space.uid']
+  issued_at DateTime [default: `now()`]
+  pdf_url Text [note: 'optional']
+  verification_code Text [note: 'indexed, required']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// RESOURCE (2)
+// =============================================================================
+
+Table resource_resources {
+  // File metadata (R2 storage URL)
+
+  uid UUID [pk, note: 'default uuid7']
+  name Text [note: 'required']
+  file_type Text [note: 'indexed, required']
+  url Text [note: 'required']
+  size BigInt [note: 'nullable']
+  owner_id UUID [note: 'indexed — Space.uid hoặc Consumer.uid']
+  owner_type Text [note: 'indexed — "space" hoặc "consumer"']
+  folder_id UUID [note: 'optional — ResourceFolder.uid']
+  order_index Integer [default: 0]
+  metadata Json [note: 'Map<Text,Text>, nullable']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table resource_folders {
+  // Thư mục chứa file (per classroom)
+
+  classroom_id UUID [pk, note: 'partition_key — Classroom.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  name Text [note: 'required']
+  parent_folder_id UUID [note: 'optional — ResourceFolder.uid (self-ref)']
+  owner_id UUID [note: 'indexed — Space.uid']
+  order_index Integer [default: 0]
+  color Text [note: 'optional']
+  is_preview_only Boolean [note: 'indexed, default false']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// NOTIFICATION (1)
+// =============================================================================
+
+Table notification_logs {
+  // Lịch sử thông báo (push + in-app bell)
+
+  target_uid UUID [pk, note: 'partition_key — Space.uid hoặc Consumer.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  notify_type Text [note: 'indexed, required']
+  title Text [note: 'required']
+  content Text [note: 'required']
+  metadata Text [note: 'optional (JSON)']
+  is_read Boolean [note: 'indexed, default false']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// PAYMENT (1)
+// =============================================================================
+
+Table payments {
+  // Giao dịch MoMo (order_id unique, status pending/completed/failed)
+
+  uid UUID [pk, note: 'default uuid7']
+  consumer_id UUID [note: 'indexed, required — Consumer.uid']
+  teacher_id UUID [note: 'indexed, optional — Space.uid (cho revenue query)']
+  order_id Text [note: 'indexed, required']
+  request_id Text [default: '']
+  amount BigInt [note: 'required (VND)']
+  order_info Text [default: '']
+  extra_data Text [default: '', note: 'base64 JSON']
+  status Text [note: 'indexed, default "pending"']
+  pay_url Text [default: '']
+  result_code Integer [default: -1]
+  trans_id BigInt [default: 0]
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// RANKING (3)
+// =============================================================================
+
+Table ranking_student_xps {
+  // Denormalized XP counter per student (level, streak, counters)
+
+  student_id UUID [pk, note: 'required — Consumer.uid']
+  total_xp BigInt [default: 0]
+  level Integer [default: 1]
+  current_level_xp BigInt [default: 0]
+  next_level_xp BigInt [default: 100]
+  streak_days Integer [default: 0]
+  last_active_date Date [note: 'optional']
+  last_active_at DateTime [note: 'optional']
+  classrooms_joined_count Integer [default: 0]
+  quizzes_passed_count Integer [default: 0]
+  exams_passed_count Integer [default: 0]
+  perfect_scores_count Integer [default: 0]
+  certificates_count Integer [default: 0]
+  attendance_count Integer [default: 0]
+  updated_at DateTime [note: 'optional']
+}
+
+Table ranking_xp_transactions {
+  // Append-only XP ledger (idempotency check qua event_type+ref_type+ref_id)
+
+  student_id UUID [pk, note: 'partition_key, required — Consumer.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  created_at DateTime [default: `now()`]
+  event_type Text [note: 'indexed, required']
+  delta_xp Integer [note: 'required']
+  ref_type Text [note: 'optional']
+  ref_id UUID [note: 'optional — uid liên quan (Exam/Quiz/Classroom)']
+  classroom_id UUID [note: 'indexed, optional — Classroom.uid']
+  description Text [default: '']
+  metadata Text [default: '{}']
+}
+
+Table ranking_achievements {
+  // Per-student achievement unlock state
+
+  student_id UUID [pk, note: 'partition_key, required — Consumer.uid']
+  achievement_code Text [pk, note: 'clustering_key, required']
+  title Text [default: '']
+  description Text [default: '']
+  icon Text [default: 'trophy']
+  is_unlocked Boolean [default: false]
+  unlocked_at DateTime [note: 'optional']
+  target_value Integer [default: 0]
+  current_value Integer [default: 0]
+  progress_pct Integer [default: 0]
+  updated_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// SOCIAL (6)
+// =============================================================================
+
+Table social_posts {
+  // Bài viết social (owner = Space hoặc Consumer)
+
+  owner_id UUID [pk, note: 'partition_key, required — Space.uid hoặc Consumer.uid']
+  owner_type Text [pk, note: 'partition_key, required, default "consumer"']
+  created_at DateTime [pk, note: 'clustering_key DESC, default now']
+  uid UUID [pk, note: 'clustering_key, default uuid7']
+  owner_name Text [default: '']
+  owner_avatar Text [default: '']
+  space_uid UUID [note: 'indexed, optional — Space.uid (nếu post trong space)']
+  content Text [default: '']
+  emotion Text [default: '']
+  image_url Text [default: '']
+  image_urls Text[] [default: `[]`]
+  visibility Text [default: 'public']
+  classroom_tags UUID[] [note: 'optional — Classroom.uid']
+  likes_count Integer [default: 0]
+  comments_count Integer [default: 0]
+  created_at_dup DateTime [note: 'explicit duplicate? dùng created_at ở trên']
+}
+
+Table social_post_likes {
+  // Like bài viết (1 row per post×owner)
+
+  post_uid UUID [pk, note: 'partition_key, required — SocialPost.uid']
+  owner_id UUID [pk, note: 'clustering_key ASC, required — Space.uid hoặc Consumer.uid']
+  owner_type Text [default: 'consumer', note: '"space" hoặc "consumer"']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table social_post_comments {
+  // Comment bài viết
+
+  post_uid UUID [pk, note: 'partition_key, required — SocialPost.uid']
+  created_at DateTime [pk, note: 'clustering_key ASC, default now']
+  uid UUID [pk, note: 'clustering_key ASC, default uuid7']
+  owner_id UUID [note: 'required — Space.uid hoặc Consumer.uid']
+  owner_type Text [default: 'consumer', note: '"space" hoặc "consumer"']
+  owner_name Text [default: '']
+  owner_avatar Text [default: '']
+  content Text [default: '']
+  created_at_dup DateTime
+}
+
+Table social_follows {
+  // Follow relationship (1 row per follower→followed). Identity lookup qua Consumer/Space
+
+  uid UUID [pk, note: 'partition_key, required — follower: Space.uid hoặc Consumer.uid']
+  followed_id UUID [pk, note: 'clustering_key ASC, required — followed: Space.uid hoặc Consumer.uid']
+  follower_type Text [default: 'consumer', note: '"space" hoặc "consumer"']
+  followed_type Text [default: 'consumer', note: '"space" hoặc "consumer"']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+Table classroom_favorites {
+  // HS favorite 1 lớp (1 row per consumer×classroom)
+
+  consumer_uid UUID [pk, note: 'partition_key, required — Consumer.uid']
+  classroom_uid UUID [pk, note: 'clustering_key DESC, required — Classroom.uid']
+  created_at DateTime
+  updated_at DateTime
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// AI (1)
+// =============================================================================
+
+Table ai_conversation_sessions {
+  // AI chat session metadata (messages lưu ở chat_messages với sender_type="ai"/"user")
+
+  session_id UUID [pk, note: 'default uuid7']
+  user_id UUID [note: 'indexed — Space.uid hoặc Consumer.uid']
+  classroom_id UUID [note: 'indexed, optional — Classroom.uid']
+  title Text [default: '']
+  created_at DateTime [default: `now()`]
+  updated_at DateTime [default: `now()`]
+  is_deleted Boolean [default: false]
+  deleted_at DateTime [note: 'optional']
+}
+
+// =============================================================================
+// FACE (1)
+// =============================================================================
+
+Table face_embeddings {
+  // Face embedding vector per student (512-float stored as JSON)
+
+  student_id UUID [pk, note: 'required — Consumer.uid']
+  uid UUID [pk, note: 'clustering_key DESC, default uuid7']
+  embedding_json Text [note: 'required — 512-float vector JSON']
+  enrolled_at DateTime [note: 'optional']
+  is_active Boolean [default: true]
+}
+
+// =============================================================================
+// RELATIONSHIPS (LOGICAL — Cassandra không enforce FK)
+// =============================================================================
+//
+// Quy ước đọc: Ref A > B nghĩa là A.column FK trỏ về B.column
+// = Cassandra không cascade, application tự xử lý
+
+// --- ACCOUNT (Consumer + Space là 2 root entity, mọi thứ khác trỏ về chúng) ---
+
+Ref: core_social_accounts.user_uid > account_consumers.uid
+Ref: core_social_accounts.user_uid > account_spaces.uid
+
+// --- CLASSROOM ---
+
+Ref: account_classrooms.teacher_id > account_spaces.uid
+Ref: course_classroom_members.member_id > account_consumers.uid
+Ref: course_classroom_members.member_id > account_spaces.uid
+Ref: classroom_activity_logs.actor_id > account_spaces.uid
+Ref: classroom_activity_logs.actor_id > account_consumers.uid
+Ref: course_teacher_contacts.teacher_id > account_spaces.uid
+Ref: course_teacher_contacts.consumer_uid > account_consumers.uid
+Ref: course_blacklists.teacher_id > account_spaces.uid
+Ref: course_blacklists.consumer_uid > account_consumers.uid
+Ref: course_blacklists.added_by > account_spaces.uid
+Ref: resource_folders.owner_id > account_spaces.uid
+
+// --- EXAM ---
+
+Ref: course_exams.classroom_id > account_classrooms.uid
+Ref: course_exams.teacher_id > account_spaces.uid
+Ref: course_exams.ref_id > quiz_quizzes.uid
+Ref: course_exams.ref_id > resource_resources.uid
+Ref: course_exam_submissions.classroom_id > account_classrooms.uid
+Ref: course_exam_submissions.student_id > account_consumers.uid
+Ref: course_exam_submissions.graded_by > account_spaces.uid
+Ref: course_exam_sessions.student_id > account_consumers.uid
+Ref: exam_event_logs.student_id > account_consumers.uid
+
+// --- MEETING ROOM ---
+
+Ref: course_meeting_rooms.classroom_uid > account_classrooms.uid
+Ref: course_meeting_rooms.host_id > account_spaces.uid
+Ref: course_meeting_rooms.host_id > account_consumers.uid
+Ref: course_meeting_room_participants.participant_id > account_spaces.uid
+Ref: course_meeting_room_participants.participant_id > account_consumers.uid
+
+// --- QUIZ ---
+
+Ref: quiz_quizzes.created_by > account_spaces.uid
+Ref: quiz_quizzes.resource_id > resource_resources.uid
+Ref: quiz_assignments.quiz_id > quiz_quizzes.uid
+Ref: quiz_assignments.classroom_id > account_classrooms.uid
+Ref: quiz_assignments.assigned_by > account_spaces.uid
+Ref: quiz_logs.student_id > account_consumers.uid
+Ref: quiz_logs.exam_id > course_exams.uid
+
+// --- QUIZ COLLECTION + CERTIFICATE ---
+
+Ref: quiz_collections.created_by > account_spaces.uid
+Ref: quiz_collections.certificate_id > certificates.uid
+Ref: quiz_collections.item_quiz_ids > quiz_quizzes.uid
+Ref: quiz_collection_assignments.collection_id > quiz_collections.uid
+Ref: quiz_collection_assignments.classroom_id > account_classrooms.uid
+Ref: quiz_collection_assignments.assigned_by > account_spaces.uid
+Ref: certificates.created_by > account_spaces.uid
+Ref: issued_certificates.certificate_id > certificates.uid
+Ref: issued_certificates.collection_id > quiz_collections.uid
+Ref: issued_certificates.classroom_id > account_classrooms.uid
+Ref: issued_certificates.issued_by > account_spaces.uid
+
+// --- RESOURCE ---
+
+Ref: resource_resources.folder_id > resource_folders.uid
+Ref: resource_resources.owner_id > account_spaces.uid
+Ref: resource_resources.owner_id > account_consumers.uid
+
+// --- CHAT ---
+
+Ref: chat_conversations.classroom_uid > account_classrooms.uid
+Ref: chat_conversations.created_by_id > account_spaces.uid
+Ref: chat_conversations.created_by_id > account_consumers.uid
+Ref: chat_conversation_members.member_id > account_spaces.uid
+Ref: chat_conversation_members.member_id > account_consumers.uid
+Ref: chat_messages.sender_id > account_spaces.uid
+Ref: chat_messages.sender_id > account_consumers.uid
+Ref: chat_messages.resource_uid > resource_resources.uid
+
+// --- CALENDAR ---
+
+Ref: calendar_events.classroom_id > account_classrooms.uid
+Ref: calendar_events.space_id > account_spaces.uid
+Ref: calendar_events.owner_id > account_spaces.uid
+Ref: calendar_attendances.user_id > account_spaces.uid
+Ref: calendar_attendances.user_id > account_consumers.uid
+Ref: calendar_leave_requests.student_id > account_consumers.uid
+Ref: calendar_leave_requests.space_id > account_spaces.uid
+Ref: calendar_leave_requests.classroom_id > account_classrooms.uid
+Ref: calendar_leave_requests.event_id > calendar_events.uid
+Ref: calendar_leave_requests.processed_by > account_spaces.uid
+
+// --- NOTIFICATION ---
+
+Ref: notification_logs.target_uid > account_spaces.uid
+Ref: notification_logs.target_uid > account_consumers.uid
+
+// --- PAYMENT ---
+
+Ref: payments.consumer_id > account_consumers.uid
+Ref: payments.teacher_id > account_spaces.uid
+
+// --- RANKING ---
+
+Ref: ranking_student_xps.student_id > account_consumers.uid
+Ref: ranking_xp_transactions.student_id > account_consumers.uid
+Ref: ranking_xp_transactions.classroom_id > account_classrooms.uid
+Ref: ranking_achievements.student_id > account_consumers.uid
+
+// --- SOCIAL ---
+
+Ref: social_posts.owner_id > account_spaces.uid
+Ref: social_posts.owner_id > account_consumers.uid
+Ref: social_posts.space_uid > account_spaces.uid
+Ref: social_post_likes.owner_id > account_spaces.uid
+Ref: social_post_likes.owner_id > account_consumers.uid
+Ref: social_post_comments.owner_id > account_spaces.uid
+Ref: social_post_comments.owner_id > account_consumers.uid
+Ref: social_follows.uid > account_spaces.uid
+Ref: social_follows.uid > account_consumers.uid
+Ref: social_follows.followed_id > account_spaces.uid
+Ref: social_follows.followed_id > account_consumers.uid
+
+// --- AI + FACE ---
+
+Ref: ai_conversation_sessions.user_id > account_spaces.uid
+Ref: ai_conversation_sessions.user_id > account_consumers.uid
+Ref: ai_conversation_sessions.classroom_id > account_classrooms.uid
+Ref: face_embeddings.student_id > account_consumers.uid

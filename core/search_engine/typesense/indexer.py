@@ -86,20 +86,6 @@ def _consumer_doc(c) -> dict:
     }
 
 
-def _teacher_contact_doc(tc) -> dict:
-    return {
-        'id':             f"{tc.teacher_id}_{tc.consumer_uid}",
-        'teacher_id':     str(tc.teacher_id),
-        'consumer_uid':   str(tc.consumer_uid),
-        'consumer_name':  tc.consumer_name or '',
-        'first_name':     getattr(tc, 'first_name', '') or '',
-        'last_name':      getattr(tc, 'last_name', '') or '',
-        'consumer_email': tc.consumer_email or '',
-        'consumer_avatar': tc.consumer_avatar or '',
-        'first_joined_at': _ts(getattr(tc, 'first_joined_at', None)),
-    }
-
-
 def _space_doc(s) -> dict:
     return {
         'id':          str(s.uid),
@@ -171,7 +157,6 @@ _COLLECTION_MAP: dict[str, tuple[str, Any]] = {
     'Space':          ('lms_space',           _space_doc),
     'Quiz':           ('lms_quiz',            _quiz_doc),
     'Resource':       ('lms_resource',        _resource_doc),
-    'TeacherContact': ('lms_teacher_contact', _teacher_contact_doc),
     'Course':         ('lms_course',          _course_doc),
 }
 
@@ -262,14 +247,6 @@ class LMSIndexer:
         cls._service().remove('lms_resource', str(uid))
 
     @classmethod
-    def index_teacher_contact(cls, tc) -> None:
-        cls._service().upsert('lms_teacher_contact', _teacher_contact_doc(tc))
-
-    @classmethod
-    def remove_teacher_contact(cls, teacher_id: str, consumer_uid: str) -> None:
-        cls._service().remove('lms_teacher_contact', f"{teacher_id}_{consumer_uid}")
-
-    @classmethod
     def index_course(cls, c) -> None:
         cls._service().upsert('lms_course', _course_doc(c))
 
@@ -286,5 +263,4 @@ class LMSIndexer:
         'lms_space':           ('features.account.space.models',            'Space',         _space_doc),
         'lms_quiz':            ('features.quiz.models',                     'Quiz',          _quiz_doc),
         'lms_resource':        ('features.resource.models',                 'Resource',      _resource_doc),
-        'lms_teacher_contact': ('features.course.classroom.models.teacher_contact', 'TeacherContact', _teacher_contact_doc),
     }

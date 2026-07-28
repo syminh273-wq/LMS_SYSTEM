@@ -130,17 +130,5 @@ class PaymentService:
             if resource_type == 'classroom':
                 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
                 ClassroomMemberService().approve_paid_member(resource_id, consumer_id)
-            elif resource_type == 'course':
-                from features.course.services import (
-                    CourseService,
-                    CourseEnrollmentService,
-                )
-                from features.account.consumer.repositories import ConsumerRepository
-
-                course = CourseService().find(resource_id)
-                consumer = ConsumerRepository().find(consumer_id)
-                CourseEnrollmentService().enroll_paid(
-                    consumer, course, payment_order_id=payment.order_id
-                )
         except Exception as e:
             logger.error(f'[Payment] Post-payment action failed for order {payment.order_id}: {e}')

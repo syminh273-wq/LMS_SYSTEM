@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from features.course.exam.repositories import ExamRepository, ExamSessionRepository
+from features.course.exam.repositories import ExamRepository, ExamSessionRepository, ExamEventLogRepository
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
-from features.course.exam.repositories.exam_audit_log_repository import ExamAuditLogRepository
 from core.utils.datetime import now_vn
 
 
@@ -14,7 +13,7 @@ class ExamSessionService:
         self.session_repo = ExamSessionRepository()
         self.exam_repo = ExamRepository()
         self.member_repo = ClassroomMemberRepository()
-        self.audit_repo = ExamAuditLogRepository()
+        self.audit_repo = ExamEventLogRepository()
 
     def open_online(self, exam_uid, teacher_id, late_threshold_seconds=0, duration_seconds=None, camera_required=None, max_face_warnings=None):
         exam = self.exam_repo.get_by_uid(exam_uid)

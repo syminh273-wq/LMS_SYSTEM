@@ -15,7 +15,6 @@ from datetime import datetime
 from uuid import UUID
 
 from features.quiz.repositories.quiz_log_repository import QuizLogRepository
-from features.quiz.repositories.quiz_attempt_repository import QuizAttemptRepository
 
 
 def _safe_uuid(val):
@@ -43,7 +42,7 @@ def _hydrate_consumer(consumers, sid):
 
 
 def _best_per_student(rows):
-    """Group log/attempt rows by student, keep the best attempt per the ranking rule."""
+    """Group log rows by student, keep the best attempt per the ranking rule."""
     by_student = defaultdict(list)
     for r in rows:
         by_student[str(r.student_id)].append(r)
@@ -64,19 +63,9 @@ def _best_per_student(rows):
 class QuizLeaderboardService:
     def __init__(self):
         self.log_repo = QuizLogRepository()
-        self.attempt_repo = QuizAttemptRepository()
 
     def _all_rows(self, quiz_id, classroom_id):
-        rows = []
-        try:
-            rows.extend(list(self.log_repo.get_by_classroom(quiz_id, classroom_id)))
-        except Exception:
-            pass
-        try:
-            rows.extend(list(self.attempt_repo.get_by_classroom(quiz_id, classroom_id)))
-        except Exception:
-            pass
-        return rows
+        return list(self.log_repo.get_by_classroom(quiz_id, classroom_id))
 
     def build(self, quiz_id, classroom_id, current_user_id=None, limit=20):
         from features.account.consumer.repositories import ConsumerRepository

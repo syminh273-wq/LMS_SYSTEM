@@ -89,16 +89,16 @@ try:
 except Exception as e:
     print(f"    ERROR: {e}")
 
-# 5. StudentProfileSettings
-print("\n[5] student_profile_settings for consumer_uid=uid:")
+# 5. Portfolio (replaces old StudentProfileSettings)
+print("\n[5] portfolio profile_settings for consumer_uid=uid:")
 try:
-    from features.account.consumer.models.student_profile_settings import StudentProfileSettings
-    try:
-        s = StudentProfileSettings.objects.get(consumer_uid=target_uuid)
-        print(f"    FOUND: bio={s.bio!r}, address={s.address!r}, city={s.city!r}")
-        print(f"    show_address={s.show_address}, profile_visibility={s.profile_visibility!r}")
-    except StudentProfileSettings.DoesNotExist:
-        print("    (no settings row)")
+    from features.portfolio.models import Portfolio
+    rows = list(Portfolio.objects.filter(owner_id=target_uuid, owner_type='consumer'))
+    if not rows:
+        print("    (no portfolio rows)")
+    for r in rows:
+        if r.key in ('bio', 'city', 'profile_visibility', 'show_address'):
+            print(f"    uid={r.uid}, key={r.key!r}, value={r.value!r}")
 except Exception as e:
     print(f"    ERROR: {e}")
 

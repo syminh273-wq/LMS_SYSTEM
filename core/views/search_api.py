@@ -41,11 +41,10 @@ class SpaceSearchAPIView(UserScopeMixin, APIView):
             'collection':  'lms_quiz',
             'query_by':    ['title', 'description'],
         },
-        # Use lms_teacher_contact so we can filter by teacher_id.
-        # lms_consumer has no teacher_id field — the relationship lives here.
+        # Use lms_consumer for full-text search; filter by uid IN (...) from TeacherContact.
         'consumer': {
-            'collection':  'lms_teacher_contact',
-            'query_by':    ['consumer_name', 'first_name', 'last_name', 'consumer_email'],
+            'collection':  'lms_consumer',
+            'query_by':    ['full_name', 'first_name', 'last_name', 'email', 'username'],
         },
         'resource': {
             'collection':  'lms_resource',
@@ -74,7 +73,7 @@ class SpaceSearchAPIView(UserScopeMixin, APIView):
             filter_parts = ['is_deleted:false']
 
             # Teacher sees only their own data
-            if type_key in ('classroom', 'exam', 'consumer') and hasattr(request.user, 'uid'):
+            if type_key in ('classroom', 'exam') and hasattr(request.user, 'uid'):
                 filter_parts.append(f'teacher_id:{request.user.uid}')
             if type_key == 'quiz' and hasattr(request.user, 'uid'):
                 filter_parts.append(f'created_by:{request.user.uid}')
@@ -82,9 +81,15 @@ class SpaceSearchAPIView(UserScopeMixin, APIView):
                 filter_parts.append(f'classroom_id:{classroom_id}')
             if type_key == 'resource' and hasattr(request.user, 'uid'):
                 filter_parts.append(f'owner_id:{request.user.uid}')
-            # lms_teacher_contact has no is_deleted — remove it for that collection
-            if type_key == 'consumer':
-                filter_parts = [f for f in filter_parts if f != 'is_deleted:false']
+            # Consumer search: scope to students who have ever studied with this teacher.
+            if type_key == 'consumer' and hasattr(request.user, 'uid'):
+                from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
+                contacts = TeacherContactRepository().get_by_teacher(request.user.uid)
+                uids = [str(c.consumer_uid) for c in contacts]
+                if not uids:
+                    output[type_key] = {'total_hits': 0, 'results': []}
+                    continue
+                filter_parts = [f'uid:{"[" + ",".join(uids) + "]"}']
 
             try:
                 resp = svc.search(

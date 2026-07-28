@@ -1,12 +1,10 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from features.account.consumer.services.student_profile_service import StudentProfileService
+from features.portfolio.services.portfolio_service import PortfolioService
 
 
 def _build_space_profile_dict(space) -> dict:
-    """Build a Consumer-shaped profile dict from a Space instance so the
-    frontend (which expects a Consumer) can render name/avatar without changes."""
     from core.storages.storage_service import storage_service
     avatar_raw = space.avatar_url or space.logo_url or ''
     avatar = storage_service.get_public_url(avatar_raw) if avatar_raw else ''
@@ -28,11 +26,6 @@ def _build_space_profile_dict(space) -> dict:
 
 
 def _format_address_public(addr_dict: dict) -> str:
-    """Format an address dict into a single human-readable string for public display.
-
-    Order: line1, ward_name, province_name. line2 is omitted to keep the header compact
-    (matches the frontend ProfileHeaderInfo.formatAddress contract).
-    """
     if not addr_dict:
         return ''
     parts = []
@@ -50,24 +43,17 @@ class StudentProfileSettingsView(APIView):
     """
 
     def get(self, request):
-        svc = StudentProfileService()
-        settings = svc.get_or_create(request.user.uid)
-        return Response(svc.serialize(settings))
+        svc = PortfolioService()
+        return Response(svc.get_profile_settings(request.user))
 
     def patch(self, request):
-        svc = StudentProfileService()
-        settings = svc.update(request.user.uid, request.data)
-        return Response(svc.serialize(settings))
+        svc = PortfolioService()
+        return Response(svc.update_profile_settings(request.user, request.data))
 
 
 class PublicStudentProfileView(APIView):
     """
     GET /api/v1/consumer/account/profile/<consumer_uid>/public/
-
-    Returns the StudentProfileSettings for the given uid, plus a `consumer`
-    field with basic info. The target may be either a Consumer (student) or
-    a Space (teacher); for Space we synthesize a Consumer-shaped dict so
-    the frontend profile page can render name/avatar uniformly.
     """
 
     def get(self, request, consumer_uid=None):
@@ -75,11 +61,11 @@ class PublicStudentProfileView(APIView):
         from features.account.consumer.serializers import ConsumerAccountSerializer
         from features.account.consumer.services.address_service import AddressService
         from features.account.space.models.space import Space
+        from features.portfolio.services.portfolio_service import PortfolioService
         import uuid as _uuid
 
-        svc = StudentProfileService()
-        settings = svc.get_or_create(consumer_uid)
-        data = svc.serialize(settings)
+        svc = PortfolioService()
+        data = svc.get_profile_settings_or_public(consumer_uid)
 
         visibility = data.get('profile_visibility', 'public')
         is_owner   = str(getattr(request.user, 'uid', '')) == str(consumer_uid)
@@ -88,7 +74,6 @@ class PublicStudentProfileView(APIView):
         if not is_owner and visibility == 'private':
             return Response({'error': 'Profile này ở chế độ riêng tư.'}, status=403)
 
-        # Determine owner_type by probing Consumer first, then Space.
         owner_type = None
         consumer_dict = None
         try:
@@ -98,7 +83,6 @@ class PublicStudentProfileView(APIView):
         except Exception:
             consumer_dict = None
 
-        # Fallback: try to find as Space (teacher) and build a compatible dict
         space_instance = None
         if not consumer_dict:
             try:
@@ -110,13 +94,6 @@ class PublicStudentProfileView(APIView):
             except Exception:
                 consumer_dict = None
 
-        # If the owner allows showing address, synthesize a formatted string
-        # from the live Address row so non-owners see the same value the owner
-        # sees in their AddressSection. The settings.address column is not
-        # maintained on write (the Address table is the source of truth), so
-        # we must join here rather than reading it from the settings row.
-        # owner_type must be probed first because the address row's owner_type
-        # is 'space' for teachers and 'consumer' for students.
         if data.get('show_address') and owner_type:
             try:
                 addr_dict = AddressService().get_for_owner(consumer_uid, owner_type)

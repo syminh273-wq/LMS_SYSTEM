@@ -38,7 +38,6 @@ class GoogleSpaceOAuthCallbackView(APIView):
         error_param = request.GET.get('error')
 
         if error_param:
-            # 'interaction_required' / 'login_required' thường đến từ prompt=none khi session Google đã hết
             safe_error = 'google_auth_failed' if error_param in ('access_denied', 'interaction_required') else 'google_auth_failed'
             return redirect(f'{frontend_url}/space/login?error={safe_error}')
 

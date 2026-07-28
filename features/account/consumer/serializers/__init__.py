@@ -5,7 +5,6 @@ from .consumer_serializer import (
     ConsumerAccountLoginSerializer,
     ConsumerChangePasswordSerializer,
 )
-from .teacher_settings_serializer import TeacherSettingSerializer
 from .address_serializer import (
     AddressReadSerializer,
     AddressUpsertSerializer,
@@ -17,7 +16,6 @@ __all__ = [
     'ConsumerAccountUpdateSerializer',
     'ConsumerAccountLoginSerializer',
     'ConsumerChangePasswordSerializer',
-    'TeacherSettingSerializer',
     'AddressReadSerializer',
     'AddressUpsertSerializer',
 ]

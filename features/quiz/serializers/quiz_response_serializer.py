@@ -93,6 +93,3 @@ class QuizLogResponseSerializer(serializers.Serializer):
     score_pct          = serializers.IntegerField()
     time_taken_seconds = serializers.IntegerField()
     submitted_at       = serializers.DateTimeField(read_only=True)
-
-
-QuizAttemptResponseSerializer = QuizLogResponseSerializer  # backward compat

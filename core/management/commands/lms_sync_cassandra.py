@@ -37,8 +37,6 @@ from features.course.exam.models.exam_session import ExamSession
 from features.course.exam.models.exam_submission import ExamSubmission
 from features.course.meeting_room.models.meeting_room import MeetingRoom
 from features.course.meeting_room.models.meeting_room_participant import MeetingRoomParticipant
-from features.course.models.course_enrollment_by_consumer import CourseEnrollmentByConsumer
-from features.course.models.course_enrollment_by_course import CourseEnrollmentByCourse
 from features.face.models.face_embedding import FaceEmbedding
 from features.notification.models.notification_log import NotificationLog
 from features.payment.models.payment import Payment
@@ -147,6 +145,45 @@ def _add_missing_columns(model, keyspace, hosts, cfg, stdout):
             stdout.write(f'  ! failed to add {name} to {model.__table_name__}: {e}')
 
 
+def _drop_extra_columns(model, keyspace, hosts, cfg, stdout):
+    """ALTER TABLE DROP columns that exist in DB but not on the model.
+    Cassandra supports DROP COLUMN since 2.2 — non-PK columns only."""
+    try:
+        cluster = _make_cluster(hosts, cfg)
+        session = cluster.connect(keyspace)
+        rows = session.execute(
+            "SELECT column_name FROM system_schema.columns "
+            "WHERE keyspace_name=%s AND table_name=%s",
+            (keyspace, model.__table_name__)
+        )
+        existing = {r.column_name for r in rows}
+        cluster.shutdown()
+    except Exception as e:
+        if _is_auth_error(e):
+            stdout.write(f'  AUTH FAIL: cannot connect to Cassandra — {e}')
+            return
+        stdout.write(f'  could not read schema for {model.__table_name__}: {e}')
+        return
+
+    model_columns = set()
+    for col in model._columns.values():
+        model_columns.add(col.column_name)
+
+    for col_name in existing - model_columns:
+        if col_name in ('created_at', 'updated_at', 'is_deleted', 'deleted_at'):
+            continue
+        try:
+            cluster = _make_cluster(hosts, cfg)
+            session = cluster.connect(keyspace)
+            session.execute(
+                f'ALTER TABLE {model.__table_name__} DROP {col_name}'
+            )
+            cluster.shutdown()
+            stdout.write(f'  - dropped column {col_name} from {model.__table_name__}')
+        except Exception as e:
+            stdout.write(f'  ! failed to drop {col_name} from {model.__table_name__}: {e}')
+
+
 class Command(BaseCommand):
     help = 'Sync all Cassandra tables (create if not exists)'
 
@@ -192,8 +229,6 @@ class Command(BaseCommand):
             ('chat.Message',                         Message),
 
             # course
-            ('course.CourseEnrollmentByConsumer',    CourseEnrollmentByConsumer),
-            ('course.CourseEnrollmentByCourse',      CourseEnrollmentByCourse),
             ('course.Classroom',                     Classroom),
             ('course.ClassroomMember',               ClassroomMember),
             ('course.ClassroomActivityLog',          ClassroomActivityLog),
@@ -265,6 +300,11 @@ class Command(BaseCommand):
                 _add_missing_columns(model, keyspace, hosts, cfg, self.stdout)
             except Exception as e:
                 self.stdout.write(f'  column check failed for {label}: {e}')
+
+            try:
+                _drop_extra_columns(model, keyspace, hosts, cfg, self.stdout)
+            except Exception as e:
+                self.stdout.write(f'  drop extra columns failed for {label}: {e}')
 
         self.stdout.write(self.style.SUCCESS('Sync done.'))
 

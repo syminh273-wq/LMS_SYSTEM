@@ -1,9 +1,15 @@
 from core.repositories.base_repository import BaseRepository
+from core.utils.pid import generate_unique_pid
 from features.account.space.models import Space
 
 
 class Repository(BaseRepository):
     model = Space
+
+    def create(self, **kwargs):
+        if not kwargs.get('pid'):
+            kwargs['pid'] = generate_unique_pid(self.find_by_pid)
+        return super().create(**kwargs)
 
     def get_by_email(self, email: str):
         instance = self.filter(email=email, is_deleted=False).first()
@@ -26,3 +32,6 @@ class Repository(BaseRepository):
     def save_password(self, instance):
         instance.save()
         return instance
+
+    def find_by_pid(self, pid: str):
+        return self.model.objects.filter(pid=pid, is_deleted=False).first()

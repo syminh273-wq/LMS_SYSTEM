@@ -1,11 +1,16 @@
 from core.repositories.base_repository import BaseRepository
+from core.utils.pid import generate_unique_pid
 from features.course.classroom.models import Classroom
 
 class Repository(BaseRepository):
     model = Classroom
 
+    def create(self, **kwargs):
+        if not kwargs.get('pid'):
+            kwargs['pid'] = generate_unique_pid(self.get_by_pid)
+        return super().create(**kwargs)
+
     def get_active_classrooms(self):
-        # ORDER BY requires a partition-level query; fetch all active then sort in memory
         return sorted(
             list(self.filter(status='active', is_deleted=False)),
             key=lambda c: c.uid,
@@ -13,16 +18,12 @@ class Repository(BaseRepository):
         )
 
     def get_by_teacher(self, teacher_id):
-        # Global filter without order_by will work fine
         return self.filter(teacher_id=teacher_id, is_deleted=False)
 
-    def discover(self, category=None, pricing_type=None, visibility_type='public', search=None):
-        """List public classrooms for the consumer Discover page.
+    def get_by_pid(self, pid):
+        return self.filter(pid=pid, is_deleted=False).first()
 
-        Cassandra does not allow `ORDER BY` when a query relies on a
-        secondary index, so we filter with the indexed columns only and
-        sort / substring-search in Python.
-        """
+    def discover(self, category=None, pricing_type=None, visibility_type='public', search=None):
         qs = self.filter(
             status='active',
             visibility_type=visibility_type,

@@ -1,14 +1,11 @@
 import string
 import random
 from features.course.classroom.repositories import Repository
-from features.sharing.services import LinkService
-from features.sharing.enums import ResourceType
 from core.search_engine.typesense.indexer import LMSIndexer
 
 class Service:
     def __init__(self):
         self.repository = Repository()
-        self.link_service = LinkService()
 
     def all(self):
         return self.repository.all()
@@ -34,17 +31,6 @@ class Service:
         # Generate a unique 6-char uppercase alphanumeric pid (invite code)
         pid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         classroom = self.repository.create(teacher_id=teacher_id, pid=pid, **data)
-
-        # Create a short link for this classroom
-        self.link_service.create_link({
-            'code': pid,
-            'resource_type': ResourceType.CLASSROOM.value,
-            'resource_id': classroom.uid,
-            'action': 'join',
-            'metadata': {
-                'name': classroom.name
-            }
-        })
 
         # Auto-create default folders: Preview, Docs, Bài kiểm tra (with 3 sub-folders)
         try:

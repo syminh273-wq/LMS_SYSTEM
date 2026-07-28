@@ -1,7 +1,6 @@
 from .course_response_serializer import (
     CourseResponseSerializer,
     CourseLessonResponseSerializer,
-    CourseEnrollmentResponseSerializer,
     CoursePreviewSerializer,
     CoursePreviewLessonSerializer,
 )
@@ -9,7 +8,6 @@ from .course_response_serializer import (
 __all__ = [
     'CourseResponseSerializer',
     'CourseLessonResponseSerializer',
-    'CourseEnrollmentResponseSerializer',
     'CoursePreviewSerializer',
     'CoursePreviewLessonSerializer',
 ]

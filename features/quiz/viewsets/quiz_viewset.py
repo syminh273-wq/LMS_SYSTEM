@@ -24,7 +24,7 @@ from features.quiz.serializers.quiz_response_serializer import (
     QuizResponseSerializer,
     QuizDetailResponseSerializer,
     QuizAssignmentResponseSerializer,
-    QuizAttemptResponseSerializer,
+    QuizLogResponseSerializer,
     QuizQuestionSerializer,
 )
 from features.quiz.serializers.quiz_leaderboard_serializer import (
@@ -364,7 +364,7 @@ class QuizViewSet(BaseModelViewSet):
         if not classroom_id:
             return Response({'detail': 'classroom_id is required.'}, status=400)
         attempts = self.service.get_all_attempts(kwargs['uid'], classroom_id)
-        return Response(QuizAttemptResponseSerializer(list(attempts), many=True).data)
+        return Response(QuizLogResponseSerializer(list(attempts), many=True).data)
 
     # ── UPDATE QUESTION  PATCH /quizzes/<uid>/questions/<question_uid>/ ──────
     @action(detail=True, methods=['patch'], url_path=r'questions/(?P<question_uid>[^/.]+)')

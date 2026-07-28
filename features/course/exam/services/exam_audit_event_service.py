@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 
 from features.course.exam.repositories import (
-    ExamAuditLogRepository,
+    ExamEventLogRepository,
     ExamRepository,
     ExamSessionRepository,
 )
@@ -86,7 +86,7 @@ class ExamAuditEventService:
     def __init__(self):
         self.session_repo = ExamSessionRepository()
         self.exam_repo = ExamRepository()
-        self.audit_repo = ExamAuditLogRepository()
+        self.audit_repo = ExamEventLogRepository()
 
     def record_event(self, session_uid, student_id, event_type, event_data=None):
         """

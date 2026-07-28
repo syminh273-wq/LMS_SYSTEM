@@ -44,27 +44,12 @@ class CourseResponseSerializer(serializers.Serializer):
     classroom_uid = serializers.UUIDField(read_only=True)
     resolve_link = serializers.DictField(read_only=True)
     lesson_count = serializers.SerializerMethodField()
-    enrollment_count = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
 
     def get_lesson_count(self, obj):
         from features.course.repositories import CourseLessonRepository
         return CourseLessonRepository().get_by_course(obj.uid).count()
-
-    def get_enrollment_count(self, obj):
-        from features.course.repositories import CourseEnrollmentRepository
-        return CourseEnrollmentRepository().count_for_course(obj.uid)
-
-
-class CourseEnrollmentResponseSerializer(serializers.Serializer):
-    consumer_id = serializers.UUIDField()
-    consumer_name = serializers.CharField()
-    consumer_avatar = serializers.CharField()
-    enrolled_at = serializers.DateTimeField()
-    pricing_type = serializers.CharField()
-    amount_vnd = serializers.IntegerField()
-    payment_order_id = serializers.CharField(allow_null=True)
 
 
 class CoursePreviewLessonSerializer(serializers.Serializer):

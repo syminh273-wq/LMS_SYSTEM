@@ -1,6 +1,6 @@
 from core.repositories.base_repository import BaseRepository
+from core.utils.pid import generate_unique_pid
 from features.account.consumer.models import Consumer
-from features.account.consumer.models.consumer import _generate_pid  # explicit generation — cqlengine default unreliable on non-PK columns
 
 
 class ConsumerRepository(BaseRepository):
@@ -8,7 +8,7 @@ class ConsumerRepository(BaseRepository):
 
     def create(self, **kwargs):
         if not kwargs.get('pid'):
-            kwargs['pid'] = _generate_pid()
+            kwargs['pid'] = generate_unique_pid(self.find_by_pid)
         return super().create(**kwargs)
 
     def get_by_email(self, email: str):

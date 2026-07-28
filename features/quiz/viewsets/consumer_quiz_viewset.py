@@ -9,7 +9,7 @@ from features.quiz.serializers.quiz_request_serializer import QuizSubmitRequestS
 from features.quiz.serializers.quiz_response_serializer import (
     QuizResponseSerializer,
     QuizPublicDetailResponseSerializer,
-    QuizAttemptResponseSerializer,
+    QuizLogResponseSerializer,
 )
 from features.quiz.serializers.quiz_leaderboard_serializer import (
     QuizLeaderboardResponseSerializer,
@@ -85,7 +85,7 @@ class ConsumerQuizViewSet(ViewSet):
         if not classroom_id:
             return Response({'detail': 'classroom_id is required.'}, status=400)
         my_attempts = self.service.get_student_attempts(pk, classroom_id, request.user.uid)
-        return Response(QuizAttemptResponseSerializer(list(my_attempts), many=True).data)
+        return Response(QuizLogResponseSerializer(list(my_attempts), many=True).data)
 
     # ── LEADERBOARD  GET /consumer/quiz/<uid>/leaderboard/?classroom_id=<id> ─
     @action(detail=True, methods=['get'], url_path='leaderboard')

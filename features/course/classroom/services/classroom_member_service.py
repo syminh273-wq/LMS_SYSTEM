@@ -101,25 +101,14 @@ class ClassroomMemberService:
 
     def _register_teacher_contact(self, classroom, consumer_id, name, avatar):
         from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
-        from features.account.consumer.repositories import ConsumerRepository
-        from core.search_engine.typesense.indexer import LMSIndexer
-        consumer = ConsumerRepository().find(consumer_id)
-        contact = TeacherContactRepository().register(
+        TeacherContactRepository().register(
             teacher_id=classroom.teacher_id,
             consumer_uid=consumer_id,
-            consumer_name=name,
-            consumer_email=getattr(consumer, 'email', ''),
-            consumer_avatar=avatar or '',
-            first_name=getattr(consumer, 'first_name', '') or '',
-            last_name=getattr(consumer, 'last_name', '') or '',
         )
-        if contact:
-            LMSIndexer.index_teacher_contact(contact)
 
     def approve(self, classroom_uid, member_id, approved_by_id):
         from features.course.classroom.services.classroom_service import Service
         from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
-        from features.account.consumer.repositories import ConsumerRepository
         from rest_framework.exceptions import PermissionDenied, NotFound
 
         classroom = Service().find(str(classroom_uid))
@@ -129,21 +118,12 @@ class ClassroomMemberService:
         if not member:
             raise NotFound("Không tìm thấy thành viên.")
 
-        # Register student in teacher's contact list + index to Typesense (idempotent)
+        # Register student in teacher's contact list (idempotent)
         try:
-            from core.search_engine.typesense.indexer import LMSIndexer
-            consumer = ConsumerRepository().find(member_id)
-            contact = TeacherContactRepository().register(
+            TeacherContactRepository().register(
                 teacher_id=classroom.teacher_id,
                 consumer_uid=member_id,
-                consumer_name=member.member_name,
-                consumer_email=getattr(consumer, 'email', ''),
-                consumer_avatar=member.member_avatar or '',
-                first_name=getattr(consumer, 'first_name', '') or '',
-                last_name=getattr(consumer, 'last_name', '') or '',
             )
-            if contact:
-                LMSIndexer.index_teacher_contact(contact)
         except Exception:
             pass  # never block the approval flow
 

@@ -4,16 +4,27 @@ from rest_framework.exceptions import NotFound
 
 from core.search_engine.typesense.service import TypesenseService
 from core.views.mixins import UserScopeMixin
+from features.account.consumer.repositories import ConsumerRepository
 from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
 from features.course.classroom.repositories import Repository as ClassroomRepository
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.exam.repositories import ExamRepository, ExamSubmissionRepository
 
 
+def _consumer_summary(consumer):
+    if not consumer:
+        return {'full_name': '', 'email': '', 'avatar_url': ''}
+    return {
+        'full_name': getattr(consumer, 'full_name', '') or '',
+        'email': getattr(consumer, 'email', '') or '',
+        'avatar_url': getattr(consumer, 'avatar_url', '') or '',
+    }
+
+
 class TeacherStudentSearchView(UserScopeMixin, APIView):
     """GET /api/v1/space/course/students/search/?q=...
-    Full-text search over students in this teacher's org scope (lms_teacher_contact).
-    teacher_id is always injected into filter — teacher can only see their own students.
+    Full-text search over students in this teacher's org scope.
+    Scoped via TeacherContact (consumer_uid list) → lms_consumer.
     """
 
     def get(self, request):
@@ -24,13 +35,17 @@ class TeacherStudentSearchView(UserScopeMixin, APIView):
         limit  = min(int(request.query_params.get('limit',  20)), 50)
         offset = max(int(request.query_params.get('offset',  0)),  0)
 
-        filter_by = f"teacher_id:{request.user.uid}"
+        contacts = TeacherContactRepository().get_by_teacher(request.user.uid)
+        uids = [str(c.consumer_uid) for c in contacts]
+        if not uids:
+            return Response({'total_hits': 0, 'results': []})
 
+        filter_by = f'uid:["' + '","'.join(uids) + '"]'
         try:
             resp = TypesenseService().search(
-                collection='lms_teacher_contact',
+                collection='lms_consumer',
                 query=query,
-                query_by=['consumer_name', 'first_name', 'last_name', 'consumer_email'],
+                query_by=['full_name', 'first_name', 'last_name', 'email', 'username'],
                 filter_by=filter_by,
                 limit=limit,
                 offset=offset,
@@ -47,16 +62,19 @@ class TeacherStudentListView(UserScopeMixin, APIView):
 
     def get(self, request):
         contacts = TeacherContactRepository().get_by_teacher(request.user.uid)
-        return Response([
-            {
+        consumer_repo = ConsumerRepository()
+        out = []
+        for c in contacts:
+            consumer = consumer_repo.find(c.consumer_uid)
+            summary = _consumer_summary(consumer)
+            out.append({
                 'consumer_uid':    str(c.consumer_uid),
-                'consumer_name':   c.consumer_name,
-                'consumer_email':  c.consumer_email,
-                'consumer_avatar': c.consumer_avatar,
+                'consumer_name':   summary['full_name'],
+                'consumer_email':  summary['email'],
+                'consumer_avatar': summary['avatar_url'],
                 'first_joined_at': c.first_joined_at.isoformat() if c.first_joined_at else None,
-            }
-            for c in contacts
-        ])
+            })
+        return Response(out)
 
 
 class TeacherStudentDetailView(UserScopeMixin, APIView):
@@ -69,6 +87,9 @@ class TeacherStudentDetailView(UserScopeMixin, APIView):
         contact = next((c for c in contacts if str(c.consumer_uid) == consumer_uid), None)
         if not contact:
             raise NotFound("Student not found in your contacts.")
+
+        consumer = ConsumerRepository().find(consumer_uid)
+        summary = _consumer_summary(consumer)
 
         classrooms = ClassroomRepository().get_by_teacher(request.user.uid)
         member_repo = ClassroomMemberRepository()
@@ -111,9 +132,9 @@ class TeacherStudentDetailView(UserScopeMixin, APIView):
         return Response({
             'consumer': {
                 'uid':            str(contact.consumer_uid),
-                'full_name':      contact.consumer_name,
-                'email':          contact.consumer_email,
-                'avatar_url':     contact.consumer_avatar,
+                'full_name':      summary['full_name'],
+                'email':          summary['email'],
+                'avatar_url':     summary['avatar_url'],
                 'first_joined_at': contact.first_joined_at.isoformat() if contact.first_joined_at else None,
             },
             'classrooms': classroom_rows,

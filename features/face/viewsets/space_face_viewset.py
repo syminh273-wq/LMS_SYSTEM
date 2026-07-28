@@ -1,19 +1,23 @@
+import json
+
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from features.face.services import FaceRecognitionService
+from features.course.exam.repositories.exam_event_log_repository import ExamEventLogRepository
 
 
 def _serialize_log(log) -> dict:
+    data = ExamEventLogRepository.parse_event_data(log)
     return {
         "uid": str(log.uid),
         "student_id": str(log.student_id),
-        "camera_open": log.camera_open,
-        "recognized": log.recognized,
-        "multiple_faces": log.multiple_faces,
-        "face_count": log.face_count,
-        "similarity": log.similarity,
-        "verified_at": log.verified_at.isoformat() if log.verified_at else None,
+        "camera_open": data.get("camera_open", False),
+        "recognized": data.get("recognized", False),
+        "multiple_faces": data.get("multiple_faces", False),
+        "face_count": data.get("face_count", 0),
+        "similarity": data.get("similarity", 0.0),
+        "verified_at": data.get("verified_at"),
     }
 
 
@@ -29,7 +33,7 @@ class SpaceFaceViewSet(ViewSet):
     def exam_logs(self, request, exam_uid=None):
         """
         GET /api/v1/space/face/exams/<exam_uid>/logs/
-        Returns all verification events for an exam (sorted newest-first by Cassandra).
+        Returns all verification events for an exam.
         """
         logs = self.service.get_exam_logs(exam_id=exam_uid)
         return Response([_serialize_log(log) for log in logs])

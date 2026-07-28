@@ -11,6 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core.models.social_account import SocialAccount
 from features.account.consumer.repositories.consumer_repository import ConsumerRepository
 
+
 class GoogleConsumerOAuthLoginView(APIView):
     authentication_classes = []
     permission_classes = []
@@ -38,7 +39,6 @@ class GoogleConsumerOAuthCallbackView(APIView):
         if request.GET.get('error') or not code:
             return redirect(f'{frontend_url}/consumer/login?error=google_auth_failed')
 
-        # Exchange code for tokens
         token_resp = http_requests.post(settings.GOOGLE_TOKEN_URL, data={
             'client_id': settings.GOOGLE_CLIENT_ID,
             'client_secret': settings.GOOGLE_CLIENT_SECRET,
@@ -66,7 +66,6 @@ class GoogleConsumerOAuthCallbackView(APIView):
 
         repo = ConsumerRepository()
 
-        # Tìm SocialAccount đã link
         social = SocialAccount.objects.filter(
             provider='google', provider_id=google_sub
         ).first()
@@ -74,10 +73,8 @@ class GoogleConsumerOAuthCallbackView(APIView):
         if social:
             consumer = repo.filter(uid=social.user_uid, is_deleted=False).first()
         else:
-            # Tìm Consumer theo email
             consumer = repo.filter(email=email, is_deleted=False).first()
             if consumer:
-                # Link google account vào consumer hiện tại
                 SocialAccount.objects.create(
                     provider='google',
                     provider_id=google_sub,

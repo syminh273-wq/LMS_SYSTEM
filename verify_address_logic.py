@@ -5,7 +5,7 @@ import django
 django.setup()
 
 import uuid
-from features.account.consumer.services.student_profile_service import StudentProfileService
+from features.portfolio.services.portfolio_service import PortfolioService
 from features.account.consumer.services.address_service import AddressService
 from features.account.consumer.services import ConsumerService
 from features.account.consumer.serializers import ConsumerAccountSerializer
@@ -25,9 +25,8 @@ def _format_address_public(addr_dict):
     return ', '.join(parts)
 
 
-svc = StudentProfileService()
-settings = svc.get_or_create(UID)
-data = svc.serialize(settings)
+svc = PortfolioService()
+data = svc.get_profile_settings_or_public(UID)
 
 print("=" * 80)
 print("PublicStudentProfileView logic trace for uid:", UID)
@@ -36,7 +35,6 @@ print(f"show_address = {data.get('show_address')}")
 print(f"profile_visibility = {data.get('profile_visibility')!r}")
 print(f"data['address'] BEFORE join = {data.get('address')!r}")
 
-# Determine owner_type
 owner_type = None
 consumer_dict = None
 try:
