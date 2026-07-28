@@ -1,8 +1,10 @@
 from uuid import UUID
 from features.account.otp.models import OTPRecord
+from core.repositories.base_repository import BaseRepository
 
 
-class OTPRepository:
+class OTPRepository(BaseRepository):
+    model = OTPRecord
 
     def upsert(self, user_uid: UUID, user_type: str, **kwargs) -> OTPRecord:
         existing = OTPRecord.objects.filter(user_uid=user_uid, user_type=user_type).first()

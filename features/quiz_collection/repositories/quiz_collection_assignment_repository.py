@@ -1,9 +1,11 @@
 from uuid import UUID
 
 from features.quiz_collection.models import QuizCollectionAssignment
+from core.repositories.base_repository import BaseRepository
 
 
-class QuizCollectionAssignmentRepository:
+class QuizCollectionAssignmentRepository(BaseRepository):
+    model = QuizCollectionAssignment
 
     def get_by_collection(self, collection_id):
         c_id = UUID(str(collection_id)) if not isinstance(collection_id, UUID) else collection_id

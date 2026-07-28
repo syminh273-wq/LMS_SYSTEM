@@ -12,11 +12,12 @@ from features.ranking.services.level_math import (
     required_xp_for_level,
     level_for_xp,
 )
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
 
-class XPService:
+class XPService(BaseService):
     def __init__(self):
         self.xp_repo = StudentXPRepository()
         self.tx_repo = XPTransactionRepository()

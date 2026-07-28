@@ -3,13 +3,14 @@ from rest_framework.exceptions import PermissionDenied, NotFound
 
 from features.course.classroom.models.teacher_blacklist import GLOBAL_SENTINEL
 from features.course.classroom.repositories.teacher_blacklist_repository import TeacherBlacklistRepository
+from core.services.base_service import BaseService
 
 
 def _u(value):
     return uuid.UUID(str(value))
 
 
-class ClassroomBlacklistService:
+class ClassroomBlacklistService(BaseService):
     def __init__(self):
         self.repo = TeacherBlacklistRepository()
 

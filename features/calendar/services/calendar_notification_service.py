@@ -13,6 +13,7 @@ from features.calendar.models.calendar_event import CalendarEvent
 from features.calendar.repositories.calendar_event_repository import CalendarEventRepository
 from features.course.classroom.models.classroom import Classroom
 from features.course.classroom.repositories.classroom_repository import Repository as ClassroomRepository
+from core.services.base_service import BaseService
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ def _frontend_classroom_url(classroom_uid: str) -> str:
     return f"{base.rstrip('/')}/consumer/classroom/{classroom_uid}"
 
 
-class CalendarNotificationService:
+class CalendarNotificationService(BaseService):
     def __init__(self):
         self.event_repo = CalendarEventRepository()
         self.classroom_repo = ClassroomRepository()

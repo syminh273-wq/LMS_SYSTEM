@@ -5,6 +5,8 @@ from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
+from core.services.base_service import BaseService
+
 logger = logging.getLogger(__name__)
 
 MAX_PAYMENTS_PER_QUERY = 2000
@@ -47,7 +49,7 @@ def _infer_granularity(from_dt: datetime | None, to_dt: datetime | None) -> str:
     return 'month'
 
 
-class PaymentAnalyticsService:
+class PaymentAnalyticsService(BaseService):
     """Aggregate payment data for the space (teacher) dashboard.
 
     Cassandra caveat: the `Payment` model only has indexed columns

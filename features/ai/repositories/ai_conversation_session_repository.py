@@ -3,9 +3,11 @@ from datetime import datetime
 from typing import List, Optional
 
 from features.ai.models.ai_conversation_session import AIConversationSession
+from core.repositories.base_repository import BaseRepository
 
 
-class AIConversationSessionRepository:
+class AIConversationSessionRepository(BaseRepository):
+    model = AIConversationSession
 
     @staticmethod
     def _safe_uuid(val) -> Optional[uuid.UUID]:

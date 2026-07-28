@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from features.ranking.repositories.student_xp_repository import StudentXPRepository
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
 
-class LeaderboardService:
+class LeaderboardService(BaseService):
     def __init__(self):
         self.xp_repo = StudentXPRepository()
 

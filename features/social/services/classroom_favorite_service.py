@@ -2,11 +2,12 @@ import logging
 
 from features.social.repositories.classroom_favorite_repository import ClassroomFavoriteRepository
 from features.social.serializers.classroom_favorite_serializer import ClassroomFavoriteResponseSerializer
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
 
-class ClassroomFavoriteService:
+class ClassroomFavoriteService(BaseService):
     def __init__(self):
         self.repo = ClassroomFavoriteRepository()
 

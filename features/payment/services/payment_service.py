@@ -6,13 +6,14 @@ from core.utils.uuid import uuid7
 from features.payment.enums import PaymentStatus
 from features.payment.repositories import PaymentRepository
 from features.payment.services.momo_service import MoMoService
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
 PENDING_TTL_SECONDS = 15 * 60
 
 
-class PaymentService:
+class PaymentService(BaseService):
     def __init__(self):
         self.repo = PaymentRepository()
         self.momo = MoMoService()

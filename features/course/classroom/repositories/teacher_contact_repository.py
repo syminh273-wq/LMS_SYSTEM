@@ -1,5 +1,6 @@
 from datetime import datetime
 from features.course.classroom.models.teacher_contact import TeacherContact
+from core.repositories.base_repository import BaseRepository
 
 
 def _u(v):
@@ -7,7 +8,8 @@ def _u(v):
     return UUID(str(v)) if not isinstance(v, UUID) else v
 
 
-class TeacherContactRepository:
+class TeacherContactRepository(BaseRepository):
+    model = TeacherContact
 
     def get_by_teacher(self, teacher_id):
         """All students who ever studied with this teacher."""

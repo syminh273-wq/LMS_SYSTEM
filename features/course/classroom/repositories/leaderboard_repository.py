@@ -3,9 +3,10 @@ from features.calendar.repositories.attendance_repository import AttendanceRepos
 from features.calendar.repositories.calendar_event_repository import CalendarEventRepository
 from features.quiz.repositories.quiz_log_repository import QuizLogRepository
 from features.course.exam.repositories.exam_submission_repository import ExamSubmissionRepository
+from core.repositories.base_repository import BaseRepository
 
 
-class LeaderboardRepository:
+class LeaderboardRepository(BaseRepository):
     """Read-only aggregations for classroom leaderboards. All queries are scoped
     to a single classroom (we use ALLOW FILTERING on tables whose primary key
     does not include classroom_id, since the expected cardinality is small)."""

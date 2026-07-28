@@ -7,13 +7,14 @@ from rest_framework import exceptions
 
 from core.notification.services.mail_service import MailService
 from features.account.otp.repositories import OTPRepository
+from core.services.base_service import BaseService
 
 
 def _generate_otp() -> str:
     return ''.join(random.choices(string.digits, k=6))
 
 
-class OTPService:
+class OTPService(BaseService):
     def __init__(self):
         self.repository = OTPRepository()
         self.mail_service = MailService()

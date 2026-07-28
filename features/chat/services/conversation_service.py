@@ -2,9 +2,10 @@ import uuid as _uuid
 from datetime import datetime
 from features.chat.repositories.conversation_repository import ConversationRepository
 from features.chat.services.identity_resolver import pair_key as build_pair_key
+from core.services.base_service import BaseService
 
 
-class ConversationService:
+class ConversationService(BaseService):
     def __init__(self):
         self.repo = ConversationRepository()
 

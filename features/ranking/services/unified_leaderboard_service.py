@@ -18,6 +18,7 @@ from features.ranking.services.explanation_resolver import (
     explain_xp_level,
 )
 from features.ranking.services.level_service import level_title
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def _safe_uuid(val):
         return None
 
 
-class UnifiedLeaderboardService:
+class UnifiedLeaderboardService(BaseService):
     def __init__(self):
         self.xp_repo = StudentXPRepository()
         self.consumers = ConsumerRepository()

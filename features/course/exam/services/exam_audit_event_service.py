@@ -7,6 +7,7 @@ from features.course.exam.repositories import (
     ExamRepository,
     ExamSessionRepository,
 )
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def _humanize_event(event_type: str) -> str:
     return mapping.get(event_type, f"Sự kiện: {event_type}")
 
 
-class ExamAuditEventService:
+class ExamAuditEventService(BaseService):
     """
     Ghi và xử lý các sự kiện giám sát trong phòng thi online.
 

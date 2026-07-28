@@ -2,9 +2,11 @@ from datetime import datetime
 
 from core.utils.uuid import uuid7
 from features.quiz.models.quiz_log import QuizLog
+from core.repositories.base_repository import BaseRepository
 
 
-class QuizLogRepository:
+class QuizLogRepository(BaseRepository):
+    model = QuizLog
 
     def get_by_classroom(self, quiz_id, classroom_id):
         return QuizLog.objects.filter(quiz_id=quiz_id, classroom_id=classroom_id)

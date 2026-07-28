@@ -1,8 +1,11 @@
 import uuid
 from features.social.models.social_profile import SocialProfile
+from core.repositories.base_repository import BaseRepository
 
 
-class ProfileRepository:
+class ProfileRepository(BaseRepository):
+    model = SocialProfile
+
     def get_by_owner(self, owner_id):
         if isinstance(owner_id, str):
             owner_id = uuid.UUID(owner_id)

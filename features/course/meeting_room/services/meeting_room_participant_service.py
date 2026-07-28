@@ -1,9 +1,10 @@
 from datetime import datetime
 from features.course.meeting_room.repositories.meeting_room_participant_repository import MeetingRoomParticipantRepository
 from features.course.meeting_room.repositories.meeting_room_repository import MeetingRoomRepository
+from core.services.base_service import BaseService
 
 
-class MeetingRoomParticipantService:
+class MeetingRoomParticipantService(BaseService):
     def __init__(self):
         self.repo = MeetingRoomParticipantRepository()
         self.room_repo = MeetingRoomRepository()

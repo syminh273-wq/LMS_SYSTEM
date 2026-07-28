@@ -28,6 +28,7 @@ from features.course.exam.repositories.exam_submission_repository import (
 from features.quiz_collection.repositories.issued_certificate_repository import (
     IssuedCertificateRepository,
 )
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ _SUBMIT_EVENTS = {'exam_submitted', 'exam_opened'}
 _WEEKDAY_KEYS = ['day_mon', 'day_tue', 'day_wed', 'day_thu', 'day_fri', 'day_sat', 'day_sun']
 
 
-class DashboardService:
+class DashboardService(BaseService):
     """Single source of truth for the Space dashboard."""
 
     def __init__(self) -> None:

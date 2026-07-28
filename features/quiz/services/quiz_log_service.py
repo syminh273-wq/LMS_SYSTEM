@@ -1,8 +1,9 @@
 from features.quiz.repositories.quiz_log_repository import QuizLogRepository
 from features.quiz.repositories.quiz_question_repository import QuizQuestionRepository
+from core.services.base_service import BaseService
 
 
-class QuizLogService:
+class QuizLogService(BaseService):
     def __init__(self):
         self.log_repo      = QuizLogRepository()
         self.question_repo = QuizQuestionRepository()

@@ -7,9 +7,10 @@ from features.course.classroom.repositories.classroom_member_repository import C
 from features.course.exam.repositories import ExamRepository, ExamSubmissionRepository
 from features.course.exam.services.exam_ai_grading_service import ExamAIGradingService
 from features.resource.repositories import ResourceRepository
+from core.services.base_service import BaseService
 
 
-class ExamSubmissionService:
+class ExamSubmissionService(BaseService):
     STATUSES = ["submitted", "late", "graded", "returned"]
 
     def __init__(self):

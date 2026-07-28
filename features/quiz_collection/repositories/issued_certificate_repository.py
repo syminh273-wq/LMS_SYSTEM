@@ -1,9 +1,11 @@
 from uuid import UUID
 
 from features.quiz_collection.models import IssuedCertificate
+from core.repositories.base_repository import BaseRepository
 
 
-class IssuedCertificateRepository:
+class IssuedCertificateRepository(BaseRepository):
+    model = IssuedCertificate
 
     def get_by_student(self, student_id):
         s_id = UUID(str(student_id)) if not isinstance(student_id, UUID) else student_id

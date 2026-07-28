@@ -7,6 +7,7 @@ from features.resource.repositories.resource_folder_repository import ResourceFo
 from features.resource.repositories.resource_repository import ResourceRepository
 from features.resource.services.resource_folder_service import ResourceFolderService
 from features.resource.services.resource_service import ResourceService
+from core.services.base_service import BaseService
 
 # File types that can be parsed + indexed in LanceDB
 _INDEXABLE_EXTENSIONS = {
@@ -17,7 +18,7 @@ _INDEXABLE_EXTENSIONS = {
 }
 
 
-class ClassroomDocService:
+class ClassroomDocService(BaseService):
     _pipeline = RAGPipeline()
 
     def __init__(self):

@@ -15,6 +15,7 @@ from datetime import datetime
 from uuid import UUID
 
 from features.quiz.repositories.quiz_log_repository import QuizLogRepository
+from core.services.base_service import BaseService
 
 
 def _safe_uuid(val):
@@ -60,7 +61,7 @@ def _best_per_student(rows):
     return best
 
 
-class QuizLeaderboardService:
+class QuizLeaderboardService(BaseService):
     def __init__(self):
         self.log_repo = QuizLogRepository()
 

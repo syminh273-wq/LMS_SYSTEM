@@ -1,8 +1,9 @@
 import uuid as _uuid
 from features.chat.repositories.conversation_member_repository import ConversationMemberRepository
+from core.services.base_service import BaseService
 
 
-class ConversationMemberService:
+class ConversationMemberService(BaseService):
     def __init__(self):
         self.repo = ConversationMemberRepository()
 

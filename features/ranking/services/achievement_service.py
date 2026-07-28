@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 
 from features.ranking.repositories.achievement_repository import AchievementRepository
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,7 @@ ACHIEVEMENT_CATALOG = [
 ]
 
 
-class AchievementService:
+class AchievementService(BaseService):
     def __init__(self):
         self.repo = AchievementRepository()
 

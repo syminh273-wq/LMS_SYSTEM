@@ -1,10 +1,11 @@
 import logging
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
 
-class ClassroomMemberService:
+class ClassroomMemberService(BaseService):
     def __init__(self):
         self.repo = ClassroomMemberRepository()
 

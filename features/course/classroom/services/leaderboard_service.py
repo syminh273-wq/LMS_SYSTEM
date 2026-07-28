@@ -10,13 +10,14 @@ from collections import defaultdict
 
 from features.course.classroom.repositories.leaderboard_repository import LeaderboardRepository
 from features.account.consumer.repositories import ConsumerRepository
+from core.services.base_service import BaseService
 
 
 QUIZ_WEIGHT = 0.6
 EXAM_WEIGHT = 0.4
 
 
-class LeaderboardService:
+class LeaderboardService(BaseService):
     def __init__(self):
         self.repo = LeaderboardRepository()
         self.consumers = ConsumerRepository()

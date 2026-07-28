@@ -1,9 +1,12 @@
 from uuid import UUID
 
 from features.course.exam.models.exam_session import ExamSession
+from core.repositories.base_repository import BaseRepository
 
 
-class ExamSessionRepository:
+class ExamSessionRepository(BaseRepository):
+    model = ExamSession
+
     def create(self, **data):
         return ExamSession.create(**data)
 

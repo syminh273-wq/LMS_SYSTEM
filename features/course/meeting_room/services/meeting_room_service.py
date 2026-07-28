@@ -4,13 +4,14 @@ from features.course.meeting_room.repositories.meeting_room_repository import Me
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from core.notification.services.notification_service import NotificationService
 from core.notification.enums.notification_provider import NotificationProvider
+from core.services.base_service import BaseService
 
 VALID_STATUSES = ('waiting', 'active', 'ended')
 
 LIVE_ROOM_PATH = 'classrooms/{classroom_uid}/live_room'
 
 
-class MeetingRoomService:
+class MeetingRoomService(BaseService):
     def __init__(self):
         self.repo = MeetingRoomRepository()
         self.member_repo = ClassroomMemberRepository()

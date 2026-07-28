@@ -3,11 +3,12 @@ import logging
 from datetime import datetime
 
 from features.course.exam.models.exam_event_log import ExamEventLog
+from core.repositories.base_repository import BaseRepository
 
 logger = logging.getLogger(__name__)
 
 
-class ExamEventLogRepository:
+class ExamEventLogRepository(BaseRepository):
     """
     Repository for the unified `exam_event_logs` table.
 
@@ -24,6 +25,8 @@ class ExamEventLogRepository:
       - `list_by_student(...)` returns audit rows for a student.
       - `get_face_logs_for_exam/student(...)` return face rows.
     """
+
+    model = ExamEventLog
 
     EVENT_KIND_AUDIT = 'audit'
     EVENT_KIND_FACE = 'face'

@@ -4,14 +4,17 @@ from typing import List, Optional
 
 from features.chat.models.message import Message
 from core.utils.uuid import uuid7
+from core.repositories.base_repository import BaseRepository
 
 
-class AIMessageRepository:
+class AIMessageRepository(BaseRepository):
     """
     Reads and writes AI conversation messages to chat_messages.
     Uses session_id as conversation_uid to co-locate with chat infra.
     sender_type='user' for human turns, sender_type='ai' for bot turns.
     """
+
+    model = Message
 
     @staticmethod
     def _safe_uuid(val) -> Optional[uuid.UUID]:

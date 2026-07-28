@@ -2,9 +2,12 @@ from datetime import datetime
 from uuid import UUID
 
 from features.course.exam.models import Exam
+from core.repositories.base_repository import BaseRepository
 
 
-class ExamRepository:
+class ExamRepository(BaseRepository):
+    model = Exam
+
     def create(self, **data):
         return Exam.create(**data)
 

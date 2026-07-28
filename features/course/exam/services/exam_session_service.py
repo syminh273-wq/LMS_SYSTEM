@@ -4,9 +4,10 @@ from uuid import uuid4
 from features.course.exam.repositories import ExamRepository, ExamSessionRepository, ExamEventLogRepository
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from core.utils.datetime import now_vn
+from core.services.base_service import BaseService
 
 
-class ExamSessionService:
+class ExamSessionService(BaseService):
     LINK_TTL_MINUTES = 5
 
     def __init__(self):

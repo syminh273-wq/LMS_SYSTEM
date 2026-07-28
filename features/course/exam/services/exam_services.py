@@ -5,9 +5,10 @@ from django.utils.dateparse import parse_date, parse_datetime
 
 from features.course.exam.repositories import ExamRepository
 from core.search_engine.typesense.indexer import LMSIndexer
+from core.services.base_service import BaseService
 
 
-class ExamService:
+class ExamService(BaseService):
     MARKDOWN = "markdown"
     FILE_TYPES = ["pdf", "image", "file"]
     STATUSES = ["draft", "published", "closed", "ongoing"]

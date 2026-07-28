@@ -2,9 +2,10 @@ from features.quiz_collection.repositories import (
     QuizCollectionRepository,
     QuizCollectionAssignmentRepository,
 )
+from core.services.base_service import BaseService
 
 
-class QuizCollectionService:
+class QuizCollectionService(BaseService):
     def __init__(self):
         self.repository = QuizCollectionRepository()
         self.assignment_repo = QuizCollectionAssignmentRepository()

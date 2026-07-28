@@ -3,6 +3,7 @@ from features.account.space.models import Space
 from features.social.models.social_profile import SocialProfile
 from features.social.repositories.profile_repository import ProfileRepository
 from features.portfolio.services.portfolio_service import PortfolioService
+from core.services.base_service import BaseService
 
 
 def _detect_owner_type(user) -> str:
@@ -15,7 +16,7 @@ def _owner_id(user):
     return user.uid
 
 
-class ProfileService:
+class ProfileService(BaseService):
     MAX_SKILLS = 20
     MAX_BIO = 500
     MAX_LINK = 200

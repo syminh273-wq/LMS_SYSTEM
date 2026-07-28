@@ -5,9 +5,10 @@ from features.course.exam.enums import (
     DOCS_ROOT_FOLDER_NAME,
     PREVIEW_ROOT_FOLDER_NAME,
 )
+from core.services.base_service import BaseService
 
 
-class ResourceFolderSeedService:
+class ResourceFolderSeedService(BaseService):
     def __init__(self):
         self.repository = ResourceFolderRepository()
 

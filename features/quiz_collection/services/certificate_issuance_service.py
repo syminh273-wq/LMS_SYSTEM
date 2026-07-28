@@ -11,6 +11,7 @@ from features.quiz_collection.repositories import (
     CertificateRepository,
     IssuedCertificateRepository,
 )
+from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ def _ensure_quiz_assignment(quiz_id, classroom_id, collection) -> None:
         )
 
 
-class CertificateIssuanceService:
+class CertificateIssuanceService(BaseService):
     """
     Decides whether a student who just submitted a quiz has now completed a
     QuizCollection, and if so, issues a certificate (idempotent).

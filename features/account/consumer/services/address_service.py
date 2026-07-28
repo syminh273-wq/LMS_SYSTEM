@@ -4,9 +4,10 @@ from features.account.consumer.serializers.address_serializer import (
     AddressUpsertSerializer,
 )
 from features.account.static_data import get_province, get_ward
+from core.services.base_service import BaseService
 
 
-class AddressService:
+class AddressService(BaseService):
 
     def __init__(self):
         self.repo = AddressRepository()

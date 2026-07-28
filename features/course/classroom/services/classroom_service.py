@@ -2,8 +2,9 @@ import string
 import random
 from features.course.classroom.repositories import Repository
 from core.search_engine.typesense.indexer import LMSIndexer
+from core.services.base_service import BaseService
 
-class Service:
+class Service(BaseService):
     def __init__(self):
         self.repository = Repository()
 

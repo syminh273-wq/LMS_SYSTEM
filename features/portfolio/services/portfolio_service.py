@@ -5,9 +5,10 @@ from features.account.consumer.models.consumer import Consumer
 from features.account.space.models.space import Space
 from features.portfolio.models import Portfolio
 from features.portfolio.repositories import PortfolioRepository
+from core.services.base_service import BaseService
 
 
-class PortfolioService:
+class PortfolioService(BaseService):
     """
     Polymorphic key-value profile service.
 

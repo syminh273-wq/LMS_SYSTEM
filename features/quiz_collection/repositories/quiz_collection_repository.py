@@ -2,13 +2,15 @@ from datetime import datetime
 from uuid import UUID
 
 from features.quiz_collection.models import QuizCollection
+from core.repositories.base_repository import BaseRepository
 
 
 def _u(v):
     return UUID(str(v)) if not isinstance(v, UUID) else v
 
 
-class QuizCollectionRepository:
+class QuizCollectionRepository(BaseRepository):
+    model = QuizCollection
 
     def get(self, uid):
         return QuizCollection.objects.filter(uid=_u(uid), is_deleted=False).first()
