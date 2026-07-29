@@ -39,10 +39,8 @@ def _save_meta(**fields):
 def generate_quiz_task(
     teacher_uid: str,
     content: str,
-    resource_url: str = None,
     quiz_type: str = 'multiple_choice',
-    num_questions: int = 10,
-    max_content_length: int = 12000,
+    num_questions: int = 5,
 ) -> dict:
     """
     Run AI quiz generation synchronously inside the RQ worker.
@@ -61,10 +59,8 @@ def generate_quiz_task(
     try:
         ai_data = QuizGenerationService.generate(
             content=content,
-            resource_url=resource_url,
             quiz_type=quiz_type,
             num_questions=num_questions,
-            max_content_length=max_content_length,
         )
     except Exception as exc:
         tb = traceback.format_exc(limit=2)

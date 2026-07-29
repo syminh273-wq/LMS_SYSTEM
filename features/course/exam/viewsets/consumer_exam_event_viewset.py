@@ -5,12 +5,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import ConsumerScopeMixin
 from features.course.exam.services import ExamAuditEventService
 
 logger = logging.getLogger(__name__)
 
 
-class ConsumerExamEventViewSet(ViewSet):
+class ConsumerExamEventViewSet(ConsumerScopeMixin, ViewSet):
     """
     Record a proctoring event from the student exam-session page.
     @param event_type: type of the proctoring event

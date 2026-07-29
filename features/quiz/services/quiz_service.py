@@ -36,6 +36,18 @@ class QuizService(BaseService):
         quiz_ids = [a.quiz_id for a in assignments]
         return self.repository.get_by_uids(quiz_ids)
 
+    def list_teacher_quizzes(self, teacher_id, classroom_id=None):
+        """Quizzes owned by a teacher, optionally scoped to one classroom's assignments."""
+        if classroom_id:
+            assignments = self.assignment_repo.get_by_classroom(classroom_id)
+            assignment_map = {str(a.quiz_id): a for a in assignments}
+            quizzes = [
+                q for q in self.repository.get_by_uids(list(assignment_map.keys()))
+                if str(q.created_by) == str(teacher_id)
+            ]
+            return quizzes, assignment_map
+        return list(self.repository.get_by_teacher(teacher_id)), {}
+
     def get_with_questions(self, quiz_uid):
         quiz = self.repository.find(quiz_uid)
         questions = list(self.question_repo.get_by_quiz(quiz_uid))

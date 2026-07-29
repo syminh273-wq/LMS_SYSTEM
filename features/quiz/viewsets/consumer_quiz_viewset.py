@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import ConsumerScopeMixin
 from features.quiz.serializers.quiz_request_serializer import QuizSubmitRequestSerializer
 from features.quiz.serializers.quiz_response_serializer import (
     QuizResponseSerializer,
@@ -21,7 +22,7 @@ from features.quiz.services.quiz_leaderboard_service import QuizLeaderboardServi
 logger = logging.getLogger(__name__)
 
 
-class ConsumerQuizViewSet(ViewSet):
+class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
     """Student-facing quiz endpoints. Correct answers are never exposed."""
 
     service = QuizService()

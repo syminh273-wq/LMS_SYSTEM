@@ -1,9 +1,9 @@
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import SpaceScopeMixin
 from features.payment.serializers.payment_analytics_serializer import (
     PaymentAnalyticsResponseSerializer,
 )
@@ -14,10 +14,8 @@ from features.payment.services.payment_analytics_service import (
 )
 
 
-class SpacePaymentViewSet(ViewSet):
+class SpacePaymentViewSet(SpaceScopeMixin, ViewSet):
     """Teacher-side payment received view (history of payments for classrooms they own)."""
-
-    permission_classes = [IsAuthenticated]
 
     def list(self, request):
         """

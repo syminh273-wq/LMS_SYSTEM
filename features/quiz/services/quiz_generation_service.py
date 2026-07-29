@@ -5,28 +5,24 @@ Two modes:
   generate()        → sync, returns full dict (legacy)
   generate_stream() → generator, yields parsed question dicts one by one
                       as the AI produces them (NDJSON streaming)
-
-PDF URLs are extracted properly using pypdf — not treated as raw text.
 """
 import io
 import json
 import logging
-import os
 import re
-import tempfile
-
-import requests
 
 from core.ai.llm.services.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PDF text extraction
-# ─────────────────────────────────────────────────────────────────────────────
+_MAX_CONTENT_LENGTH = 12000
+
+
 
 def _extract_pdf_text(pdf_bytes: bytes) -> str:
     """Extract plain text from PDF bytes using pypdf."""
+    if not pdf_bytes.startswith(b'%PDF-'):
+        raise ValueError('File không đúng định dạng PDF.')
     from pypdf import PdfReader
     reader = PdfReader(io.BytesIO(pdf_bytes))
     pages = []
@@ -37,30 +33,7 @@ def _extract_pdf_text(pdf_bytes: bytes) -> str:
     return "\n\n".join(pages)
 
 
-def _fetch_content(url: str, timeout: int = 30) -> str:
-    """Download a resource URL and return its text content.
 
-    For PDFs: extracts text via pypdf instead of returning raw bytes.
-    For other text types: returns response text directly.
-    """
-    resp = requests.get(url, timeout=timeout)
-    resp.raise_for_status()
-
-    content_type = resp.headers.get('content-type', '').lower()
-    is_pdf = 'pdf' in content_type or url.lower().split('?')[0].endswith('.pdf')
-
-    if is_pdf:
-        text = _extract_pdf_text(resp.content)
-        if not text.strip():
-            raise ValueError("Could not extract text from PDF — the file may be scanned or image-only.")
-        return text
-
-    return resp.text
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Shared output schema (injected into every system message)
-# ─────────────────────────────────────────────────────────────────────────────
 
 _NDJSON_FORMAT_RULE = (
     "OUTPUT FORMAT RULES (MUST FOLLOW EXACTLY):\n"
@@ -104,42 +77,14 @@ _RULES = {
         "Questions and answers must come from the document content — never invent facts.",
         "Options should be similar in length to avoid length-bias clues.",
     ],
-    "true_false": [
-        "Each question is a declarative STATEMENT, not a question.",
-        "option_a is always 'Đúng'. option_b is always 'Sai'.",
-        "option_c and option_d are plausible partial-truth distractors.",
-        "Exactly half the statements should be TRUE, half FALSE.",
-        "False statements must contain one specific, testable error from the document.",
-        "Statements must come strictly from the document.",
-    ],
-    "fill_blank": [
-        "The question field contains the sentence with ___ marking the blank.",
-        "The blank must replace a KEY TERM — not a preposition or filler word.",
-        "4 options are possible words/phrases to fill the blank — only one is correct.",
-        "3 wrong options must be plausible terms from the same domain.",
-        "Each question tests a different key term from the document.",
-    ],
-    "scenario": [
-        "Every question MUST open with a 2-3 sentence real-world scenario.",
-        "The question asks what to do, conclude, or identify in that scenario.",
-        "The correct answer requires applying document concepts, not just recalling them.",
-        "Wrong options represent common misconceptions or surface-level thinking.",
-        "Scenarios and concepts must be grounded in the document content.",
-    ],
 }
 
 _PERSONAS = {
     "multiple_choice": "QuizMaster AI — expert MCQ designer for educational assessments",
-    "true_false": "QuizMaster AI — expert True/False quiz designer",
-    "fill_blank": "QuizMaster AI — expert fill-in-the-blank quiz designer",
-    "scenario": "QuizMaster AI — expert scenario-based assessment designer",
 }
 
 _TASK_TYPES = {
     "multiple_choice": "Multiple-choice — 4 options, exactly 1 correct answer",
-    "true_false": "True/False statements — students judge correct or incorrect",
-    "fill_blank": "Fill-in-the-blank — sentence with key term removed, 4 choices",
-    "scenario": "Scenario-based — real-world situation + applied-knowledge question",
 }
 
 QUIZ_TYPES = list(_RULES.keys())
@@ -360,17 +305,13 @@ class QuizGenerationService:
     @classmethod
     def generate(
         cls,
-        content: str = None,
-        resource_url: str = None,
+        content: str,
         quiz_type: str = 'multiple_choice',
-        num_questions: int = 10,
-        max_content_length: int = 12000,
+        num_questions: int = 5,
     ) -> dict:
-        if not content and not resource_url:
-            raise ValueError("Provide either 'content' or 'resource_url'")
         if not content:
-            content = _fetch_content(resource_url)
-        content = content[:max_content_length]
+            raise ValueError("Provide 'content'")
+        content = content[:_MAX_CONTENT_LENGTH]
 
         messages = _get_messages(quiz_type, content, num_questions, streaming=False)
 
@@ -403,11 +344,9 @@ class QuizGenerationService:
     @classmethod
     def generate_stream(
         cls,
-        content: str = None,
-        resource_url: str = None,
+        content: str,
         quiz_type: str = 'multiple_choice',
-        num_questions: int = 10,
-        max_content_length: int = 12000,
+        num_questions: int = 5,
     ):
         """
         Generator that yields dicts as the AI produces them.
@@ -418,11 +357,9 @@ class QuizGenerationService:
         On error:     {"type": "error",     "detail": "..."}
         """
         try:
-            if not content and not resource_url:
-                raise ValueError("Provide either 'content' or 'resource_url'")
             if not content:
-                content = _fetch_content(resource_url)
-            content = content[:max_content_length]
+                raise ValueError("Provide 'content'")
+            content = content[:_MAX_CONTENT_LENGTH]
         except Exception as exc:
             yield {"type": "error", "detail": str(exc)}
             return

@@ -437,23 +437,23 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
             ).data)
         return Response(items)
 
-    @action(detail=True, methods=['get'], url_path='preview-folder')
-    def preview_folder(self, request, pk=None):
-        """
-        Get the preview folder and its documents for a classroom. Always accessible.
-        @return: folder, docs
-        """
-        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
-        from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
-
-        folder = ClassroomDocService().get_preview_folder(str(pk))
-        if not folder:
-            return Response({'folder': None, 'docs': []})
-        docs = ClassroomDocService().list_folder(classroom_uid=str(pk), folder_id=str(folder.uid))
-        return Response({
-            'folder': ResourceFolderResponseSerializer(folder).data,
-            'docs': ResourceResponseSerializer(docs, many=True).data,
-        })
+    # @action(detail=True, methods=['get'], url_path='preview-folder')
+    # def preview_folder(self, request, pk=None):
+    #     """
+    #     Get the preview folder and its documents for a classroom. Always accessible.
+    #     @return: folder, docs
+    #     """
+    #     from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+    #     from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
+    #
+    #     folder = ClassroomDocService().get_preview_folder(str(pk))
+    #     if not folder:
+    #         return Response({'folder': None, 'docs': []})
+    #     docs = ClassroomDocService().list_folder(classroom_uid=str(pk), folder_id=str(folder.uid))
+    #     return Response({
+    #         'folder': ResourceFolderResponseSerializer(folder).data,
+    #         'docs': ResourceResponseSerializer(docs, many=True).data,
+    #     })
 
     @action(detail=True, methods=['get'], url_path='preview')
     def preview(self, request, pk=None):
@@ -461,7 +461,6 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         Get the classroom landing-page payload for a prospective student.
         @return: classroom info, preview folder + docs, next action (join/checkout/none)
         """
-        from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.course.classroom.repositories import Repository as ClassroomRepo
         from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
 

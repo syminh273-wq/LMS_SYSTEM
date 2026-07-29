@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rq.job import Job, JobStatus
 
 from core.views.api.base_viewset import BaseModelViewSet
+from core.views.mixins import SpaceScopeMixin
 from features.quiz.serializers.quiz_request_serializer import (
     QuizGenerateRequestSerializer,
     QuizUpdateRequestSerializer,
@@ -42,20 +43,25 @@ from features.quiz.tasks.serializers import (
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
-class QuizViewSet(BaseModelViewSet):
+class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
     serializer_class = QuizResponseSerializer
     service = QuizService()
     generation_service = QuizGenerationService()
 
-    def get_queryset(self):
-        return self.service.get_by_teacher(self.request.user.uid)
-
-    # ── LIST  GET /quizzes/ ────────────────────────────────────────────────
     def list(self, request, *args, **kwargs):
-        queryset = list(self.get_queryset())
-        return Response(QuizResponseSerializer(queryset, many=True).data)
+        classroom_id = request.query_params.get('classroom_id')
+        quizzes, assignment_map = self.service.list_teacher_quizzes(request.user.uid, classroom_id)
 
-    # ── RETRIEVE  GET /quizzes/<uid>/ ─────────────────────────────────────
+        data = []
+        for quiz in quizzes:
+            item = QuizResponseSerializer(quiz).data
+            assignment = assignment_map.get(str(quiz.uid))
+            item['assigned_classrooms'] = (
+                [QuizAssignmentResponseSerializer(assignment).data] if assignment else []
+            )
+            data.append(item)
+        return Response(data)
+
     def retrieve(self, request, *args, **kwargs):
         quiz, questions = self.service.get_with_questions(kwargs['uid'])
         assignments = self.service.get_assigned_classrooms(kwargs['uid'])
@@ -70,51 +76,35 @@ class QuizViewSet(BaseModelViewSet):
         data['assigned_classrooms'] = QuizAssignmentResponseSerializer(assignments, many=True).data
         return Response(data)
 
-    # ── QUIZ TYPES  GET /quizzes/types/ ───────────────────────────────────
     @action(detail=False, methods=['get'], url_path='types')
     def types(self, request):
         labels = {
             'multiple_choice': 'Trắc nghiệm 4 đáp án',
-            'true_false':      'Đúng / Sai',
-            'fill_blank':      'Điền vào chỗ trống',
-            'scenario':        'Tình huống thực tế',
         }
         return Response([{'value': t, 'label': labels.get(t, t)} for t in QUIZ_TYPES])
 
-    # ── GENERATE SYNC  POST /quizzes/generate/ ────────────────────────────
     @action(detail=False, methods=['post'], url_path='generate')
     def generate(self, request):
         req_serializer = QuizGenerateRequestSerializer(data=request.data)
         req_serializer.is_valid(raise_exception=True)
         params = req_serializer.validated_data
 
-        resource_id = params.get('resource_id')
-        content     = params.get('content')
-        quiz_type   = params.get('quiz_type', 'multiple_choice')
-        num_questions     = params.get('num_questions', 10)
-        max_content_length = params.get('max_content_length', 12000)
-        resource_url = None
+        quiz_type     = params.get('quiz_type', 'multiple_choice')
+        num_questions = params.get('num_questions', 5)
 
         uploaded_file = request.FILES.get('file')
-        if uploaded_file and not content and not resource_id:
-            try:
-                content = _extract_pdf_text(uploaded_file.read())
-            except Exception as exc:
-                return Response({'detail': f'Không thể đọc file PDF: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+        if not uploaded_file:
+            return Response({'detail': "Upload a 'file'."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not content and not resource_id:
-            return Response({'detail': "Provide 'content', 'resource_id', or upload a 'file'."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if resource_id and not content:
-            from features.resource.repositories.resource_repository import ResourceRepository
-            resource = ResourceRepository().find(resource_id)
-            resource_url = resource.url
+        try:
+            content = _extract_pdf_text(uploaded_file.read())
+        except Exception as exc:
+            return Response({'detail': f'Không thể đọc file PDF: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             ai_data = QuizGenerationService.generate(
-                content=content, resource_url=resource_url,
+                content=content,
                 quiz_type=quiz_type, num_questions=num_questions,
-                max_content_length=max_content_length,
             )
         except Exception as exc:
             return Response({'detail': f'AI generation failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
@@ -123,7 +113,7 @@ class QuizViewSet(BaseModelViewSet):
             created_by=request.user.uid,
             title=ai_data.get('title', 'Untitled Quiz'),
             description=ai_data.get('description', ''),
-            resource_id=resource_id,
+            resource_id=None,
             questions=ai_data['questions'],
         )
 
@@ -145,37 +135,27 @@ class QuizViewSet(BaseModelViewSet):
         req_serializer.is_valid(raise_exception=True)
         params = req_serializer.validated_data
 
-        resource_id = params.get('resource_id')
-        content     = params.get('content')
-        quiz_type   = params.get('quiz_type', 'multiple_choice')
-        num_questions     = params.get('num_questions', 10)
-        max_content_length = params.get('max_content_length', 12000)
-        resource_url = None
+        quiz_type     = params.get('quiz_type', 'multiple_choice')
+        num_questions = params.get('num_questions', 5)
 
         uploaded_file = request.FILES.get('file')
-        if uploaded_file and not content and not resource_id:
-            try:
-                content = _extract_pdf_text(uploaded_file.read())
-            except Exception as exc:
-                err_msg = json.dumps({'type': 'error', 'detail': f'Không thể đọc file PDF: {exc}'})
-                def err_stream():
-                    yield f"data: {err_msg}\n\n"
-                response = StreamingHttpResponse(err_stream(), content_type='text/event-stream')
-                response['Cache-Control'] = 'no-cache'
-                return response
-
-        if not content and not resource_id:
-            msg = json.dumps({'type': 'error', 'detail': "Provide 'content', 'resource_id', or upload a 'file'."})
+        if not uploaded_file:
+            msg = json.dumps({'type': 'error', 'detail': "Upload a 'file'."})
             def missing_stream():
                 yield f"data: {msg}\n\n"
             response = StreamingHttpResponse(missing_stream(), content_type='text/event-stream')
             response['Cache-Control'] = 'no-cache'
             return response
 
-        if resource_id and not content:
-            from features.resource.repositories.resource_repository import ResourceRepository
-            resource = ResourceRepository().find(resource_id)
-            resource_url = resource.url
+        try:
+            content = _extract_pdf_text(uploaded_file.read())
+        except Exception as exc:
+            err_msg = json.dumps({'type': 'error', 'detail': f'Không thể đọc file PDF: {exc}'})
+            def err_stream():
+                yield f"data: {err_msg}\n\n"
+            response = StreamingHttpResponse(err_stream(), content_type='text/event-stream')
+            response['Cache-Control'] = 'no-cache'
+            return response
 
         teacher_uid = request.user.uid
         service = self.service
@@ -185,9 +165,8 @@ class QuizViewSet(BaseModelViewSet):
             total = 0
             try:
                 for event in QuizGenerationService.generate_stream(
-                    content=content, resource_url=resource_url,
+                    content=content,
                     quiz_type=quiz_type, num_questions=num_questions,
-                    max_content_length=max_content_length,
                 ):
                     if event['type'] == 'error':
                         yield f"data: {json.dumps(event)}\n\n"
@@ -198,7 +177,7 @@ class QuizViewSet(BaseModelViewSet):
                             created_by=teacher_uid,
                             title=event['title'],
                             description=event['description'],
-                            resource_id=resource_id,
+                            resource_id=None,
                         )
                         yield f"data: {json.dumps({'type': 'meta', 'quiz_uid': str(quiz.uid), 'title': event['title'], 'description': event['description']})}\n\n"
 
@@ -398,43 +377,28 @@ class QuizViewSet(BaseModelViewSet):
         req_serializer.is_valid(raise_exception=True)
         params = req_serializer.validated_data
 
-        resource_id = params.get('resource_id')
-        content = params.get('content')
         quiz_type = params.get('quiz_type', 'multiple_choice')
-        num_questions = params.get('num_questions', 10)
-        max_content_length = params.get('max_content_length', 12000)
+        num_questions = params.get('num_questions', 5)
 
         uploaded_file = request.FILES.get('file')
-        if uploaded_file and not content and not resource_id:
-            try:
-                content = _extract_pdf_text(uploaded_file.read())
-            except Exception as exc:
-                return Response(
-                    {'detail': f'Không thể đọc file PDF: {exc}'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        if not uploaded_file:
+            return Response({'detail': "Upload a 'file'."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not content and not resource_id:
+        try:
+            content = _extract_pdf_text(uploaded_file.read())
+        except Exception as exc:
             return Response(
-                {'detail': "Provide 'content', 'resource_id', or upload a 'file'."},
+                {'detail': f'Không thể đọc file PDF: {exc}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        resource_url = None
-        if resource_id and not content:
-            from features.resource.repositories.resource_repository import ResourceRepository
-            resource = ResourceRepository().find(resource_id)
-            resource_url = resource.url
 
         queue = django_rq.get_queue('default')
         job = queue.enqueue(
             generate_quiz_task,
             teacher_uid=str(request.user.uid),
             content=content,
-            resource_url=resource_url,
             quiz_type=quiz_type,
             num_questions=num_questions,
-            max_content_length=max_content_length,
             job_id=str(uuid.uuid4()),
             job_timeout=300,
         )

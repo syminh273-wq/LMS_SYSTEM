@@ -115,6 +115,11 @@ class ClassroomMemberService(BaseService):
         classroom = Service().find(str(classroom_uid))
         if str(classroom.teacher_id) != str(approved_by_id):
             raise PermissionDenied("Chỉ giáo viên mới có thể duyệt thành viên.")
+
+        max_students = getattr(classroom, 'max_students', 0) or 0
+        if max_students > 0 and self.repo.count_approved(classroom_uid) >= max_students:
+            raise PermissionDenied(f"Lớp học đã đủ sĩ số tối đa ({max_students}). Không thể duyệt thêm học viên.")
+
         member = self.repo.approve_member(classroom_uid, member_id)
         if not member:
             raise NotFound("Không tìm thấy thành viên.")

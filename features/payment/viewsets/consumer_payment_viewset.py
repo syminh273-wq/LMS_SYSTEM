@@ -1,16 +1,15 @@
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-
 from core.views.api.base_viewset import BaseModelViewSet
+from core.views.mixins import ConsumerScopeMixin
 from features.payment.serializers import PaymentRequestSerializer
 from features.payment.serializers.payment_response_serializer import PaymentInitiateResponseSerializer, PaymentResponseSerializer
 from features.payment.services import PaymentService
 from features.payment.repositories import PaymentRepository
 
 
-class PaymentViewSet(BaseModelViewSet):
+class ConsumerPaymentViewSet(ConsumerScopeMixin, BaseModelViewSet):
     """Consumer payment history + initiate MoMo payment."""
     http_method_names = ['get', 'post']
 

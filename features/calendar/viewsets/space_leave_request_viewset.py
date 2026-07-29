@@ -12,7 +12,7 @@ from features.calendar.serializers.leave_request_serializer import (
 )
 
 
-class LeaveRequestViewSet(SpaceScopeMixin, ViewSet):
+class SpaceLeaveRequestViewSet(SpaceScopeMixin, ViewSet):
     serializer_class = LeaveRequestSerializer
 
     def _get_queryset(self, request):

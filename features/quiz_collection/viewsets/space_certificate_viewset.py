@@ -3,6 +3,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import SpaceScopeMixin
 from features.quiz_collection.serializers.certificate_request_serializer import (
     CertificateCreateRequestSerializer,
     CertificateUpdateRequestSerializer,
@@ -13,7 +14,7 @@ from features.quiz_collection.serializers.certificate_response_serializer import
 from features.quiz_collection.services import CertificateService
 
 
-class CertificateViewSet(ViewSet):
+class SpaceCertificateViewSet(SpaceScopeMixin, ViewSet):
     service = CertificateService()
 
     def list(self, request):

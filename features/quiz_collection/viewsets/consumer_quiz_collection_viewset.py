@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import ConsumerScopeMixin
 from features.quiz_collection.serializers.quiz_collection_response_serializer import (
     QuizCollectionResponseSerializer,
     QuizCollectionDetailResponseSerializer,
@@ -23,7 +24,7 @@ from features.quiz_collection.repositories import IssuedCertificateRepository
 logger = logging.getLogger(__name__)
 
 
-class ConsumerQuizCollectionViewSet(ViewSet):
+class ConsumerQuizCollectionViewSet(ConsumerScopeMixin, ViewSet):
     service = QuizCollectionService()
     issuance_service = CertificateIssuanceService()
     issued_repo = IssuedCertificateRepository()

@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'django_cassandra_engine',
     'corsheaders',
     'django_rq',
+    'django_extensions',
 
     # Local apps
     'core',

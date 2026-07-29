@@ -6,6 +6,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import SpaceScopeMixin
 from features.course.exam.serializers import (
     ExamSubmissionAIGradeSerializer,
     ExamSubmissionGradeSerializer,
@@ -98,7 +99,7 @@ def _submission_error_response(exc):
     return Response({"error": message}, status=code)
 
 
-class SpaceExamViewSet(ViewSet):
+class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def __init__(self, **kwargs):

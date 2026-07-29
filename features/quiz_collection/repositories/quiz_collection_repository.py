@@ -80,4 +80,7 @@ class QuizCollectionRepository(BaseRepository):
         return instance
 
     def get_item_quiz_ids(self, instance):
-        return list(instance.item_quiz_ids or [])
+        return [
+            {'quiz_id': qid, 'order': idx}
+            for idx, qid in enumerate(instance.item_quiz_ids or [])
+        ]

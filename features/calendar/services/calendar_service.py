@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import PermissionDenied, NotFound, ValidationError
 
 from core.services.base_service import BaseService
 from features.calendar.repositories.calendar_event_repository import CalendarEventRepository
@@ -41,13 +41,57 @@ class CalendarService(BaseService):
 
     def create_event(self, space_id, owner_id, classroom_id=None, **kwargs):
         self._ensure_classroom_ownership(classroom_id, owner_id)
+        self._check_overlap(classroom_id, owner_id, kwargs['start_time'], kwargs['end_time'])
         return self.create(space_id=space_id, owner_id=owner_id, classroom_id=classroom_id, **kwargs)
 
     def update_event(self, event, requester_id, **kwargs):
         self._ensure_event_ownership(event, requester_id)
         if 'classroom_id' in kwargs and kwargs['classroom_id'] != event.classroom_id:
             self._ensure_classroom_ownership(kwargs['classroom_id'], requester_id)
+        classroom_id = kwargs.get('classroom_id', event.classroom_id)
+        start_time = kwargs.get('start_time', event.start_time)
+        end_time = kwargs.get('end_time', event.end_time)
+        self._check_overlap(classroom_id, event.owner_id, start_time, end_time, exclude_uid=event.uid)
         return self.update(event, **kwargs)
+
+    def _check_overlap(self, classroom_id, owner_id, start_time, end_time, exclude_uid=None):
+        candidates = self.repository.get_by_classroom(classroom_id) if classroom_id else self.repository.get_by_owner(owner_id)
+        for candidate in candidates:
+            if exclude_uid and str(candidate.uid) == str(exclude_uid):
+                continue
+            if candidate.start_time < end_time and candidate.end_time > start_time:
+                raise ValidationError({'start_time': 'Đã tồn tại lịch trùng ngày/giờ.'})
+
+    def create_recurring_events(self, space_id, owner_id, classroom_id, event_type, title, description, slots):
+        self._ensure_classroom_ownership(classroom_id, owner_id)
+
+        existing = list(self.repository.get_by_classroom(classroom_id) if classroom_id else self.repository.get_by_owner(owner_id))
+        conflicts = []
+        accepted = []
+        for slot in slots:
+            start_time, end_time = slot['start_time'], slot['end_time']
+            if any(e.start_time < end_time and e.end_time > start_time for e in existing):
+                conflicts.append({'start_time': start_time, 'end_time': end_time, 'reason': 'Đã tồn tại lịch trùng ngày/giờ.'})
+            else:
+                accepted.append(slot)
+
+        if conflicts:
+            return [], conflicts
+
+        created = [
+            self.create(
+                space_id=space_id,
+                owner_id=owner_id,
+                classroom_id=classroom_id,
+                type=event_type,
+                title=title,
+                description=description,
+                start_time=slot['start_time'],
+                end_time=slot['end_time'],
+            )
+            for slot in slots
+        ]
+        return created, []
 
     def delete_event(self, event, requester_id):
         self._ensure_event_ownership(event, requester_id)

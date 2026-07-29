@@ -1,7 +1,7 @@
 from datetime import datetime
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 
 from core.views.api.base_viewset import BaseModelViewSet
 from core.views.mixins import SpaceScopeMixin
@@ -28,7 +28,7 @@ def _parse_dt(value):
         return None
 
 
-class CalendarViewSet(SpaceScopeMixin, BaseModelViewSet):
+class SpaceCalendarViewSet(SpaceScopeMixin, BaseModelViewSet):
     serializer_class = CalendarEventSerializer
 
     def get_queryset(self):
@@ -72,46 +72,36 @@ class CalendarViewSet(SpaceScopeMixin, BaseModelViewSet):
         title = data["title"]
         event_type = data.get("type", "class")
         description = data.get("description", "")
-        start_date = data["start_date"]
-        end_date = data["end_date"]
 
         service = CalendarService()
-        created_uids = []
-        failed = 0
-        for slot in slots:
-            try:
-                ev = service.create_event(
-                    space_id=request.user.uid,
-                    owner_id=request.user.uid,
-                    classroom_id=classroom_id,
-                    type=event_type,
-                    title=title,
-                    description=description,
-                    start_time=slot["start_time"],
-                    end_time=slot["end_time"],
-                )
-                created_uids.append(ev.uid)
-            except Exception:
-                failed += 1
+        created_events, conflicts = service.create_recurring_events(
+            space_id=request.user.uid,
+            owner_id=request.user.uid,
+            classroom_id=classroom_id,
+            event_type=event_type,
+            title=title,
+            description=description,
+            slots=slots,
+        )
 
-        if classroom_id and created_uids:
-            enqueue_recurring_email(
-                classroom_uid=classroom_id,
-                event_uids=created_uids,
-                start_date=start_date,
-                end_date=end_date,
-                title=title,
-                event_type=event_type,
-                description=description,
-            )
+        if classroom_id and created_events:
+            enqueue_recurring_email(classroom_id)
 
         return Response(
             {
-                "created": len(created_uids),
-                "failed": failed,
-                "event_uids": [str(u) for u in created_uids],
+                "created": len(created_events),
+                "failed": len(conflicts),
+                "event_uids": [str(ev.uid) for ev in created_events],
+                "conflicts": [
+                    {
+                        "start_time": c["start_time"].isoformat(),
+                        "end_time": c["end_time"].isoformat(),
+                        "reason": c["reason"],
+                    }
+                    for c in conflicts
+                ],
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED if created_events else status.HTTP_200_OK,
         )
 
     def update(self, request, *args, **kwargs):

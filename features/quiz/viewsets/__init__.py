@@ -1,1 +1,1 @@
-from .quiz_viewset import QuizViewSet
+from .space_quiz_viewset import SpaceQuizViewSet

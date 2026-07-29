@@ -2,10 +2,11 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import ConsumerScopeMixin
 from features.face.services import FaceRecognitionService
 
 
-class ConsumerFaceViewSet(ViewSet):
+class ConsumerFaceViewSet(ConsumerScopeMixin, ViewSet):
     """
     Student-facing endpoints for face enrollment and REST verification.
     """

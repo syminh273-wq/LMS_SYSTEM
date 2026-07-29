@@ -10,7 +10,7 @@ VISIBILITY_CHOICES = ['public', 'private']
 class ClassroomRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     description = serializers.CharField(required=False, allow_blank=True, default='')
-    max_students = serializers.IntegerField(required=False, default=0)
+    max_students = serializers.IntegerField(required=False, default=0, min_value=0)
     status = serializers.ChoiceField(choices=['active', 'private'], required=False, default='active')
     pricing_type = serializers.ChoiceField(choices=['free', 'paid'], required=False, default='free')
     price_vnd = serializers.IntegerField(required=False, default=0, min_value=0)

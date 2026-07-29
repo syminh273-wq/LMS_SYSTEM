@@ -17,6 +17,12 @@ class CalendarEventRepository(BaseRepository):
             kwargs['type'] = type_
         return self.filter(**kwargs)
 
+    def get_by_owner(self, owner_id, type_=None):
+        kwargs = {'owner_id': owner_id, 'is_deleted': False}
+        if type_:
+            kwargs['type'] = type_
+        return self.filter(**kwargs)
+
     def get_by_classroom_uids(self, classroom_uids, type_=None):
         results = []
         for cid in classroom_uids:

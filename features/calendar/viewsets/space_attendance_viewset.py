@@ -7,7 +7,7 @@ from core.views.mixins import SpaceScopeMixin
 from features.calendar.services.attendance_service import AttendanceService
 from features.calendar.serializers.attendance_serializer import AttendanceSerializer, AttendanceUpdateSerializer
 
-class AttendanceViewSet(SpaceScopeMixin, ViewSet):
+class SpaceAttendanceViewSet(SpaceScopeMixin, ViewSet):
     def list(self, request):
         event_id = request.query_params.get('event_id')
         if not event_id:

@@ -15,6 +15,9 @@ class ClassroomMemberRepository(BaseRepository):
         """Approved members of a classroom."""
         return self.model.objects.filter(classroom_uid=classroom_uid, is_deleted=False, status='approved')
 
+    def count_approved(self, classroom_uid):
+        return len(list(self.get_members(classroom_uid)))
+
     def get_pending_members(self, classroom_uid):
         """Pending members of a classroom waiting for approval."""
         return self.model.objects.filter(classroom_uid=classroom_uid, is_deleted=False, status='pending')

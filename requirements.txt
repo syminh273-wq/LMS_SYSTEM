@@ -11,6 +11,7 @@ django-filter
 channels
 daphne
 django-cors-headers
+django-extensions
 boto3
 qrcode==8.2
 

@@ -3,6 +3,7 @@ import json
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import SpaceScopeMixin
 from features.face.services import FaceRecognitionService
 from features.course.exam.repositories.exam_event_log_repository import ExamEventLogRepository
 
@@ -21,7 +22,7 @@ def _serialize_log(log) -> dict:
     }
 
 
-class SpaceFaceViewSet(ViewSet):
+class SpaceFaceViewSet(SpaceScopeMixin, ViewSet):
     """
     Teacher/admin endpoints to view face verification logs.
     """

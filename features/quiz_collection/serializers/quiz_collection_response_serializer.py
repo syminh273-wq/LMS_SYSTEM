@@ -6,7 +6,6 @@ from rest_framework import serializers
 class QuizCollectionItemResponseSerializer(serializers.Serializer):
     quiz_id = serializers.UUIDField(read_only=True)
     order = serializers.IntegerField()
-    added_at = VnDateTimeField(read_only=True)
 
 
 class QuizCollectionAssignmentResponseSerializer(serializers.Serializer):
@@ -23,9 +22,17 @@ class QuizCollectionResponseSerializer(serializers.Serializer):
     description = serializers.CharField()
     quiz_count = serializers.IntegerField()
     certificate_id = serializers.UUIDField(allow_null=True, required=False)
+    certificate_name = serializers.SerializerMethodField()
     status = serializers.CharField()
     created_at = VnDateTimeField(read_only=True)
     updated_at = VnDateTimeField(read_only=True)
+
+    def get_certificate_name(self, obj):
+        certificate_id = obj.get('certificate_id') if isinstance(obj, dict) else obj.certificate_id
+        if not certificate_id:
+            return None
+        cert = self.context.get('certificates_by_id', {}).get(str(certificate_id))
+        return cert.name if cert else None
 
 
 class QuizCollectionDetailResponseSerializer(QuizCollectionResponseSerializer):

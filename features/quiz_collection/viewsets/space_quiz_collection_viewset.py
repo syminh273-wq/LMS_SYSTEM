@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.views.mixins import SpaceScopeMixin
 from features.quiz_collection.serializers.quiz_collection_request_serializer import (
     QuizCollectionCreateRequestSerializer,
     QuizCollectionUpdateRequestSerializer,
@@ -17,21 +18,29 @@ from features.quiz_collection.serializers.quiz_collection_response_serializer im
     QuizCollectionAssignmentResponseSerializer,
 )
 from features.quiz_collection.services import QuizCollectionService
+from features.quiz_collection.repositories import CertificateRepository
 from features.quiz.repositories.quiz_repository import QuizRepository
 
 
-class QuizCollectionViewSet(ViewSet):
+class SpaceQuizCollectionViewSet(SpaceScopeMixin, ViewSet):
     service = QuizCollectionService()
     quiz_service = QuizRepository()
+    certificate_repository = CertificateRepository()
+
+    def _certificates_by_id(self, collections):
+        cert_ids = [c.certificate_id for c in collections if c.certificate_id]
+        return self.certificate_repository.get_by_ids(cert_ids)
 
     def list(self, request):
         collections = list(self.service.get_by_teacher(request.user.uid))
-        return Response(QuizCollectionResponseSerializer(collections, many=True).data)
+        context = {'certificates_by_id': self._certificates_by_id(collections)}
+        return Response(QuizCollectionResponseSerializer(collections, many=True, context=context).data)
 
     def retrieve(self, request, pk=None):
         data = self.service.get_detail(pk)
         if str(data['collection'].created_by) != str(request.user.uid):
             raise PermissionDenied('You do not have permission to view this collection.')
+        context = {'certificates_by_id': self._certificates_by_id([data['collection']])}
         return Response(QuizCollectionDetailResponseSerializer({
             **{f: getattr(data['collection'], f) for f in [
                 'uid', 'created_by', 'title', 'description', 'quiz_count',
@@ -39,7 +48,7 @@ class QuizCollectionViewSet(ViewSet):
             ]},
             'items': data['items'],
             'assignments': data['assignments'],
-        }).data)
+        }, context=context).data)
 
     def create(self, request):
         serializer = QuizCollectionCreateRequestSerializer(data=request.data)
@@ -51,8 +60,9 @@ class QuizCollectionViewSet(ViewSet):
             description=d.get('description', ''),
             certificate_id=d.get('certificate_id'),
         )
+        context = {'certificates_by_id': self._certificates_by_id([collection])}
         return Response(
-            QuizCollectionResponseSerializer(collection).data,
+            QuizCollectionResponseSerializer(collection, context=context).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -63,7 +73,8 @@ class QuizCollectionViewSet(ViewSet):
         serializer = QuizCollectionUpdateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         updated = self.service.update(collection, **serializer.validated_data)
-        return Response(QuizCollectionResponseSerializer(updated).data)
+        context = {'certificates_by_id': self._certificates_by_id([updated])}
+        return Response(QuizCollectionResponseSerializer(updated, context=context).data)
 
     def destroy(self, request, pk=None):
         collection = self.service.find(pk)
@@ -102,7 +113,7 @@ class QuizCollectionViewSet(ViewSet):
         serializer = QuizCollectionReorderRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         ordered = [str(q) for q in serializer.validated_data['ordered_quiz_ids']]
-        existing = set(self.service.item_repo.get_quiz_ids(pk))
+        existing = {str(q) for q in (collection.item_quiz_ids or [])}
         if set(ordered) != existing:
             return Response(
                 {'detail': 'ordered_quiz_ids must contain exactly the same quiz_ids as the collection.'},

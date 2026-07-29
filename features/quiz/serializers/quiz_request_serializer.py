@@ -3,20 +3,15 @@ from core.serializers.fields import VnDateTimeField
 from rest_framework import serializers
 
 
-QUIZ_TYPE_CHOICES = ['multiple_choice', 'true_false', 'fill_blank', 'scenario']
+QUIZ_TYPE_CHOICES = ['multiple_choice']
 
 
 class QuizGenerateRequestSerializer(serializers.Serializer):
-    content     = serializers.CharField(required=False, allow_blank=False)
-    resource_id = serializers.UUIDField(required=False)
     quiz_type = serializers.ChoiceField(
         choices=QUIZ_TYPE_CHOICES, required=False, default='multiple_choice',
     )
     num_questions = serializers.IntegerField(
-        required=False, default=10, min_value=5, max_value=30,
-    )
-    max_content_length = serializers.IntegerField(
-        required=False, default=12000, min_value=1000, max_value=40000,
+        required=False, default=5, min_value=5, max_value=30,
     )
 
     def validate(self, attrs):

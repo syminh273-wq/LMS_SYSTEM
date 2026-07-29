@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from core.utils.datetime import to_vn_iso
+from core.views.mixins import ConsumerScopeMixin
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.exam.serializers import (
     ExamSubmissionRequestSerializer,
@@ -68,7 +69,7 @@ def _submission_error_response(exc):
     return Response({"error": message}, status=code)
 
 
-class ConsumerExamViewSet(ViewSet):
+class ConsumerExamViewSet(ConsumerScopeMixin, ViewSet):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
