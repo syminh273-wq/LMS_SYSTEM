@@ -2,15 +2,11 @@ import base64
 import json
 import uuid
 
-from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from features.ai.services.ai_conversation_session_service import AIConversationSessionService
-
-_ai_session_service = AIConversationSessionService()
 from core.serializers.classroom import ClassroomResponseSerializer
 from core.serializers.classroom.request import ClassroomRequestSerializer
 from core.views.api.base_viewset import BaseModelViewSet
@@ -18,7 +14,7 @@ from core.views.mixins import UserScopeMixin
 from features.account.space.models.space import Space
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
-from features.course.classroom.services import Service, ClassroomAIService
+from features.course.classroom.services import Service
 from features.course.classroom.services.classroom_doc_service import ClassroomDocService
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
@@ -111,68 +107,70 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
 
     # ── Documents (LanceDB) ───────────────────────────────────────────────────
 
-    @action(detail=True, methods=['post', 'get'], url_path='docs')
-    def docs(self, request, uid=None):
+    def docs_upload(self, request, uid=None):
         """
-        Upload a document (POST) or list documents (GET) for a classroom.
-        @param file: uploaded document, PDF/TXT/MD (POST, required)
+        Upload a document for a classroom.
+        @param file: uploaded document, PDF/TXT/MD (required)
         @param section: category label (optional)
-        @param folder_id: destination/filter folder uid (optional)
-        @param order_index: position within folder (POST, optional)
-        @return: created document, or list of documents
+        @param folder_id: destination folder uid (optional)
+        @param order_index: position within folder (optional)
+        @return: created document
         """
-        doc_service = ClassroomDocService()
+        if not isinstance(request.user, Space):
+            raise PermissionDenied("Only teachers can upload documents.")
 
-        if request.method == 'POST':
-            if not isinstance(request.user, Space):
-                raise PermissionDenied("Only teachers can upload documents.")
-
-            if 'file' not in request.FILES:
-                return Response(
-                    {'success': False, 'message': 'No file provided'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            section = request.data.get('section', '')
-            folder_id = request.data.get('folder_id') or None
-            exam_period = request.data.get('exam_period') or None
-            try:
-                order_index = int(request.data.get('order_index', 0))
-            except (TypeError, ValueError):
-                order_index = 0
-            result = doc_service.upload_and_index(
-                classroom_uid=str(uid),
-                file_obj=request.FILES['file'],
-                section=section,
-                folder_id=folder_id,
-                order_index=order_index,
-                exam_period=exam_period,
+        if 'file' not in request.FILES:
+            return Response(
+                {'success': False, 'message': 'No file provided'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            resource = result.get('data')
-            if resource:
-                ClassroomActivityLogService().log(
-                    classroom_uid=uid,
-                    log_level='major',
-                    event_type='document_uploaded',
-                    actor_id=request.user.uid,
-                    actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
-                    actor_role='teacher',
-                    target_name=getattr(resource, 'name', ''),
-                    metadata={'section': section, 'folder_id': str(folder_id) if folder_id else ''},
-                )
-                resp_data = ResourceResponseSerializer(resource).data
-                if not result.get('success'):
-                    resp_data['_warning'] = result.get('message', 'LanceDB indexing thất bại')
-                return Response(resp_data, status=status.HTTP_201_CREATED)
-            return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
-        # GET
+        section = request.data.get('section', '')
+        folder_id = request.data.get('folder_id') or None
+        exam_period = request.data.get('exam_period') or None
+        try:
+            order_index = int(request.data.get('order_index', 0))
+        except (TypeError, ValueError):
+            order_index = 0
+        result = ClassroomDocService().upload_and_index(
+            classroom_uid=str(uid),
+            file_obj=request.FILES['file'],
+            section=section,
+            folder_id=folder_id,
+            order_index=order_index,
+            exam_period=exam_period,
+        )
+        resource = result.get('data')
+        if resource:
+            ClassroomActivityLogService().log(
+                classroom_uid=uid,
+                log_level='major',
+                event_type='document_uploaded',
+                actor_id=request.user.uid,
+                actor_name=getattr(request.user, 'full_name', '') or getattr(request.user, 'username', ''),
+                actor_role='teacher',
+                target_name=getattr(resource, 'name', ''),
+                metadata={'section': section, 'folder_id': str(folder_id) if folder_id else ''},
+            )
+            resp_data = ResourceResponseSerializer(resource).data
+            if not result.get('success'):
+                resp_data['_warning'] = result.get('message', 'LanceDB indexing thất bại')
+            return Response(resp_data, status=status.HTTP_201_CREATED)
+        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+    def docs_list(self, request, uid=None):
+        """
+        List documents for a classroom.
+        @param section: category label (optional)
+        @param folder_id: filter folder uid (optional)
+        @return: list of documents
+        """
         section = request.query_params.get('section')
         folder_id = request.query_params.get('folder_id') or None
         if folder_id or 'folder_id' in request.query_params:
-            docs = doc_service.list_folder(classroom_uid=str(uid), folder_id=folder_id)
+            docs = ClassroomDocService().list_folder(classroom_uid=str(uid), folder_id=folder_id)
         else:
-            docs = doc_service.list_docs(classroom_uid=str(uid), section=section)
+            docs = ClassroomDocService().list_docs(classroom_uid=str(uid), section=section)
         return Response(ResourceResponseSerializer(docs, many=True).data)
 
     @action(detail=True, methods=['get'], url_path='docs/tree')
@@ -340,7 +338,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
-    # ── Activity Log ─────────────────────────────────────────────────────────
 
     @action(detail=True, methods=['get'], url_path='activity')
     def activity(self, request, uid=None):
@@ -369,149 +366,3 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             before=before,
         )
         return Response(logs)
-
-    # ── AI Bot ────────────────────────────────────────────────────────────────
-
-    _CLASSROOM_PROMPT = (
-        "Bạn là AI Trợ giảng, hỗ trợ học sinh và giáo viên hiểu sâu nội dung bài học.\n\n"
-        "QUY TẮC BẮT BUỘC:\n"
-        "- Với BẤT KỲ câu hỏi nào về nội dung, tài liệu, bài học, nhân vật, sự kiện, khái niệm: "
-        "BẮT BUỘC phải gọi tool search_documents TRƯỚC, sau đó mới trả lời dựa trên kết quả.\n"
-        "- KHÔNG được tự trả lời từ kiến thức của mình. KHÔNG được nói 'không tìm thấy' mà chưa gọi tool.\n"
-        "- Chỉ bỏ qua search_documents với lời chào xã giao (Xin chào, Hi, Hello,...).\n\n"
-        "Khi trả lời dựa trên kết quả tool:\n"
-        "1. Trả lời đầy đủ và có chiều sâu — giải thích để người học thực sự hiểu.\n"
-        "2. Dẫn chứng cụ thể từ tài liệu — dùng câu như 'Theo tài liệu...', 'Bài học nêu rõ rằng...'.\n"
-        "3. Văn phong tự nhiên, thân thiện như người thầy đang giảng.\n"
-        "4. Cấu trúc rõ ràng — chia đoạn hoặc liệt kê có thứ tự nếu có nhiều ý.\n"
-        "5. Nếu kết quả search_documents trống hoặc không liên quan: CHỈ nói 'Tài liệu lớp học không có thông tin về vấn đề này.'\n\n"
-        "CHỈ trả lời bằng tiếng Việt."
-    )
-
-    @action(detail=True, methods=['post'], url_path='ask')
-    def ask(self, request, uid=None):
-        """
-        Ask the classroom AI a question and get a synchronous answer.
-        @param question: the question text
-        @return: answer, tool_calls, session_id
-        """
-        question = (request.data.get('question') or '').strip()
-        if not question:
-            return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
-
-        ai_service = ClassroomAIService()
-        session_id = ai_service.get_session_id(
-            request.data.get('session_id'), request.user.uid, uid
-        )
-
-        filter_meta = {'classroom_id': str(uid)}
-        section = request.data.get('section')
-        if section:
-            filter_meta['section'] = section
-
-        result = ai_service.ask(
-            question=question,
-            session_id=session_id,
-            user_id=request.user.uid,
-            classroom_id=uid,
-            filter_meta=filter_meta,
-            system_prompt=self._CLASSROOM_PROMPT
-        )
-
-        return Response({
-            'answer':     result['answer'],
-            'tool_calls': result['tool_calls'],
-            'session_id': session_id,
-        })
-
-    @action(detail=True, methods=['post'], url_path='ask-stream')
-    def ask_stream(self, request, uid=None):
-        """
-        Ask the classroom AI a question and stream the answer via SSE.
-        @param question: the question text
-        @return: text/event-stream response
-        """
-        ai_service = ClassroomAIService()
-
-        question = (request.data.get('question') or '').strip()
-        if not question:
-            return Response({'error': 'Câu hỏi không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
-
-        session_id = ai_service.get_session_id(
-            request.data.get('session_id'), request.user.uid, uid
-        )
-
-        mode = (request.data.get('mode') or 'doc').strip()
-        section = request.data.get('section')
-        document_id = request.data.get('document_id')
-
-        resp = StreamingHttpResponse(
-            ai_service.ask_stream(
-                question=question,
-                session_id=session_id,
-                user_id=request.user.uid,
-                classroom_id=uid,
-                mode=mode,
-                document_id=document_id,
-                section=section
-            ),
-            content_type='text/event-stream; charset=utf-8'
-        )
-        resp['Cache-Control'] = 'no-cache'
-        resp['X-Accel-Buffering'] = 'no'
-        return resp
-
-    @action(detail=True, methods=['get'], url_path='active-session')
-    def active_session(self, request, uid=None):
-        """
-        Continue the most recent AI session or create a new one.
-        @return: session_id, messages
-        """
-        session_id = _ai_session_service.ensure_session(None, request.user.uid, str(uid))
-        messages = _ai_session_service.get_display_messages(session_id)
-        return Response({
-            'session_id': session_id,
-            'messages': messages
-        })
-
-    @action(detail=True, methods=['post'], url_path='ai-session')
-    def ai_session(self, request, uid=None):
-        """
-        Create a new AI session, or clear and replace an existing one.
-        @param session_id: existing session to clear (optional)
-        @return: session_id
-        """
-        old_sid = (request.data.get('session_id') or '').strip()
-        if old_sid and _ai_session_service.session_exists(old_sid):
-            new_sid = _ai_session_service.clear_session(
-                old_sid, user_id=request.user.uid, classroom_id=str(uid)
-            )
-        else:
-            new_sid = _ai_session_service.create_session(
-                user_id=request.user.uid, classroom_id=str(uid)
-            )
-        return Response({'session_id': new_sid})
-
-    @action(detail=True, methods=['get'], url_path='ai-sessions')
-    def ai_sessions(self, request, uid=None):
-        """
-        List all AI sessions for this teacher in this classroom.
-        @return: list of sessions
-        """
-        sessions = _ai_session_service.list_sessions(
-            user_id=request.user.uid, classroom_id=str(uid)
-        )
-        return Response(sessions)
-
-    @action(detail=True, methods=['get'], url_path='ai-session/history')
-    def ai_session_history(self, request, uid=None):
-        """
-        Get the message history for an AI session.
-        @param session_id: the session to fetch history for
-        @return: session_id, messages
-        """
-        session_id = (request.query_params.get('session_id') or '').strip()
-        if not session_id or not _ai_session_service.session_exists(session_id):
-            return Response({'error': 'Session không hợp lệ.'}, status=status.HTTP_404_NOT_FOUND)
-        messages = _ai_session_service.get_display_messages(session_id)
-        return Response({'session_id': session_id, 'messages': messages})

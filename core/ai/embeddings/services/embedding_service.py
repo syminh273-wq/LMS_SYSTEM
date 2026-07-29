@@ -75,7 +75,6 @@ class HashEmbeddings(Embeddings):
         return self._encode(text)
 
 
-# ── Factory ───────────────────────────────────────────────────────────────────
 
 _instance: Embeddings = None
 

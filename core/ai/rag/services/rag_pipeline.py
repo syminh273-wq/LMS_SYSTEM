@@ -5,7 +5,8 @@ Architecture (theo chuẩn RAG)
 ─────────────────────────────
   Document / Text
         │
-  ① LangChain Loader + RecursiveCharacterTextSplitter   (chunking)
+  ①
+   + RecursiveCharacterTextSplitter   (chunking)
         │  • mỗi chunk có chunk_index, document_id, classroom_id
         │
   ② Embedding Model  (Ollama nomic-embed-text, qua AI_MODE)
@@ -84,7 +85,7 @@ class RAGPipeline:
             min_score if min_score is not None else self.DEFAULT_MIN_SCORE
         )
         self._embedder = None
-        self._store_cache: dict = {}  # dim → LanceVectorService
+        self._store_cache: dict = {}
 
     # ─────────────────────────────────────────────────────────────────────────
     # ① LangChain — load & chunk
@@ -121,10 +122,7 @@ class RAGPipeline:
         v_docs = viparse.load(file_path, ocr=True)
         docs = []
         for vd in v_docs:
-            # viparse Document → LangChain Document
-            # viparse dùng .text, metadata là DocumentMetadata object
             content = vd.text
-            # Convert DocumentMetadata → dict bằng cách lấy các field quan trọng
             vmeta = vd.metadata
             meta = {
                 "source": getattr(vmeta, "source", ""),
@@ -133,7 +131,6 @@ class RAGPipeline:
                 "lang": getattr(vmeta, "lang", ""),
                 "content_type": getattr(vmeta, "content_type", ""),
             }
-            # Thêm extra fields nếu có
             extra = getattr(vmeta, "extra", None)
             if extra and isinstance(extra, dict):
                 meta.update(extra)
@@ -161,9 +158,6 @@ class RAGPipeline:
         )
         return splitter.split_documents([doc])
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # ② Embedding model
-    # ─────────────────────────────────────────────────────────────────────────
 
     def _get_embedder(self):
         if self._embedder is None:
@@ -176,22 +170,37 @@ class RAGPipeline:
     def _embed_query(self, text: str) -> List[float]:
         return self._get_embedder().embed_query(text)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # ③ LanceDB — vector store
-    # ─────────────────────────────────────────────────────────────────────────
+
 
     def _get_store(self, embed_dim: int = None) -> LanceVectorService:
+        """
+        Trả về LanceVectorService cho collection hiện tại — tạo (và cache) MỘT LẦN
+        duy nhất, tránh việc mở lại kết nối/table LanceDB mỗi khi retrieve/ingest
+        được gọi (retrieve, ingest_document, ask/ask_stream đều đi qua đây).
+
+        Vì sao cần `embed_dim`:
+          Số chiều (dimension) của vector embedding chỉ biết được SAU LẦN GỌI
+          MODEL EMBEDDING ĐẦU TIÊN (auto-detect, xem `_get_embedder`/dòng 393).
+          Nếu `_get_store()` được gọi trước đó (chưa biết dim) rồi mới gọi lại
+          với `embed_dim` xác định, ta backfill giá trị này vào store đã cache
+          — thay vì tạo store mới — để không mất kết nối/table đã mở.
+
+        Lưu ý: dù tên biến `_store_cache` gợi ý "cache theo dim", trên thực tế
+        chỉ luôn dùng 1 key duy nhất (0) — đây là cache 1-slot (singleton),
+        KHÔNG phải cache nhiều store theo từng dim khác nhau.
+        """
         if not self._store_cache:
+            # Lần gọi đầu tiên: chưa có store nào → tạo mới và cache lại.
             self._store_cache[0] = LanceVectorService(self.collection, embed_dim=embed_dim)
             return self._store_cache[0]
+
         store = self._store_cache[0]
         if embed_dim and not store._embed_dim:
+            # Store đã tồn tại nhưng chưa biết dim (được tạo trước lần embed đầu
+            # tiên) → set bổ sung dim vào, không tạo lại store.
             store._embed_dim = embed_dim
         return store
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # ④ retrieve() — vector search với metadata filter
-    # ─────────────────────────────────────────────────────────────────────────
 
     def retrieve(
         self,

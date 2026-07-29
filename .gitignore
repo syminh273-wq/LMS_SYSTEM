@@ -5,6 +5,7 @@ db.sqlite3
 .idea/
 .venv/
 .zencoder/
+.DS_Store
 
 # Database
 lancedb/

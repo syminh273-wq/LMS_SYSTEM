@@ -1,23 +1,3 @@
-"""
-ClassroomAIService — orchestration layer cho classroom AI.
-
-Kiến trúc (chuẩn RAG)
-──────────────────────
-  ViewSet (HTTP / WS)
-        ↓
-  ClassroomAIService   ← chỉ làm orchestration: permission, session, SSE
-        ↓
-  RAGPipeline          ← retrieve / build_context / generate_stream
-        ↓
-  LanceVectorService + Embedding + LLM
-
-Mode handling
-─────────────
-  doc     — RAG retrieval + LLM streaming (câu hỏi về tài liệu lớp)
-  manage  — LangChain tool-calling agent (quản lý lớp: học sinh, bài thi…)
-  free    — LLM thuần, không retrieval (chat tự do)
-"""
-
 import json
 from typing import Generator
 
@@ -28,7 +8,6 @@ from core.ai.rag.services.rag_pipeline import RAGPipeline
 from core.ai.tools.tool_executor import LMSToolExecutor
 from features.ai.services.ai_conversation_session_service import AIConversationSessionService
 
-# Module-level singleton — tránh re-instantiate RAGPipeline (giữ _store_cache)
 _pipeline = RAGPipeline()
 
 _DOC_MODE_SYSTEM_PROMPT = (
@@ -59,12 +38,10 @@ class ClassroomAIService:
     def __init__(self):
         self.session_service = AIConversationSessionService()
 
-    # ── Session ───────────────────────────────────────────────────────────────
 
     def get_session_id(self, session_id, user_id, classroom_id):
         return self.session_service.ensure_session(session_id, str(user_id), str(classroom_id))
 
-    # ── Public API ────────────────────────────────────────────────────────────
 
     def ask(self, question, session_id, user_id, classroom_id, filter_meta, system_prompt):
         """Synchronous AI response (manage mode với tool-calling)."""
@@ -157,7 +134,6 @@ class ClassroomAIService:
         finally:
             yield "data: [DONE]\n\n"
 
-    # ── Mode handlers ─────────────────────────────────────────────────────────
 
     def _handle_doc_mode(
         self,
@@ -194,7 +170,6 @@ class ClassroomAIService:
         ]
         return AIClient.chat_stream(messages, timeout=300)
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
 
     @staticmethod
     def _sse(payload: dict) -> str:
