@@ -3,11 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.serializers.classroom.blacklist_serializer import BlacklistEntrySerializer, BlacklistRequestSerializer
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
 
 
-class GlobalBlacklistView(UserScopeMixin, APIView):
+class GlobalBlacklistView(SpaceScopeMixin, APIView):
     """
     List (GET) or add to (POST) a teacher's global (cross-classroom) blacklist.
     @param consumer_uid: student to block (POST, required)
@@ -32,7 +32,7 @@ class GlobalBlacklistView(UserScopeMixin, APIView):
         return Response(BlacklistEntrySerializer(entry).data, status=status.HTTP_201_CREATED)
 
 
-class GlobalBlacklistDetailView(UserScopeMixin, APIView):
+class GlobalBlacklistDetailView(SpaceScopeMixin, APIView):
     """
     Remove a student from a teacher's global blacklist.
     @return: no content

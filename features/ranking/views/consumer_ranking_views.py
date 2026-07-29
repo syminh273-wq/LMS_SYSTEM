@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import ConsumerScopeMixin
 from features.ranking.services.xp_service import XPService
 from features.ranking.services.achievement_service import AchievementService
 from features.ranking.services.leaderboard_service import LeaderboardService
@@ -56,7 +56,7 @@ def _serialize_student_xp(student_xp, student_id):
     }
 
 
-class _BaseConsumerRankingView(APIView, UserScopeMixin):
+class _BaseConsumerRankingView(ConsumerScopeMixin, APIView):
     def _me_id(self, request):
         return str(request.user.uid)
 

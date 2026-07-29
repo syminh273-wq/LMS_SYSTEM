@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from core.views.api.base_viewset import BaseModelViewSet
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.calendar.services.calendar_service import CalendarService
 from features.calendar.serializers.calendar_serializer import (
     CalendarEventSerializer,
@@ -28,7 +28,7 @@ def _parse_dt(value):
         return None
 
 
-class CalendarViewSet(UserScopeMixin, BaseModelViewSet):
+class CalendarViewSet(SpaceScopeMixin, BaseModelViewSet):
     serializer_class = CalendarEventSerializer
 
     def get_queryset(self):

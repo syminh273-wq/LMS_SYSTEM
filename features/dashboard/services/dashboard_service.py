@@ -1,9 +1,3 @@
-"""Aggregate dashboard data for a space (teacher) account.
-
-Pulls KPIs and top classes in a single round-trip so the frontend can
-render the Space dashboard with one HTTP request instead of N.
-"""
-
 from __future__ import annotations
 
 from typing import Any

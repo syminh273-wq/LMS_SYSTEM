@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.views.api.base_viewset import BaseModelViewSet
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import ConsumerScopeMixin
 from features.account.consumer.serializers import (
     ConsumerAccountSerializer,
     ConsumerAccountCreateSerializer,
@@ -13,7 +13,7 @@ from features.account.consumer.serializers import (
 from features.account.consumer.services import ConsumerService
 
 
-class ViewSet(UserScopeMixin, BaseModelViewSet):
+class ViewSet(ConsumerScopeMixin, BaseModelViewSet):
     serializer_class = ConsumerAccountSerializer
 
     def get_queryset(self):

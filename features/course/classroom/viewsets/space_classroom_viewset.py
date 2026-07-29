@@ -10,8 +10,7 @@ from rest_framework.response import Response
 from core.serializers.classroom import ClassroomResponseSerializer
 from core.serializers.classroom.request import ClassroomRequestSerializer
 from core.views.api.base_viewset import BaseModelViewSet
-from core.views.mixins import UserScopeMixin
-from features.account.space.models.space import Space
+from core.views.mixins import SpaceScopeMixin
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
 from features.course.classroom.services import Service
@@ -19,13 +18,11 @@ from features.course.classroom.services.classroom_doc_service import ClassroomDo
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
 
-class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
+class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
     serializer_class = ClassroomResponseSerializer
 
     def get_queryset(self):
-        if isinstance(self.request.user, Space):
-            return Service().get_by_teacher(self.request.user.uid)
-        return Service().get_active_classrooms()
+        return Service().get_by_teacher(self.request.user.uid)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -43,10 +40,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         return Response(ClassroomResponseSerializer(instance).data)
 
     def create(self, request, *args, **kwargs):
-        # Only teachers (Space accounts) can create a classroom
-        if not isinstance(request.user, Space):
-            raise PermissionDenied("Only teachers (Space accounts) can create a classroom.")
-
         serializer = ClassroomRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = Service().create_classroom(
@@ -69,7 +62,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         instance = service.find(kwargs['uid'])
 
         # Ownership check
-        if not isinstance(request.user, Space) or instance.teacher_id != request.user.uid:
+        if instance.teacher_id != request.user.uid:
             raise PermissionDenied("You do not have permission to update this classroom.")
 
         serializer = ClassroomRequestSerializer(data=request.data)
@@ -82,7 +75,7 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         instance = service.find(kwargs['uid'])
 
         # Ownership check
-        if not isinstance(request.user, Space) or instance.teacher_id != request.user.uid:
+        if instance.teacher_id != request.user.uid:
             raise PermissionDenied("You do not have permission to delete this classroom.")
 
         service.delete(instance)
@@ -116,9 +109,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         @param order_index: position within folder (optional)
         @return: created document
         """
-        if not isinstance(request.user, Space):
-            raise PermissionDenied("Only teachers can upload documents.")
-
         if 'file' not in request.FILES:
             return Response(
                 {'success': False, 'message': 'No file provided'},
@@ -213,9 +203,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             ResourceFolderResponseSerializer,
         )
 
-        if not isinstance(request.user, Space):
-            raise PermissionDenied("Only teachers can manage folders.")
-
         folder_service = ClassroomDocService()._folder_service
         classroom_uuid = uuid.UUID(str(uid))
 
@@ -260,9 +247,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
             ResourceFolderResponseSerializer,
             ResourceFolderUpdateRequestSerializer,
         )
-
-        if not isinstance(request.user, Space):
-            raise PermissionDenied("Only teachers can manage folders.")
 
         folder_service = ClassroomDocService()._folder_service
         try:
@@ -318,9 +302,6 @@ class ClassroomViewSet(UserScopeMixin, BaseModelViewSet):
         Delete a document from a classroom.
         @return: no content
         """
-        if not isinstance(request.user, Space):
-            raise PermissionDenied("Only teachers can delete documents.")
-
         result = ClassroomDocService().delete_doc(
             classroom_uid=str(uid),
             resource_uid=resource_uid,

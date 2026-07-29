@@ -17,10 +17,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.search_engine.typesense.service import TypesenseService
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 
 
-class SpaceSearchAPIView(UserScopeMixin, APIView):
+class SpaceSearchAPIView(SpaceScopeMixin, APIView):
     """
     GET /api/v1/space/search/?q=<query>&types=classroom,exam,quiz,consumer
     Authenticated: Space (teacher) accounts only.

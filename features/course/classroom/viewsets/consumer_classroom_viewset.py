@@ -8,7 +8,7 @@ from rest_framework.viewsets import ViewSet
 
 from core.serializers.classroom import ClassroomResponseSerializer
 from core.views.api.pagination import StandardResultsSetPagination
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import ConsumerScopeMixin
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
@@ -16,7 +16,7 @@ from features.course.classroom.services import Service
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 
 
-class ConsumerClassroomViewSet(UserScopeMixin, ViewSet):
+class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
     """Classroom endpoints for students (Consumer accounts)."""
 
     pagination_class = StandardResultsSetPagination

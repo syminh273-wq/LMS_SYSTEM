@@ -3,13 +3,13 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
 
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.course.classroom.services import Service
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
 
-class ClassroomMemberViewSet(UserScopeMixin, ViewSet):
+class SpaceClassroomMemberViewSet(SpaceScopeMixin, ViewSet):
 
     def _serialize_member(self, m):
         return {

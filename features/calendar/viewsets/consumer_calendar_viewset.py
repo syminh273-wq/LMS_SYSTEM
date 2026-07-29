@@ -2,7 +2,7 @@ from datetime import datetime
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import ConsumerScopeMixin
 from features.calendar.services.calendar_service import CalendarService
 from features.calendar.serializers.calendar_serializer import CalendarEventSerializer
 
@@ -18,7 +18,7 @@ def _parse_dt(value):
         return None
 
 
-class ConsumerCalendarViewSet(UserScopeMixin, ViewSet):
+class ConsumerCalendarViewSet(ConsumerScopeMixin, ViewSet):
     def list(self, request):
         events = CalendarService().get_for_consumer(
             member_id=request.user.uid,

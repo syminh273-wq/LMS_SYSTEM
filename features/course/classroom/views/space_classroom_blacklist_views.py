@@ -3,11 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.serializers.classroom.blacklist_serializer import BlacklistEntrySerializer, BlacklistRequestSerializer
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
 
 
-class ClassroomBlacklistView(UserScopeMixin, APIView):
+class SpaceClassroomBlacklistView(SpaceScopeMixin, APIView):
     """
     List (GET) or add to (POST) a classroom's blacklist.
     @param consumer_uid: student to block (POST, required)
@@ -45,7 +45,7 @@ class ClassroomBlacklistView(UserScopeMixin, APIView):
         return Response(BlacklistEntrySerializer(entry).data, status=status.HTTP_201_CREATED)
 
 
-class ClassroomBlacklistDetailView(UserScopeMixin, APIView):
+class SpaceClassroomBlacklistDetailView(SpaceScopeMixin, APIView):
     """
     Remove a student from a classroom's blacklist.
     @return: no content

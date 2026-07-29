@@ -1,12 +1,13 @@
-from .classroom_viewset import ClassroomViewSet
-from .classroom_member_viewset import ClassroomMemberViewSet
+from .space_classroom_viewset import SpaceClassroomViewSet
+from .space_classroom_member_viewset import SpaceClassroomMemberViewSet
 from .consumer_classroom_viewset import ConsumerClassroomViewSet
-from .classroom_ai_viewset import ClassroomAIViewSet, ConsumerClassroomAIViewSet
+from .space_classroom_ai_viewset import SpaceClassroomAIViewSet
+from .consumer_classroom_ai_viewset import ConsumerClassroomAIViewSet
 
 __all__ = [
-    'ClassroomViewSet',
-    'ClassroomMemberViewSet',
+    'SpaceClassroomViewSet',
+    'SpaceClassroomMemberViewSet',
     'ConsumerClassroomViewSet',
-    'ClassroomAIViewSet',
+    'SpaceClassroomAIViewSet',
     'ConsumerClassroomAIViewSet',
 ]

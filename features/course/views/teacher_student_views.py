@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound
 
 from core.search_engine.typesense.service import TypesenseService
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.account.consumer.repositories import ConsumerRepository
 from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
 from features.course.classroom.repositories import Repository as ClassroomRepository
@@ -21,7 +21,7 @@ def _consumer_summary(consumer):
     }
 
 
-class TeacherStudentSearchView(UserScopeMixin, APIView):
+class TeacherStudentSearchView(SpaceScopeMixin, APIView):
     """
     Full-text search over students in this teacher's org scope.
     @param q: search query (required)
@@ -58,7 +58,7 @@ class TeacherStudentSearchView(UserScopeMixin, APIView):
             return Response({'total_hits': 0, 'results': [], 'error': str(exc)})
 
 
-class TeacherStudentListView(UserScopeMixin, APIView):
+class TeacherStudentListView(SpaceScopeMixin, APIView):
     """
     List all unique students who ever studied with the authenticated teacher.
     @return: list of students with first_joined_at
@@ -81,7 +81,7 @@ class TeacherStudentListView(UserScopeMixin, APIView):
         return Response(out)
 
 
-class TeacherStudentDetailView(UserScopeMixin, APIView):
+class TeacherStudentDetailView(SpaceScopeMixin, APIView):
     """
     Get a student's profile and their stats across the teacher's classrooms.
     @param consumer_uid: the student to look up

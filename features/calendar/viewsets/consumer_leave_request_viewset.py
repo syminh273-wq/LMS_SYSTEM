@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import ViewSet
 
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import ConsumerScopeMixin
 from features.calendar.services.leave_request_service import LeaveRequestService
 from features.calendar.serializers.leave_request_serializer import (
     LeaveRequestSerializer,
@@ -13,7 +13,7 @@ from features.calendar.serializers.leave_request_serializer import (
 )
 
 
-class ConsumerLeaveRequestViewSet(UserScopeMixin, ViewSet):
+class ConsumerLeaveRequestViewSet(ConsumerScopeMixin, ViewSet):
     serializer_class = LeaveRequestSerializer
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 

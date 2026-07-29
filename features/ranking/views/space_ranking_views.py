@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.ranking.services.xp_service import XPService
 from features.ranking.services.achievement_service import AchievementService
 from features.ranking.services.unified_leaderboard_service import UnifiedLeaderboardService
@@ -49,7 +49,7 @@ def _serialize_student_xp(student_xp, student_id):
     }
 
 
-class SpaceRankingStudentView(APIView, UserScopeMixin):
+class SpaceRankingStudentView(SpaceScopeMixin, APIView):
     """
     Get a student's XP/level summary.
     @return: XP, level, streak, activity counters
@@ -60,7 +60,7 @@ class SpaceRankingStudentView(APIView, UserScopeMixin):
         return Response(_serialize_student_xp(xp, student_uid))
 
 
-class SpaceRankingAchievementsView(APIView, UserScopeMixin):
+class SpaceRankingAchievementsView(SpaceScopeMixin, APIView):
     """
     List a student's achievements.
     @return: list of achievements
@@ -71,7 +71,7 @@ class SpaceRankingAchievementsView(APIView, UserScopeMixin):
         return Response(AchievementSerializer(data, many=True).data)
 
 
-class SpaceRankingStudentClassroomView(APIView, UserScopeMixin):
+class SpaceRankingStudentClassroomView(SpaceScopeMixin, APIView):
     """
     Get a student's stats within one classroom.
     @return: gamification + academic stats for the student in this classroom
@@ -85,7 +85,7 @@ class SpaceRankingStudentClassroomView(APIView, UserScopeMixin):
         return Response(StudentClassroomStatsSerializer(payload).data)
 
 
-class SpaceRankingClassroomView(APIView, UserScopeMixin):
+class SpaceRankingClassroomView(SpaceScopeMixin, APIView):
     """
     Get the unified leaderboard for a classroom.
 

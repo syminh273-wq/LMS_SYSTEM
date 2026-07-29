@@ -3,11 +3,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import ViewSet
 
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.calendar.services.attendance_service import AttendanceService
 from features.calendar.serializers.attendance_serializer import AttendanceSerializer, AttendanceUpdateSerializer
 
-class AttendanceViewSet(UserScopeMixin, ViewSet):
+class AttendanceViewSet(SpaceScopeMixin, ViewSet):
     def list(self, request):
         event_id = request.query_params.get('event_id')
         if not event_id:

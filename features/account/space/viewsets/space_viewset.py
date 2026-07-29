@@ -5,7 +5,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 import os
 
 from core.views.api.base_viewset import BaseModelViewSet
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.account.space.serializers import (
     SpaceAccountSerializer,
     SpaceAccountCreateSerializer,
@@ -18,7 +18,7 @@ from features.account.space.services import Service
 from features.account.space.repositories import Repository
 
 
-class ViewSet(UserScopeMixin, BaseModelViewSet):
+class ViewSet(SpaceScopeMixin, BaseModelViewSet):
     repository = Repository()
     queryset = repository.all()
     serializer_class = SpaceAccountSerializer

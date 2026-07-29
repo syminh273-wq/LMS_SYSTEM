@@ -12,10 +12,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.search_engine.typesense.service import TypesenseService
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import ConsumerScopeMixin
 
 
-class ConsumerSearchAPIView(UserScopeMixin, APIView):
+class ConsumerSearchAPIView(ConsumerScopeMixin, APIView):
     """Search endpoint for students (consumer accounts)."""
 
     SUPPORTED_TYPES = ('classroom', 'exam', 'resource')

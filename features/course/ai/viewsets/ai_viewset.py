@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-from core.views.mixins import UserScopeMixin
+from core.views.mixins import SpaceScopeMixin
 from features.course.ai.serializers.ai_serializer import (
     AIAskSerializer,
     AIIngestSerializer,
@@ -12,7 +12,7 @@ from features.course.ai.serializers.ai_serializer import (
 from features.course.ai.services.course_ai_service import CourseAIService
 
 
-class CourseAIViewSet(UserScopeMixin, ViewSet):
+class CourseAIViewSet(SpaceScopeMixin, ViewSet):
     """
     AI/RAG endpoints for teachers (space users).
 
