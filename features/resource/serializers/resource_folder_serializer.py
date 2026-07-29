@@ -16,6 +16,22 @@ class ResourceFolderResponseSerializer(serializers.Serializer):
     updated_at = VnDateTimeField(read_only=True)
 
 
+class ResourceFolderTreeSerializer(ResourceFolderResponseSerializer):
+    """Recursive tree node serializer.
+
+    Instance shape: {'folder': ResourceFolder, 'children': [node, ...], 'docs': [Resource, ...]}
+    as produced by ResourceFolderService.build_tree/list_tree.
+    """
+
+    def to_representation(self, instance):
+        from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
+
+        data = super().to_representation(instance['folder'])
+        data['children'] = ResourceFolderTreeSerializer(instance['children'], many=True).data
+        data['docs'] = ResourceResponseSerializer(instance['docs'], many=True).data
+        return data
+
+
 class ResourceFolderCreateRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     parent_folder_id = serializers.UUIDField(required=False, allow_null=True)

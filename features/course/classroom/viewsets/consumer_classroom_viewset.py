@@ -541,7 +541,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         @return: folders, root docs, preview_only flag
         """
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
-        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+        from features.resource.serializers.resource_folder_serializer import ResourceFolderTreeSerializer
         from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
 
         from features.course.classroom.repositories import Repository
@@ -561,7 +561,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         if not has_access:
             tree = ClassroomDocService().list_tree(classroom_uid=str(pk), consumer_id=consumer_id)
             return Response({
-                'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
+                'folders': ResourceFolderTreeSerializer(tree['folders'], many=True).data,
                 'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
                 'preview_only': True,
                 'requires_payment': True,
@@ -572,7 +572,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
 
         tree = ClassroomDocService().list_tree(classroom_uid=str(pk), consumer_id=consumer_id)
         return Response({
-            'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
+            'folders': ResourceFolderTreeSerializer(tree['folders'], many=True).data,
             'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
             'preview_only': tree.get('preview_only', False),
             'requires_payment': False,

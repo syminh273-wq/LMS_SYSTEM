@@ -15,10 +15,9 @@ class Address(BaseTimeStampModel):
 
     __table_name__ = "account_addresses"
 
-    uid = columns.UUID(primary_key=True, default=uuid4)
-
-    owner_id   = columns.UUID(index=True, required=True)   # Consumer.uid or Space.uid
-    owner_type = columns.Text(index=True, required=True)   # 'consumer' | 'space'
+    owner_id   = columns.UUID(partition_key=True, required=True)   # Consumer.uid or Space.uid
+    owner_type = columns.Text(partition_key=True, required=True)   # 'consumer' | 'space'
+    uid = columns.UUID(primary_key=True, default=uuid4, clustering_order="DESC")
 
     type  = columns.Text(required=True)                    # home | work | billing | other
     label = columns.Text(default="")                       # user-given label, e.g. "Nhà mẹ"

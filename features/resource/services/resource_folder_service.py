@@ -54,9 +54,48 @@ class ResourceFolderService(BaseService):
         self.repository.soft_delete_recursive(folder)
 
     def list_tree(self, classroom_id):
-        """Return flat list of all non-deleted folders in the classroom,
-        caller (frontend) builds the tree view."""
-        return self.repository.get_by_classroom(classroom_id)
+        """Return the nested folder tree for the classroom: each node is
+        {'folder': ResourceFolder, 'children': [node, ...], 'docs': [Resource, ...]},
+        sorted by order_index then name at every level."""
+        folders = self.repository.get_by_classroom(classroom_id)
+        docs = self.resource_repository.get_by_owner(classroom_id)
+        return self.build_tree(folders, docs)
 
     def list_children(self, classroom_id, parent_folder_id=None):
         return self.repository.get_children(classroom_id, parent_folder_id)
+
+    @staticmethod
+    def build_tree(folders, docs):
+        """Assemble folders + docs (flat, already filtered to one classroom)
+        into a nested tree, each node carrying its own docs."""
+        # Step 1: bucket docs by their folder_id (as string, so it matches the
+        docs_by_folder = {}
+        for doc in docs:
+            folder_id = getattr(doc, 'folder_id', None)
+            if folder_id is None:
+                continue
+            docs_by_folder.setdefault(str(folder_id), []).append(doc)
+
+        # Step 2: create one flat node per folder first (dict keyed by uid string),
+        nodes = {
+            str(folder.uid): {'folder': folder, 'children': [], 'docs': docs_by_folder.get(str(folder.uid), [])}
+            for folder in folders
+        }
+
+        # Step 3: wire each node into its parent's `children` list, or into
+        roots = []
+        for folder in folders:
+            node = nodes[str(folder.uid)]
+            parent_id = getattr(folder, 'parent_folder_id', None)
+            parent_node = nodes.get(str(parent_id)) if parent_id else None
+            (parent_node['children'] if parent_node else roots).append(node)
+
+        # Step 4: sort every level (folders then their docs) by order_index,
+        def sort_recursive(items):
+            items.sort(key=lambda n: (n['folder'].order_index or 0, n['folder'].name))
+            for item in items:
+                item['docs'].sort(key=lambda d: (getattr(d, 'order_index', 0) or 0, d.name))
+                sort_recursive(item['children'])
+
+        sort_recursive(roots)
+        return roots

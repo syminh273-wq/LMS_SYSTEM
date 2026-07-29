@@ -6,8 +6,10 @@ class ClassroomMemberRepository(BaseRepository):
     model = ClassroomMember
 
     def get_by_member(self, member_id):
-        """Approved classroom memberships for a user (partition key lookup — fast)."""
-        return self.model.objects.filter(member_id=member_id, is_deleted=False, status='approved')
+        """Approved classroom memberships for a user (classroom_uid is now the partition key)."""
+        return self.model.objects.filter(
+            member_id=member_id, is_deleted=False, status='approved'
+        ).allow_filtering()
 
     def get_members(self, classroom_uid):
         """Approved members of a classroom."""
@@ -60,4 +62,4 @@ class ClassroomMemberRepository(BaseRepository):
 
     def get_history_by_member(self, member_id, limit: int = 50):
         """All classroom memberships (approved + pending + soft-deleted) for a user, newest first."""
-        return self.model.objects.filter(member_id=member_id).limit(limit)
+        return self.model.objects.filter(member_id=member_id).allow_filtering().limit(limit)

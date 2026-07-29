@@ -17,7 +17,9 @@ class ResourceRepository(BaseRepository):
     def get_by_owner_and_folder(self, owner_id, folder_id=None):
         qs = self.filter(owner_id=owner_id, is_deleted=False)
         if folder_id is None:
+            # folder_id=None means "root level" -> keep only docs with no folder.
             return [r for r in qs if getattr(r, 'folder_id', None) is None]
+        # Otherwise keep only docs belonging to the given folder.
         return [r for r in qs if getattr(r, 'folder_id', None) == folder_id]
 
     def find(self, uid):

@@ -17,13 +17,17 @@ class AddressRepository(BaseRepository):
         return (
             self.model.objects
             .filter(owner_id=uid, owner_type=owner_type, is_deleted=False)
-            .allow_filtering()
             .first()
         )
 
     def get_by_uid(self, uid):
         try:
-            return self.model.objects.filter(uid=UUID(str(uid)), is_deleted=False).first()
+            return (
+                self.model.objects
+                .filter(uid=UUID(str(uid)), is_deleted=False)
+                .allow_filtering()
+                .first()
+            )
         except (TypeError, ValueError):
             return None
 

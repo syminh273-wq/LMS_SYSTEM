@@ -154,9 +154,11 @@ class ClassroomDocService(BaseService):
 
         if preview_only:
             preview_folder = self._folder_repo.get_preview_folder(owner_id)
-            folders = [preview_folder] if preview_folder else []
-            preview_folder_id = preview_folder.uid if preview_folder else None
-            docs_root = self._resource_repo.get_by_owner_and_folder(owner_id, preview_folder_id)
+            if preview_folder is None:
+                folders = []
+            else:
+                preview_docs = self._resource_repo.get_by_owner_and_folder(owner_id, preview_folder.uid)
+                folders = self._folder_service.build_tree([preview_folder], preview_docs)
             return {
                 'folders': folders,
                 'docs_root': [],

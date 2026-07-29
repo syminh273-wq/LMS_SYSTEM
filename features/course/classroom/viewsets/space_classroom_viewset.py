@@ -98,7 +98,6 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
             'url': f'/join/{classroom.pid}',
         })
 
-    # ── Documents (LanceDB) ───────────────────────────────────────────────────
 
     def docs_upload(self, request, uid=None):
         """
@@ -169,10 +168,10 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
         List the folder tree and root-level documents for a classroom.
         @return: folders, root-level docs, preview folder uid
         """
-        from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
+        from features.resource.serializers.resource_folder_serializer import ResourceFolderTreeSerializer
         tree = ClassroomDocService().list_tree(classroom_uid=str(uid))
         return Response({
-            'folders': ResourceFolderResponseSerializer(tree['folders'], many=True).data,
+            'folders': ResourceFolderTreeSerializer(tree['folders'], many=True).data,
             'docs_root': ResourceResponseSerializer(tree['docs_root'], many=True).data,
             'preview_folder_uid': str(tree['preview_folder'].uid) if tree.get('preview_folder') else None,
         })
@@ -201,6 +200,7 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
         from features.resource.serializers.resource_folder_serializer import (
             ResourceFolderCreateRequestSerializer,
             ResourceFolderResponseSerializer,
+            ResourceFolderTreeSerializer,
         )
 
         folder_service = ClassroomDocService()._folder_service
@@ -235,7 +235,7 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
             return Response(ResourceFolderResponseSerializer(folder).data, status=status.HTTP_201_CREATED)
 
         folders = folder_service.list_tree(classroom_uuid)
-        return Response(ResourceFolderResponseSerializer(folders, many=True).data)
+        return Response(ResourceFolderTreeSerializer(folders, many=True).data)
 
     @action(detail=True, methods=['patch', 'delete'], url_path='folders/(?P<folder_uid>[^/.]+)')
     def folder_detail(self, request, uid=None, folder_uid=None):

@@ -226,7 +226,7 @@ FACE_VERIFY_THRESHOLD=0.45   # cosine similarity threshold (0.0–1.0, higher = 
 After starting the Django server for the first time with this feature:
 
 ```bash
-python manage.py sync_cassandra
+python manage.py lms_sync_cassandra
 ```
 
 This creates two new tables: `face_embeddings` and `face_verification_logs`.
@@ -298,7 +298,7 @@ This project uses **Apache Cassandra** instead of a relational database. Key dif
 
 | SQL | Cassandra |
 |-----|-----------|
-| `makemigrations` / `migrate` | `sync_cassandra` |
+| `makemigrations` / `migrate` | `lms_sync_cassandra` |
 | Foreign keys | Stored as plain UUID fields |
 | `JOIN` queries | Not supported — data is denormalized |
 | Arbitrary filtering | Secondary indexes with limitations |
@@ -306,7 +306,7 @@ This project uses **Apache Cassandra** instead of a relational database. Key dif
 After adding or modifying a model, run:
 
 ```bash
-python manage.py sync_cassandra
+python manage.py lms_sync_cassandra
 ```
 
 ---
@@ -316,7 +316,7 @@ python manage.py sync_cassandra
 | Command | Description |
 |---------|-------------|
 | `python manage.py runserver` | Start the development server |
-| `python manage.py sync_cassandra` | Sync all Cassandra models to the database |
+| `python manage.py lms_sync_cassandra` | Sync all Cassandra models to the database |
 | `python manage.py show_urls` | Print all registered API endpoints |
 | `python manage.py shell` | Open the Django interactive shell |
 | `poetry add <package>` | Add a new dependency |
