@@ -158,6 +158,13 @@ class SpaceAccountProfileUpdateSerializer(serializers.Serializer):
 
         return normalized
 
+class SpaceSettingsSerializer(serializers.Serializer):
+    space_profile = serializers.JSONField(required=False)
+    security_config = serializers.JSONField(required=False)
+    classroom_defaults = serializers.JSONField(required=False)
+    notification_prefs = serializers.JSONField(required=False)
+
+
 class SpaceChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True)

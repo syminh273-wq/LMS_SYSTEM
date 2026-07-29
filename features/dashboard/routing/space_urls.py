@@ -10,12 +10,7 @@ _dashboard = SpaceDashboardViewSet.as_view({
     'get': 'summary',
 })
 
-_usage = SpaceDashboardViewSet.as_view({
-    'get': 'usage',
-})
-
 urlpatterns = [
     path('summary/', _dashboard, name='space-dashboard-summary'),
-    path('usage/', _usage, name='space-dashboard-usage'),
     path('', include(router.urls)),
 ]

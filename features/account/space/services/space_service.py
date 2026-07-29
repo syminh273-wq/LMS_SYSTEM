@@ -5,6 +5,8 @@ from rest_framework import exceptions
 from core.backend.auth.base_auth_services import BaseAuthService
 from features.account.space.models import Space
 from features.account.space.repositories import Repository
+from features.account.user_setting.services.user_setting_service import UserSettingService
+from features.account.user_setting.enums import UserTypes as SettingUserTypes
 
 
 class Service(BaseAuthService):
@@ -15,6 +17,13 @@ class Service(BaseAuthService):
         'avatar_url',
         'learning_certificates',
         'contact_information',
+    }
+
+    editable_settings_categories = {
+        'space_profile',
+        'security_config',
+        'classroom_defaults',
+        'notification_prefs',
     }
 
     def __init__(self):
@@ -51,6 +60,20 @@ class Service(BaseAuthService):
             profile_data['updated_at'] = datetime.now()
             instance = self.repository.update_profile(instance, **profile_data)
         return instance
+
+    def get_settings(self, user):
+        instance = self.get_mine(user)
+        return UserSettingService().get_all_settings(instance.uid)
+
+    def update_settings(self, user, data: dict):
+        instance = self.get_mine(user)
+        categories = {
+            key: value
+            for key, value in data.items()
+            if key in self.editable_settings_categories
+        }
+        UserSettingService().update_bulk_settings(instance.uid, SettingUserTypes.SPACE, categories)
+        return UserSettingService().get_all_settings(instance.uid)
 
     def change_password(self, user, current_password: str, new_password: str):
         instance = self.get_mine(user)

@@ -4,6 +4,7 @@ from .space_serializer import (
     SpaceAccountCreateSerializer,
     SpaceAccountUpdateSerializer,
     SpaceAccountProfileUpdateSerializer,
+    SpaceSettingsSerializer,
     SpaceChangePasswordSerializer,
     SpaceAccountLoginSerializer
 )

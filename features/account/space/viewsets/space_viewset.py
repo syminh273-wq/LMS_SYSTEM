@@ -11,6 +11,7 @@ from features.account.space.serializers import (
     SpaceAccountCreateSerializer,
     SpaceAccountUpdateSerializer,
     SpaceAccountProfileUpdateSerializer,
+    SpaceSettingsSerializer,
     SpaceChangePasswordSerializer,
 )
 from features.account.space.services import Service
@@ -56,6 +57,32 @@ class ViewSet(UserScopeMixin, BaseModelViewSet):
         service = Service()
         space = service.update_mine(request.user, serializer.validated_data)
         return Response(SpaceAccountSerializer(instance=space).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='settings')
+    def get_settings(self, request, *args, **kwargs):
+        """
+        Get current space settings (profile, security, classroom defaults, notifications)
+        """
+        if not request.user or not request.user.is_authenticated:
+            return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        service = Service()
+        return Response(service.get_settings(request.user))
+
+    @action(detail=False, methods=['patch'], url_path='settings')
+    def update_settings(self, request, *args, **kwargs):
+        """
+        Update current space settings (profile, security, classroom defaults, notifications)
+        """
+        if not request.user or not request.user.is_authenticated:
+            return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = SpaceSettingsSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        service = Service()
+        updated = service.update_settings(request.user, serializer.validated_data)
+        return Response(updated, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='change-password')
     def change_password(self, request, *args, **kwargs):

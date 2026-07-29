@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from core.views.mixins import UserScopeMixin
 from features.chat.services.message_service import MessageService
 from features.chat.services.conversation_member_service import ConversationMemberService
-from features.chat.serializers.message_serializer import MessageSerializer
+from features.chat.serializers.message_serializer import MessageSerializer, attach_avatars
 
 
 class MessageViewSet(UserScopeMixin, ViewSet):
@@ -46,6 +46,7 @@ class MessageViewSet(UserScopeMixin, ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        attach_avatars(msgs)
         serialized = MessageSerializer(msgs, many=True).data
         return Response({
             'results': serialized,

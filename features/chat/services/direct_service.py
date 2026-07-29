@@ -120,6 +120,15 @@ def create_message(conversation_uid, sender_id, sender_name, sender_type: str,
         last_msg_at=datetime.utcnow(),
     )
 
+    sender_avatar = ''
+    try:
+        from features.social.repositories.profile_repository import ProfileRepository
+        profile = ProfileRepository().get_by_owner(msg.sender_id)
+        if profile:
+            sender_avatar = profile.avatar_url or ''
+    except Exception:
+        pass
+
     return {
         'uid': str(msg.uid),
         'conversation_uid': str(msg.conversation_uid),
@@ -128,6 +137,7 @@ def create_message(conversation_uid, sender_id, sender_name, sender_type: str,
         'sender_id': str(msg.sender_id) if msg.sender_id else None,
         'sender_type': msg.sender_type or '',
         'sender_name': msg.sender_name or '',
+        'sender_avatar': sender_avatar,
         'attachment': {
             'uid': str(msg.resource_uid) if msg.resource_uid else None,
             'url': msg.resource_url or '',

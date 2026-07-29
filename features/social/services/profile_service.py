@@ -105,7 +105,7 @@ class ProfileService(BaseService):
         if 'cover_url' in data:
             identity_clean['cover_url'] = (data.get('cover_url') or '')[:500]
 
-        updated = self.repo.update(profile, **identity_clean) if identity_clean else profile
+        updated = self.repo.update(profile, identity_clean) if identity_clean else profile
         social = self.portfolio_service.get_social_profile(owner_id, owner_type)
         return self.serialize(updated, social)
 

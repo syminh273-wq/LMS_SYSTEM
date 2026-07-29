@@ -15,7 +15,6 @@ from rest_framework.viewsets import ViewSet
 
 from features.dashboard.serializers.dashboard_serializers import (
     DashboardSummaryResponseSerializer,
-    DashboardUsageResponseSerializer,
 )
 from features.dashboard.services.dashboard_service import DashboardService
 
@@ -23,9 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class SpaceDashboardViewSet(ViewSet):
-    """GET /api/v1/space/dashboard/summary/
-    GET /api/v1/space/dashboard/usage/
-    """
+    """GET /api/v1/space/dashboard/summary/"""
 
     permission_classes = [IsAuthenticated]
     service_class = DashboardService
@@ -36,9 +33,6 @@ class SpaceDashboardViewSet(ViewSet):
             self._service = self.service_class()
         return self._service
 
-    def list(self, request):
-        """Default action — alias for summary."""
-        return self.summary(request)
 
     def summary(self, request):
         try:
@@ -50,14 +44,3 @@ class SpaceDashboardViewSet(ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         return Response(DashboardSummaryResponseSerializer(data).data)
-
-    def usage(self, request):
-        try:
-            data = self.service.get_usage(request.user.uid)
-        except Exception as exc:
-            logger.exception('[dashboard] usage failed: %s', exc)
-            return Response(
-                {'detail': 'Failed to build dashboard usage.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        return Response(DashboardUsageResponseSerializer(data).data)

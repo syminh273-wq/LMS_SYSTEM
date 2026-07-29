@@ -167,6 +167,7 @@ class MessageConsumer(BaseWebSocketConsumer):
                 'size': event.get('resource_size', 0),
                 'type': event['msg_type'],
             }
+        sender_avatar = await self._resolve_avatar(event.get('sender_id'))
         await self.send_json({
             'type': 'chat_message',
             'uid': event['uid'],
@@ -176,9 +177,21 @@ class MessageConsumer(BaseWebSocketConsumer):
             'sender_id': event.get('sender_id'),
             'sender_type': event.get('sender_type', ''),
             'sender_name': event.get('sender_name', ''),
+            'sender_avatar': sender_avatar,
             'attachment': attachment,
             'created_at': event['created_at'],
         })
+
+    @database_sync_to_async
+    def _resolve_avatar(self, sender_id):
+        if not sender_id:
+            return ''
+        try:
+            from features.social.repositories.profile_repository import ProfileRepository
+            profile = ProfileRepository().get_by_owner(sender_id)
+            return profile.avatar_url or '' if profile else ''
+        except Exception:
+            return ''
 
     async def broadcast_typing(self, event):
         await self.send_json({

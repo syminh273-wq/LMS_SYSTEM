@@ -38,7 +38,6 @@ class ExamRepository(BaseRepository):
         return qs
 
     def list_published_by_classroom(self, classroom_id):
-        # published = có thể nộp bài; ongoing = đang thi; closed = đã kết thúc
         qs = list(Exam.objects(classroom_id=classroom_id, is_deleted=False))
         return [e for e in qs if e.status in ('published', 'ongoing', 'closed')]
 

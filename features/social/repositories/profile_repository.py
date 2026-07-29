@@ -12,6 +12,26 @@ class ProfileRepository(BaseRepository):
         rows = list(SocialProfile.objects.filter(owner_id=owner_id).limit(1))
         return rows[0] if rows else None
 
+    def get_by_owners(self, owner_ids):
+        """Batch fetch profiles by owner_id. Returns dict[str, SocialProfile]."""
+        if not owner_ids:
+            return {}
+        normalized: list[uuid.UUID] = []
+        for oid in owner_ids:
+            if not oid:
+                continue
+            if isinstance(oid, str):
+                try:
+                    normalized.append(uuid.UUID(oid))
+                except (ValueError, AttributeError):
+                    continue
+            elif isinstance(oid, uuid.UUID):
+                normalized.append(oid)
+        if not normalized:
+            return {}
+        rows = SocialProfile.objects.filter(owner_id__in=normalized).allow_filtering().limit(len(normalized))
+        return {str(p.owner_id): p for p in rows}
+
     def get_or_create(self, owner_id, owner_type: str) -> SocialProfile:
         if isinstance(owner_id, str):
             owner_id = uuid.UUID(owner_id)

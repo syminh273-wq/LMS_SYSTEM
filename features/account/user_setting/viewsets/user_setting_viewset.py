@@ -4,10 +4,6 @@ from rest_framework.permissions import IsAuthenticated
 
 from features.account.space.models.space import Space
 from ..services.user_setting_service import UserSettingService
-from ..serializers.user_setting_serializer import (
-    UserSettingSerializer,
-    UserBulkSettingsSerializer,
-)
 from ..enums import UserTypes
 
 class UserSettingViewSet(viewsets.ViewSet):
@@ -44,7 +40,3 @@ class UserSettingViewSet(viewsets.ViewSet):
             settings_data
         )
         return Response(self.service.get_all_settings(request.user.uid))
-
-    def patch(self, request):
-        """Partial update of settings"""
-        return self.create(request)
