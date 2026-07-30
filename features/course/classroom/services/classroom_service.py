@@ -29,7 +29,6 @@ class Service(BaseService):
         )
 
     def create_classroom(self, teacher_id, data: dict):
-        # Generate a unique 6-char uppercase alphanumeric pid (invite code)
         pid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         classroom = self.repository.create(teacher_id=teacher_id, pid=pid, **data)
 

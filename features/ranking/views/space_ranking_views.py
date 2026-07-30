@@ -73,8 +73,8 @@ class SpaceRankingAchievementsView(SpaceScopeMixin, APIView):
 
 class SpaceRankingStudentClassroomView(SpaceScopeMixin, APIView):
     """
-    Get a student's stats within one classroom.
-    @return: gamification + academic stats for the student in this classroom
+    Get a student's academic score within one classroom.
+    @return: academic score stats for the student in this classroom
     """
 
     def get(self, request, student_uid, classroom_uid):
@@ -87,10 +87,10 @@ class SpaceRankingStudentClassroomView(SpaceScopeMixin, APIView):
 
 class SpaceRankingClassroomView(SpaceScopeMixin, APIView):
     """
-    Get the unified leaderboard for a classroom.
+    Get the academic score board for a classroom.
 
-    Each entry contains both the gamification (XP / level / level_title) and
-    the academic score (quiz_avg / exam_avg / attendance_pct / total_score),
+    Each entry contains the weighted exam score (total_score / exam_count,
+    weighted from exam submissions: final x3, midterm x2, regular x1),
     plus a human-readable `explanation`.
     @param limit: max entries, default 20
     @return: unified leaderboard

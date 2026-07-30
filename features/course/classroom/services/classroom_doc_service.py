@@ -70,12 +70,6 @@ class ClassroomDocService(BaseService):
 
         ext = os.path.splitext(file_obj.name)[1].lower()
         if ext in _INDEXABLE_EXTENSIONS:
-            old_count = self._pipeline.delete_document({
-                'document_id': str(resource.uid),
-            })
-            if old_count:
-                print(f"[RAG] Removed {old_count} stale chunk(s) for '{resource.name}' before re-index")
-
             tmp_path = None
             try:
                 file_obj.seek(0)

@@ -185,10 +185,10 @@ class AchievementsCatalogView(_BaseConsumerRankingView):
 
 class ClassroomLeaderboardView(_BaseConsumerRankingView):
     """
-    Get the unified leaderboard for a classroom, for the current student.
+    Get the academic score board for a classroom, for the current student.
 
-    Each entry has both gamification (XP / level) and academic score, plus an
-    `explanation`. Only members of the classroom can view.
+    Each entry has the weighted exam score, plus an `explanation`. Only
+    members of the classroom can view.
     @param limit: max entries, default 20
     @return: unified leaderboard
     """
@@ -219,8 +219,8 @@ class ClassroomLeaderboardView(_BaseConsumerRankingView):
 
 class MeClassroomStatsView(_BaseConsumerRankingView):
     """
-    Get the current student's stats within one classroom.
-    @return: gamification + academic stats for the student in this classroom
+    Get the current student's academic score within one classroom.
+    @return: academic score stats for the student in this classroom
     """
 
     def get(self, request, classroom_uid):

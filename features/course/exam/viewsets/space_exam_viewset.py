@@ -159,7 +159,8 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
             prev_status = self.exam_service.get_exam(uid).status
         except Exception:
             pass
-        exam = self.exam_service.update_exam(uid, request.data.copy())
+        file_obj = request.FILES.get('file')
+        exam = self.exam_service.update_exam(uid, request.data.copy(), file_obj=file_obj)
         new_status = request.data.get('status')
         if new_status == 'published' and prev_status != 'published':
             ClassroomActivityLogService().log(
@@ -337,7 +338,6 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-    # ── CLASSROOM-SCOPED AI GRADE ──────────────────────────────────────────────
 
     def ai_grade_classroom_submissions(self, request, classroom_uid=None):
         serializer = ExamSubmissionAIGradeSerializer(data=request.data)
@@ -349,7 +349,6 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
         )
         return Response(_serialize_ai_grade_batch(results))
 
-    # ── AUDIT LOG (submission-scoped) ─────────────────────────────────────────
 
     def _resolve_submission_for_teacher(self, submission_uid, teacher_id):
         submission = self.submission_service.get_submission(submission_uid)

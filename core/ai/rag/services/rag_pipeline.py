@@ -37,6 +37,7 @@ Metadata stored in LanceDB during ingest
   metadata_json : str(JSON)   các field khác: doc_name, doc_url, folder_id…
 """
 
+import logging
 import uuid
 from typing import Generator, List, Tuple, Union
 
@@ -48,6 +49,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from core.ai.embeddings.services.embedding_service import get_embedding_service
 from core.ai.llm.services.ai_client import AIClient
 from core.ai.vector_store.services.lance_vector_service import LanceVectorService
+
+logger = logging.getLogger('rag_pipeline')
 
 _SYSTEM_PROMPT = (
     "Bạn là một trợ lý ảo hữu ích. Hãy trả lời câu hỏi của người dùng CHỈ bằng cách sử dụng ngữ cảnh được cung cấp. "
@@ -87,9 +90,6 @@ class RAGPipeline:
         self._embedder = None
         self._store_cache: dict = {}
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # ① LangChain — load & chunk
-    # ─────────────────────────────────────────────────────────────────────────
 
     def _load_and_chunk(self, file_path: str, metadata: dict = None) -> list:
         """
@@ -233,13 +233,10 @@ class RAGPipeline:
         if section:
             where["section"] = section
 
-        print(f"\n{'='*60}")
-        print(f"[RAG:retrieve] Query         : {query!r}")
-        print(f"[RAG:retrieve] Filter        : {where}")
-        print(f"[RAG:retrieve] Top-K         : {k}")
-        print(f"[RAG:retrieve] Min score     : {threshold}")
-        print(f"[RAG:retrieve] Per-doc cap   : {cap}")
-        print(f"[RAG:retrieve] Collection    : {self.collection}")
+        logger.info(
+            "[RAG:retrieve] query=%r filter=%s top_k=%s min_score=%s per_doc_cap=%s collection=%s",
+            query, where, k, threshold, cap, self.collection,
+        )
 
         if not classroom_id:
             raise ValueError("classroom_id is required for retrieval (security: prevent cross-classroom leakage)")
@@ -250,15 +247,16 @@ class RAGPipeline:
 
         hits = [h for h in raw_hits if h.get("score", 0) >= threshold]
 
-        print(f"[RAG:retrieve] Raw {len(raw_hits)} → kept {len(hits)} (≥{threshold}):")
-        for i, h in enumerate(hits, 1):
-            meta = h.get("metadata", {})
-            doc_name = meta.get("doc_name") or meta.get("document_id") or "?"
-            page = meta.get("page")
-            score = h.get("score", 0)
-            preview = h["document"][:120].replace("\n", " ")
-            print(f"  [{i}] score={score:.4f} | {doc_name}" + (f" p.{page}" if page else "") + f" | {preview!r}")
-        print(f"{'='*60}\n")
+        if logger.isEnabledFor(logging.INFO):
+            lines = [f"[RAG:retrieve] Raw {len(raw_hits)} → kept {len(hits)} (≥{threshold}):"]
+            for i, h in enumerate(hits, 1):
+                meta = h.get("metadata", {})
+                doc_name = meta.get("doc_name") or meta.get("document_id") or "?"
+                page = meta.get("page")
+                score = h.get("score", 0)
+                preview = h["document"][:120].replace("\n", " ")
+                lines.append(f"  [{i}] score={score:.4f} | {doc_name}" + (f" p.{page}" if page else "") + f" | {preview!r}")
+            logger.info("\n".join(lines))
         return hits
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -418,7 +416,10 @@ class RAGPipeline:
         ]
         store.add_batch(rows)
 
-        print(f"[RAG] Ingested {len(chunks)} chunks → '{self.collection}' (dim={dim}, document_id={metadata['document_id']})")
+        logger.info(
+            "[RAG] Ingested %s chunks → '%s' (dim=%s, document_id=%s)",
+            len(chunks), self.collection, dim, metadata['document_id'],
+        )
         return {"chunks": len(chunks), "collection": self.collection, "source": source, "document_id": str(metadata["document_id"])}
 
     def ask(

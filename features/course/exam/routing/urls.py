@@ -3,7 +3,7 @@ from features.course.exam.viewsets import SpaceExamViewSet
 
 urlpatterns = [
     path('', SpaceExamViewSet.as_view({'get': 'list', 'post': 'create'})),
-    path('<uuid:uid>/', SpaceExamViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+    path('<uuid:uid>/', SpaceExamViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'update', 'delete': 'destroy'})),
     path('<uuid:uid>/open-online/', SpaceExamViewSet.as_view({'post': 'open_online'})),
     path('<uuid:uid>/close-online/', SpaceExamViewSet.as_view({'post': 'close_online'})),
     path('<uuid:uid>/online-sessions/', SpaceExamViewSet.as_view({'get': 'list_online_sessions'})),

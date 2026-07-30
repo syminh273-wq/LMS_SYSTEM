@@ -39,16 +39,12 @@ def explain_xp_history_row(tx) -> str:
     )
 
 
-def explain_score(quiz_avg: float, exam_avg: float, attendance_pct: float) -> str:
-    qa = round(float(quiz_avg or 0), 2)
-    ea = round(float(exam_avg or 0), 2)
-    ap = round(float(attendance_pct or 0), 2)
+def explain_score(total_score: float, exam_count: int) -> str:
+    score = round(float(total_score or 0), 2)
+    count = int(exam_count or 0)
+    if count == 0:
+        return 'Chưa có bài thi nào được chấm điểm.'
     return (
-        f'Điểm thành tích = {qa}% quiz (×0.6) + {ea}% exam (×0.4). '
-        f'Điểm danh {ap}%.'
+        f'Điểm thành tích = {score} điểm (trung bình có trọng số từ {count} bài thi: '
+        f'cuối kỳ ×3, giữa kỳ ×2, thường xuyên ×1).'
     )
-
-
-def explain_xp_level(level: int, total_xp: int) -> str:
-    from features.ranking.services.level_service import level_title
-    return f'Cấp {level} ({level_title(level)}) — {int(total_xp or 0)} XP tích lũy'

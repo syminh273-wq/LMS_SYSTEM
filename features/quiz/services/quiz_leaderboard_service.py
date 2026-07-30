@@ -68,7 +68,7 @@ class QuizLeaderboardService(BaseService):
     def _all_rows(self, quiz_id, classroom_id):
         return list(self.log_repo.get_by_classroom(quiz_id, classroom_id))
 
-    def build(self, quiz_id, classroom_id, current_user_id=None, limit=20):
+    def build(self, quiz_id, classroom_id, limit=20):
         from features.account.consumer.repositories import ConsumerRepository
 
         consumers = ConsumerRepository()
@@ -102,18 +102,6 @@ class QuizLeaderboardService(BaseService):
 
         total_students = len(entries)
         my_entry = None
-        if current_user_id:
-            cur = str(current_user_id)
-            for e in entries:
-                if e['student_id'] == cur:
-                    my_entry = {
-                        'rank': e['rank'],
-                        'best_score_pct': e['best_score_pct'],
-                        'best_time_taken_seconds': e['best_time_taken_seconds'],
-                        'best_attempt_uid': e['best_attempt_uid'],
-                        'attempts_count': e['attempts_count'],
-                    }
-                    break
 
         top3 = entries[:3]
         sliced = entries[:max(1, int(limit))]
@@ -131,57 +119,39 @@ class QuizLeaderboardService(BaseService):
         from features.account.consumer.repositories import ConsumerRepository
 
         consumers = ConsumerRepository()
-        rows = self._all_rows(quiz_id, classroom_id)
         sid = str(student_id)
+        rows = list(self.log_repo.get_by_student(quiz_id, classroom_id, sid))
+        name, avatar = _hydrate_consumer(consumers, sid)
 
-        attempts_for_student = [r for r in rows if str(r.student_id) == sid]
-        if not attempts_for_student:
-            name, avatar = _hydrate_consumer(consumers, sid)
+        if not rows:
             return {
                 'student_id': sid,
                 'student_name': name,
                 'student_avatar': avatar,
-                'rank': None,
                 'best_score_pct': 0,
+                'best_score': 0,
+                'best_total_questions': 0,
                 'best_time_taken_seconds': 0,
                 'best_attempt_uid': None,
+                'best_attempt_number': 0,
+                'best_submitted_at': None,
                 'attempts_count': 0,
-                'attempts': [],
             }
 
-        best = _best_per_student(attempts_for_student).get(sid)
-        name, avatar = _hydrate_consumer(consumers, sid)
-
-        attempt_payloads = []
-        for a in attempts_for_student:
-            attempt_payloads.append({
-                'attempt_uid': str(getattr(a, 'uid', '')) if getattr(a, 'uid', None) else None,
-                'attempt_number': int(getattr(a, 'attempt_number', 1) or 1),
-                'score': int(getattr(a, 'score', 0) or 0),
-                'total_questions': int(getattr(a, 'total_questions', 0) or 0),
-                'score_pct': int(getattr(a, 'score_pct', 0) or 0),
-                'time_taken_seconds': int(getattr(a, 'time_taken_seconds', 0) or 0),
-                'submitted_at': getattr(a, 'submitted_at', None),
-            })
-        attempt_payloads.sort(key=lambda x: -x['score_pct'])
-
-        full_lb = self.build(quiz_id=quiz_id, classroom_id=classroom_id, current_user_id=None, limit=1000)
-        rank = None
-        for e in full_lb.get('entries', []):
-            if e['student_id'] == sid:
-                rank = e['rank']
-                break
+        best = _best_per_student(rows)[sid]
 
         return {
             'student_id': sid,
             'student_name': name,
             'student_avatar': avatar,
-            'rank': rank,
             'best_score_pct': int(getattr(best, 'score_pct', 0) or 0),
+            'best_score': int(getattr(best, 'score', 0) or 0),
+            'best_total_questions': int(getattr(best, 'total_questions', 0) or 0),
             'best_time_taken_seconds': int(getattr(best, 'time_taken_seconds', 0) or 0),
-            'best_attempt_uid': str(getattr(best, 'uid', '')) if best and getattr(best, 'uid', None) else None,
-            'attempts_count': len(attempt_payloads),
-            'attempts': attempt_payloads,
+            'best_attempt_uid': str(getattr(best, 'uid', '')) if getattr(best, 'uid', None) else None,
+            'best_attempt_number': int(getattr(best, 'attempt_number', 1) or 1),
+            'best_submitted_at': getattr(best, 'submitted_at', None),
+            'attempts_count': len(rows),
         }
 
     def _count_attempts(self, rows, sid):

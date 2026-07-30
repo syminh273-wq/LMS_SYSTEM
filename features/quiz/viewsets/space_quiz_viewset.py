@@ -321,7 +321,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         payload = QuizLeaderboardService().build(
             quiz_id=uid,
             classroom_id=classroom_id,
-            current_user_id=None,
             limit=limit,
         )
         return Response(QuizLeaderboardResponseSerializer(payload).data)

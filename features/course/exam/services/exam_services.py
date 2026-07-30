@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, time, timezone as datetime_timezone
 
 from django.utils import timezone
@@ -124,6 +125,9 @@ class ExamService(BaseService):
         return data
 
     def create_exam(self, teacher_id, data, file_obj=None):
+        from uuid import UUID
+
+        data.pop("file", None)
         self.validate_exam_type(data)
         data = self.normalize_due_date(data)
 
@@ -138,6 +142,11 @@ class ExamService(BaseService):
             data["status"] = "published" if data.get("exam_mode") == "online" else "draft"
 
         self.validate_status(data["status"])
+
+        if data.get("classroom_id") and not isinstance(data["classroom_id"], UUID):
+            data["classroom_id"] = UUID(str(data["classroom_id"]))
+        if data.get("ref_id") and not isinstance(data["ref_id"], UUID):
+            data["ref_id"] = UUID(str(data["ref_id"]))
 
         exam = self.exam_repo.create(**data)
         LMSIndexer.index_exam(exam)
@@ -240,14 +249,19 @@ class ExamService(BaseService):
             exams = self.exam_repo.list_by_teacher(teacher_id, status=status, exam_mode=exam_mode, exam_type=exam_type)
         return exams
 
-    def update_exam(self, uid, data):
+    def update_exam(self, uid, data, file_obj=None):
+        data.pop("file", None)
         exam = self.get_exam(uid)
         data = self.normalize_due_date(data)
 
         if "exam_type" in data:
             self.validate_exam_type(data)
 
-        if "content_type" in data or "exam_type" in data:
+        if file_obj is not None:
+            data.setdefault("classroom_id", str(exam.classroom_id))
+            data.setdefault("exam_type", getattr(exam, "exam_type", "assignment"))
+            data = self._handle_file_upload(data, file_obj, exam.teacher_id)
+        elif "content_type" in data or "exam_type" in data:
             data = self.validate_content(data)
 
         if "status" in data:

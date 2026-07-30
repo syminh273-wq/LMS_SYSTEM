@@ -38,8 +38,10 @@
 
 ## Why a separate module (not extending `classroom.leaderboard`)?
 
-- `classroom.leaderboard` is a **score** (`quiz_avg × 0.6 + exam_avg × 0.4`)
-  computed on the fly, scoped to **one classroom**.
+- The academic **score** is computed on the fly from `ExamSubmission`
+  grades, weighted by the exam's `exam_period` (final ×3, midterm ×2,
+  regular ×1), scoped to **one classroom**
+  (`UnifiedLeaderboardService._score_by_student`).
 - The new ranking needs **persisted state** (total XP across all
   classrooms), **denormalized counters** (passed quizzes, certificates,
   streak days), and **time-windowed aggregation** (week/month).

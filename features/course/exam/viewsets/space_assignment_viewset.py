@@ -1,8 +1,19 @@
+from django.http import QueryDict
 from rest_framework import status
 from rest_framework.response import Response
 
 from features.course.exam.viewsets.space_exam_viewset import SpaceExamViewSet, _serialize_exam
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
+
+
+def _to_plain_dict(data):
+    """QueryDict stores values as lists internally; **data unpacking bypasses
+    its __getitem__ override and leaks those raw lists (e.g. classroom_id
+    becomes ['<uuid>']). QueryDict.dict() collapses each key to its last
+    scalar value, which is what downstream **data unpacking needs."""
+    if isinstance(data, QueryDict):
+        return data.dict()
+    return dict(data) if not isinstance(data, dict) else data.copy()
 
 
 class SpaceAssignmentViewSet(SpaceExamViewSet):
@@ -28,7 +39,7 @@ class SpaceAssignmentViewSet(SpaceExamViewSet):
         return Response(_serialize_exam(exam))
 
     def create(self, request):
-        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        data = _to_plain_dict(request.data)
         data["exam_type"] = "assignment"
         file_obj = request.FILES.get('file')
 
@@ -57,10 +68,11 @@ class SpaceAssignmentViewSet(SpaceExamViewSet):
         if getattr(exam, "exam_type", "assignment") != "assignment":
             return Response({"error": "Assignment not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        data = _to_plain_dict(request.data)
         data["exam_type"] = "assignment"
+        file_obj = request.FILES.get('file')
         prev_status = exam.status
-        updated = self.exam_service.update_exam(uid, data)
+        updated = self.exam_service.update_exam(uid, data, file_obj=file_obj)
 
         if data.get('status') == 'published' and prev_status != 'published':
             ClassroomActivityLogService().log(
