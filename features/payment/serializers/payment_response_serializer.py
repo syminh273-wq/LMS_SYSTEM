@@ -1,18 +1,8 @@
 from core.serializers.fields import VnDateTimeField
 
-import base64
-import json
-
 from rest_framework import serializers
 
-
-def decode_meta(extra_data: str) -> dict:
-    if not extra_data:
-        return {}
-    try:
-        return json.loads(base64.b64decode(extra_data).decode())
-    except Exception:
-        return {}
+from features.payment.utils import parse_meta
 
 
 class PaymentResponseSerializer(serializers.Serializer):
@@ -30,12 +20,51 @@ class PaymentResponseSerializer(serializers.Serializer):
     updated_at = VnDateTimeField(read_only=True)
     resource_type = serializers.SerializerMethodField()
     resource_id = serializers.SerializerMethodField()
+    resource_name = serializers.SerializerMethodField()
+    teacher_name = serializers.SerializerMethodField()
+
+    def to_representation(self, instance):
+        self._meta = parse_meta(getattr(instance, 'extra_data', ''))
+        return super().to_representation(instance)
 
     def get_resource_type(self, obj):
-        return decode_meta(getattr(obj, 'extra_data', '')).get('resource_type')
+        return self._meta.get('resource_type')
 
     def get_resource_id(self, obj):
-        return decode_meta(getattr(obj, 'extra_data', '')).get('resource_id')
+        return self._meta.get('resource_id')
+
+    def get_resource_name(self, obj):
+        if not self.context.get('with_details'):
+            return None
+        resource_type = self._meta.get('resource_type')
+        resource_id = self._meta.get('resource_id')
+        if not resource_type or not resource_id:
+            return None
+        try:
+            if resource_type == 'classroom':
+                from features.course.classroom.repositories import Repository as ClassroomRepository
+                classroom = ClassroomRepository().find(resource_id)
+                return getattr(classroom, 'name', None)
+            if resource_type == 'course':
+                from features.course.repositories import CourseRepository
+                course = CourseRepository().find(resource_id)
+                return getattr(course, 'name', None)
+        except Exception:
+            return None
+        return None
+
+    def get_teacher_name(self, obj):
+        if not self.context.get('with_details'):
+            return None
+        teacher_id = getattr(obj, 'teacher_id', None)
+        if not teacher_id:
+            return None
+        try:
+            from features.account.space.repositories import Repository as SpaceRepository
+            teacher = SpaceRepository().find(str(teacher_id))
+            return getattr(teacher, 'full_name', None) or getattr(teacher, 'name', None)
+        except Exception:
+            return None
 
 
 class PaymentInitiateResponseSerializer(serializers.Serializer):

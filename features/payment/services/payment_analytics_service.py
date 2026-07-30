@@ -1,11 +1,10 @@
-import base64
-import json
 import logging
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
 from core.services.base_service import BaseService
+from features.payment.utils import parse_meta as _parse_meta
 
 logger = logging.getLogger(__name__)
 
@@ -18,15 +17,6 @@ STATUS_LABEL = {
     'failed': 'Thất bại',
     'cancelled': 'Đã hoàn tiền',
 }
-
-
-def _decode_meta(extra_data: str | None) -> dict:
-    if not extra_data:
-        return {}
-    try:
-        return json.loads(base64.b64decode(extra_data).decode())
-    except Exception:
-        return {}
 
 
 def _bucket_key(dt: datetime, granularity: str) -> str:
@@ -138,7 +128,7 @@ class PaymentAnalyticsService(BaseService):
         target = str(resource_id)
         return [
             p for p in payments
-            if str(_decode_meta(getattr(p, 'extra_data', '')).get('resource_id') or '') == target
+            if str(_parse_meta(getattr(p, 'extra_data', '')).get('resource_id') or '') == target
         ]
 
     # ── aggregations ────────────────────────────────────────────────────
@@ -212,7 +202,7 @@ class PaymentAnalyticsService(BaseService):
     def _aggregate_by_classroom(self, payments: list) -> list:
         groups: dict[str, dict] = {}
         for p in payments:
-            meta = _decode_meta(getattr(p, 'extra_data', ''))
+            meta = _parse_meta(getattr(p, 'extra_data', ''))
             if meta.get('resource_type') != 'classroom':
                 continue
             rid = str(meta.get('resource_id') or '')

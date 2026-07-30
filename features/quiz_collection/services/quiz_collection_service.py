@@ -58,6 +58,17 @@ class QuizCollectionService(BaseService):
                 continue
             self.repository.add_item(collection, qid_str)
             added.append(qid_str)
+
+        if added:
+            classroom_assignments = self.assignment_repo.get_by_collection(collection_id)
+            if classroom_assignments:
+                from features.quiz_collection.services.certificate_issuance_service import (
+                    _ensure_quiz_assignment,
+                )
+                for classroom_assignment in classroom_assignments:
+                    for qid_str in added:
+                        _ensure_quiz_assignment(qid_str, classroom_assignment.classroom_id, collection)
+
         return added
 
     def remove_quiz(self, collection_id, quiz_id):
@@ -73,7 +84,17 @@ class QuizCollectionService(BaseService):
         self.repository.reorder_items(collection, ordered_quiz_ids)
 
     def assign_to_classroom(self, collection_id, classroom_id, assigned_by):
-        return self.assignment_repo.assign(collection_id, classroom_id, assigned_by)
+        assignment = self.assignment_repo.assign(collection_id, classroom_id, assigned_by)
+
+        collection = self.repository.get(collection_id)
+        if collection:
+            from features.quiz_collection.services.certificate_issuance_service import (
+                _ensure_quiz_assignment,
+            )
+            for quiz_id in (collection.item_quiz_ids or []):
+                _ensure_quiz_assignment(quiz_id, classroom_id, collection)
+
+        return assignment
 
     def unassign_from_classroom(self, collection_id, classroom_id):
         self.assignment_repo.unassign(collection_id, classroom_id)

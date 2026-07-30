@@ -43,13 +43,7 @@ def _is_student_in_classroom(student_id, classroom_id) -> bool:
 
 def _ensure_quiz_assignment(quiz_id, classroom_id, collection) -> None:
     """
-    Idempotent fallback: if a quiz is part of a collection assigned to a classroom
-    but no `quiz_assignments` row exists yet (missing seed / broken workflow),
-    create one with safe defaults so certificate issuance can proceed.
-
-    This does NOT bypass any teacher config — if an assignment already exists, it
-    is left untouched. The defaults match what the rest of the system uses when
-    an assignment is missing.
+    Ensures that the quiz assignment exists.
     """
     try:
         from features.quiz.repositories.quiz_assignment_repository import (
@@ -133,8 +127,6 @@ class CertificateIssuanceService(BaseService):
                 if str(just_submitted_quiz_id) not in [str(q) for q in (collection.item_quiz_ids or [])]:
                     continue
 
-            self._ensure_all_quiz_assignments(collection_id, classroom_id, collection)
-
             if not self._is_completed(collection_id, classroom_id, student_id):
                 continue
 
@@ -192,16 +184,6 @@ class CertificateIssuanceService(BaseService):
 
         return issued_now
 
-    def _ensure_all_quiz_assignments(self, collection_id, classroom_id, collection) -> None:
-        """Make sure every quiz in the collection has a quiz_assignments row."""
-        try:
-            quiz_ids = list(collection.item_quiz_ids or [])
-        except Exception as exc:
-            logger.warning(f"[Certificate] Could not list quiz items for {collection_id}: {exc}")
-            return
-        for quiz_id in quiz_ids:
-            _ensure_quiz_assignment(quiz_id, classroom_id, collection)
-
     def _is_completed(self, collection_id, classroom_id, student_id) -> bool:
         from features.quiz.repositories.quiz_log_repository import QuizLogRepository
         from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
@@ -250,9 +232,6 @@ class CertificateIssuanceService(BaseService):
                 'passed_quiz_ids': [],
                 'missing_quiz_ids': [],
             }
-
-        if collection is not None:
-            self._ensure_all_quiz_assignments(collection_id, classroom_id, collection)
 
         from features.quiz.repositories.quiz_log_repository import QuizLogRepository
 
@@ -309,9 +288,7 @@ class CertificateIssuanceService(BaseService):
 
         return result
 
-    # ------------------------------------------------------------------
-    # Enriched response helpers
-    # ------------------------------------------------------------------
+
     def enrich_issued_certificate(self, issued) -> dict:
         """
         Convert an IssuedCertificate model into a response-friendly dict with

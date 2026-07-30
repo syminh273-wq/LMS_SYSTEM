@@ -29,8 +29,8 @@ class ConsumerPaymentViewSet(ConsumerScopeMixin, BaseModelViewSet):
             payments = [p for p in payments if (p.status or '').lower() == status_filter]
         resource_type = (request.query_params.get('resource_type') or '').strip().lower()
         if resource_type:
-            from features.payment.serializers.payment_response_serializer import decode_meta
-            payments = [p for p in payments if (decode_meta(getattr(p, 'extra_data', '')).get('resource_type') or '').lower() == resource_type]
+            from features.payment.utils import parse_meta
+            payments = [p for p in payments if (parse_meta(getattr(p, 'extra_data', '')).get('resource_type') or '').lower() == resource_type]
         try:
             limit = int(request.query_params.get('limit') or 50)
         except (TypeError, ValueError):
@@ -44,7 +44,7 @@ class ConsumerPaymentViewSet(ConsumerScopeMixin, BaseModelViewSet):
         payment = PaymentRepository().get_by_order_id(order_id)
         if not payment or str(payment.consumer_id) != str(request.user.uid):
             return Response({'error': 'Không tìm thấy đơn hàng.'}, status=status.HTTP_404_NOT_FOUND)
-        return Response(PaymentResponseSerializer(payment).data)
+        return Response(PaymentResponseSerializer(payment, context={'with_details': True}).data)
 
     @action(detail=False, methods=['post'], url_path='create')
     def initiate(self, request):

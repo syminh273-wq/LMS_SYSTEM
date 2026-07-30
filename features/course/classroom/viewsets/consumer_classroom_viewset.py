@@ -347,8 +347,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         from features.payment.enums import PaymentStatus
         from features.payment.repositories import PaymentRepository
         from features.payment.services import PaymentService
-        import base64
-        import json
+        from features.payment.utils import parse_meta
 
         try:
             classroom = Repository().find(str(pk))
@@ -364,10 +363,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
             for p in PaymentRepository().get_by_consumer(str(request.user.uid)):
                 if p.status != PaymentStatus.PENDING.value:
                     continue
-                try:
-                    meta = json.loads(base64.b64decode(p.extra_data).decode())
-                except Exception:
-                    continue
+                meta = parse_meta(getattr(p, 'extra_data', ''))
                 if (meta.get('resource_type') == 'classroom'
                         and meta.get('resource_id') == str(classroom.uid)):
                     return Response({
@@ -402,40 +398,6 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         @return: access status
         """
         return Response(Service().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
-
-    @action(detail=False, methods=['get'], url_path='me/history')
-    def me_history(self, request):
-        """
-        List every join event the current student has with any classroom, newest first.
-        @param limit: max entries, default 50
-        @return: join history, including soft-deleted and rejected entries
-        """
-        from features.course.classroom.serializers.classroom_member_history_serializer import ClassroomMemberHistorySerializer
-        try:
-            limit = int(request.query_params.get('limit') or 50)
-        except (TypeError, ValueError):
-            limit = 50
-        limit = max(1, min(limit, 200))
-
-        members = list(ClassroomMemberRepository().get_history_by_member(request.user.uid, limit=limit))
-        members.sort(key=lambda m: getattr(m, 'joined_at', None) or getattr(m, 'updated_at', None) or 0, reverse=True)
-
-        service = Service()
-        items = []
-        for m in members:
-            classroom_name = ''
-            teacher_name = ''
-            try:
-                c = service.find(str(m.classroom_uid))
-                classroom_name = getattr(c, 'name', '') or ''
-                teacher_name = getattr(c, 'teacher_name', '') or ''
-            except Exception:
-                pass
-            items.append(ClassroomMemberHistorySerializer(
-                m,
-                context={'classroom_name': classroom_name, 'teacher_name': teacher_name},
-            ).data)
-        return Response(items)
 
     # @action(detail=True, methods=['get'], url_path='preview-folder')
     # def preview_folder(self, request, pk=None):

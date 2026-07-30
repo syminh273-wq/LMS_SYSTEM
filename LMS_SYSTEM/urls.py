@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/v1/consumer/payment/', include('features.payment.routing.public_urls')),
     path('api/v1/consumer/payment/', include('features.payment.routing.urls')),
     path('api/v1/space/payment/', include('features.payment.routing.space_urls')),
+    path('api/v1/consumer/history/', include('features.history.routing.urls')),
     path('api/v1/space/dashboard/', include('features.dashboard.routing.space_urls')),
     path('api/v1/consumer/face/', include('features.face.routing.urls')),
     path('api/v1/space/face/', include('features.face.routing.space_urls')),

@@ -18,7 +18,7 @@ class Payment(BaseTimeStampModel):
 
     amount = columns.BigInt(required=True)               # VND
     order_info = columns.Text(default='')
-    extra_data = columns.Text(default='')                # base64 JSON: {consumer_id, resource_type, resource_id, teacher_id}
+    extra_data = columns.Text(default='')                 # JSON: {consumer_id, resource_type, resource_id, teacher_id}
 
     status = columns.Text(default=PaymentStatus.PENDING.value, index=True)
     pay_url = columns.Text(default='')                   # MoMo redirect URL

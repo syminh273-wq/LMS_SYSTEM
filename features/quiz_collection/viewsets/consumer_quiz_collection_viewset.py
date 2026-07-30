@@ -34,7 +34,14 @@ class ConsumerQuizCollectionViewSet(ConsumerScopeMixin, ViewSet):
         if not classroom_id:
             return Response({'detail': 'classroom_id is required.'}, status=400)
         collections = self.service.get_for_classroom(classroom_id)
-        return Response(QuizCollectionResponseSerializer(collections, many=True).data)
+        progress_by_id = {
+            str(collection.uid): self.issuance_service.get_student_progress(
+                collection.uid, classroom_id, request.user.uid,
+            )
+            for collection in collections
+        }
+        context = {'progress_by_id': progress_by_id}
+        return Response(QuizCollectionResponseSerializer(collections, many=True, context=context).data)
 
     def retrieve(self, request, pk=None):
         classroom_id = request.query_params.get('classroom_id')

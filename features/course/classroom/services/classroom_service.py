@@ -57,8 +57,7 @@ class Service(BaseService):
         from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
         from features.payment.repositories import PaymentRepository
         from features.payment.enums import PaymentStatus
-        import base64
-        import json
+        from features.payment.utils import parse_meta
 
         classroom = self.find(str(classroom_uid))
         pricing_type = getattr(classroom, 'pricing_type', 'free') or 'free'
@@ -81,10 +80,7 @@ class Service(BaseService):
                 for p in payments:
                     if p.status != PaymentStatus.PENDING.value:
                         continue
-                    try:
-                        meta = json.loads(base64.b64decode(p.extra_data).decode())
-                    except Exception:
-                        continue
+                    meta = parse_meta(getattr(p, 'extra_data', ''))
                     if meta.get('resource_type') == 'classroom' and meta.get('resource_id') == classroom_uid_str:
                         pending_payment = {
                             'order_id': p.order_id,
@@ -118,7 +114,6 @@ class Service(BaseService):
         from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
         from features.course.classroom.services.classroom_doc_service import ClassroomDocService
         from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
-        from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
         from features.social.services.classroom_favorite_service import ClassroomFavoriteService
         from core.serializers.classroom.classroom_response_serializer import ClassroomResponseSerializer
 
@@ -154,16 +149,12 @@ class Service(BaseService):
             try:
                 from features.payment.repositories import PaymentRepository
                 from features.payment.enums import PaymentStatus
-                import base64
-                import json
+                from features.payment.utils import parse_meta
 
                 for p in PaymentRepository().get_by_consumer(str(consumer_id)):
                     if p.status != PaymentStatus.PENDING.value:
                         continue
-                    try:
-                        meta = json.loads(base64.b64decode(p.extra_data).decode())
-                    except Exception:
-                        continue
+                    meta = parse_meta(getattr(p, 'extra_data', ''))
                     if (meta.get('resource_type') == 'classroom'
                             and meta.get('resource_id') == str(classroom.uid)):
                         pending_payment = {

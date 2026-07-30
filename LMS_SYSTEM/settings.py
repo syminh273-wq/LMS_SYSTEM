@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'features.notification',
     'features.calendar',
     'features.payment',
+    'features.history',
     'features.face',
     'features.quiz_collection',
     'features.portfolio',

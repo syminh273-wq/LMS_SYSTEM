@@ -1,11 +1,10 @@
-import base64
-import json
 import logging
 from datetime import datetime, timezone
 from core.utils.uuid import uuid7
 from features.payment.enums import PaymentStatus
 from features.payment.repositories import PaymentRepository
 from features.payment.services.momo_service import MoMoService
+from features.payment.utils import dump_meta, parse_meta
 from core.services.base_service import BaseService
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,7 @@ class PaymentService(BaseService):
         }
         if teacher_id:
             meta["teacher_id"] = teacher_id
-        extra_data = base64.b64encode(json.dumps(meta).encode()).decode()
+        extra_data = dump_meta(meta)
 
         result = self.momo.create_payment(
             order_id=order_id,
@@ -123,7 +122,7 @@ class PaymentService(BaseService):
 
     def _on_payment_success(self, payment) -> None:
         try:
-            meta = json.loads(base64.b64decode(payment.extra_data).decode())
+            meta = parse_meta(payment.extra_data)
             resource_type = meta.get('resource_type')
             resource_id = meta.get('resource_id')
             consumer_id = meta.get('consumer_id')

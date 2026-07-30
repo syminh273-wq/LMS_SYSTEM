@@ -1,16 +1,6 @@
-import base64
-import json
 from core.repositories.base_repository import BaseRepository
 from features.payment.models import Payment
-
-
-def _decode_meta(extra_data: str) -> dict:
-    if not extra_data:
-        return {}
-    try:
-        return json.loads(base64.b64decode(extra_data).decode())
-    except Exception:
-        return {}
+from features.payment.utils import parse_meta
 
 
 class PaymentRepository(BaseRepository):
@@ -31,13 +21,13 @@ class PaymentRepository(BaseRepository):
 
     def find_existing_for_resource(self, consumer_id, resource_type: str, resource_id: str):
         """Return the most recent active payment (pending or completed) for this
-        consumer + resource. `resource_id` is matched inside the base64 extra_data
+        consumer + resource. `resource_id` is matched inside the extra_data
         blob — Cassandra has no native JSON index, so we filter by consumer_id
         (indexed) and decode in Python.
         """
         target = str(resource_id)
         for p in self.model.objects.filter(consumer_id=consumer_id, is_deleted=False).limit(200):
-            meta = _decode_meta(getattr(p, 'extra_data', '') or '')
+            meta = parse_meta(getattr(p, 'extra_data', '') or '')
             if meta.get('resource_type') == resource_type and str(meta.get('resource_id')) == target:
                 if (p.status or '') in ('pending', 'completed'):
                     return p
