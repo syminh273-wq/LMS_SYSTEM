@@ -27,7 +27,6 @@ class ClassroomDocService(BaseService):
         self._folder_service = ResourceFolderService()
         self._folder_repo = ResourceFolderRepository()
 
-    # ── Public API ────────────────────────────────────────────────────────────
 
     def upload_and_index(self, classroom_uid: str, file_obj, section: str = '', folder_id=None, order_index=0, exam_period=None):
         """

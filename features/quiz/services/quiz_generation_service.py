@@ -53,50 +53,38 @@ _SYNC_FORMAT_RULE = (
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# System message registry  (switch on quiz_type)
+# System message
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_system(persona: str, task_type: str, rules: list, format_rule: str, num_questions: int) -> dict:
-    rules_text = "\n".join(f"- {r}" for r in rules)
+_PERSONA = "QuizMaster AI — expert MCQ designer for educational assessments"
+_TASK_TYPE = "Multiple-choice — 4 options, exactly 1 correct answer"
+_RULES = [
+    "Exactly 4 options: a, b, c, d. One unambiguously correct answer.",
+    "Distractors must be plausible but clearly wrong to anyone who read the material.",
+    "Never use 'all of the above' or 'none of the above'.",
+    "Cover a mix of recall, comprehension, application, and analysis.",
+    "Questions and answers must come from the document content — never invent facts.",
+    "Options should be similar in length to avoid length-bias clues.",
+]
+
+_USER_TEMPLATE = "Generate the quiz from the document below.\n\n<document>\n{content}\n</document>"
+
+
+def _build_system(format_rule: str, num_questions: int) -> dict:
+    rules_text = "\n".join(f"- {r}" for r in _RULES)
     content = (
-        f"You are: {persona}\n"
+        f"You are: {_PERSONA}\n"
         f"Language: Vietnamese ONLY. Translate all content to Vietnamese.\n"
-        f"Task: {task_type}. Generate exactly {num_questions} questions.\n"
+        f"Task: {_TASK_TYPE}. Generate exactly {num_questions} questions.\n"
         f"Rules:\n{rules_text}\n\n"
         f"{format_rule}"
     )
     return {"role": "system", "content": content}
 
 
-_RULES = {
-    "multiple_choice": [
-        "Exactly 4 options: a, b, c, d. One unambiguously correct answer.",
-        "Distractors must be plausible but clearly wrong to anyone who read the material.",
-        "Never use 'all of the above' or 'none of the above'.",
-        "Cover a mix of recall, comprehension, application, and analysis.",
-        "Questions and answers must come from the document content — never invent facts.",
-        "Options should be similar in length to avoid length-bias clues.",
-    ],
-}
-
-_PERSONAS = {
-    "multiple_choice": "QuizMaster AI — expert MCQ designer for educational assessments",
-}
-
-_TASK_TYPES = {
-    "multiple_choice": "Multiple-choice — 4 options, exactly 1 correct answer",
-}
-
-QUIZ_TYPES = list(_RULES.keys())
-
-_USER_TEMPLATE = "Generate the quiz from the document below.\n\n<document>\n{content}\n</document>"
-
-
-def _get_messages(quiz_type: str, content: str, num_questions: int, streaming: bool) -> list:
-    """Switch on quiz_type → build [system, user] message pair."""
-    qt = quiz_type if quiz_type in _RULES else 'multiple_choice'
+def _get_messages(content: str, num_questions: int, streaming: bool) -> list:
     fmt = _NDJSON_FORMAT_RULE if streaming else _SYNC_FORMAT_RULE
-    system = _build_system(_PERSONAS[qt], _TASK_TYPES[qt], _RULES[qt], fmt, num_questions)
+    system = _build_system(fmt, num_questions)
     user = {"role": "user", "content": _USER_TEMPLATE.format(content=content)}
     return [system, user]
 
@@ -179,16 +167,6 @@ class QuizGenerationService:
             'd': 'd', '4': 'd', '④': 'd',
         }
         return mapping.get(s, s[:1] if s[:1] in 'abcd' else 'a')
-
-    @classmethod
-    def _looks_like_questions_json(cls, raw: str) -> bool:
-        """Cheap pre-check: does the raw text contain a plausible questions array?"""
-        if not raw:
-            return False
-        low = raw.lower()
-        has_q = '"question"' in low or '"q"' in low
-        has_correct = '"correct"' in low or '"answer"' in low or '"ans"' in low
-        return has_q and has_correct
 
     @classmethod
     def _parse_quiz_payload(cls, raw: str, num_questions: int) -> dict:
@@ -306,14 +284,13 @@ class QuizGenerationService:
     def generate(
         cls,
         content: str,
-        quiz_type: str = 'multiple_choice',
         num_questions: int = 5,
     ) -> dict:
         if not content:
             raise ValueError("Provide 'content'")
         content = content[:_MAX_CONTENT_LENGTH]
 
-        messages = _get_messages(quiz_type, content, num_questions, streaming=False)
+        messages = _get_messages(content, num_questions, streaming=False)
 
         def validator(raw: str) -> bool:
             try:
@@ -345,7 +322,6 @@ class QuizGenerationService:
     def generate_stream(
         cls,
         content: str,
-        quiz_type: str = 'multiple_choice',
         num_questions: int = 5,
     ):
         """
@@ -364,7 +340,7 @@ class QuizGenerationService:
             yield {"type": "error", "detail": str(exc)}
             return
 
-        messages = _get_messages(quiz_type, content, num_questions, streaming=True)
+        messages = _get_messages(content, num_questions, streaming=True)
 
         # raw_chunks is a generator of str chunks + final tuple
         raw_chunks = AIClient.chat_stream(messages, models=AIClient.TEXT_MODELS, timeout=120)

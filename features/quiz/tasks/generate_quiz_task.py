@@ -39,7 +39,6 @@ def _save_meta(**fields):
 def generate_quiz_task(
     teacher_uid: str,
     content: str,
-    quiz_type: str = 'multiple_choice',
     num_questions: int = 5,
 ) -> dict:
     """
@@ -50,8 +49,8 @@ def generate_quiz_task(
     — the status view reads job.is_failed to surface them.
     """
     logger.info(
-        "[generate_quiz_task] start teacher=%s type=%s n=%s",
-        teacher_uid, quiz_type, num_questions,
+        "[generate_quiz_task] start teacher=%s n=%s",
+        teacher_uid, num_questions,
     )
 
     _save_meta(status='running', progress=5, current_step=1)
@@ -59,7 +58,6 @@ def generate_quiz_task(
     try:
         ai_data = QuizGenerationService.generate(
             content=content,
-            quiz_type=quiz_type,
             num_questions=num_questions,
         )
     except Exception as exc:

@@ -3,13 +3,7 @@ from core.serializers.fields import VnDateTimeField
 from rest_framework import serializers
 
 
-QUIZ_TYPE_CHOICES = ['multiple_choice']
-
-
 class QuizGenerateRequestSerializer(serializers.Serializer):
-    quiz_type = serializers.ChoiceField(
-        choices=QUIZ_TYPE_CHOICES, required=False, default='multiple_choice',
-    )
     num_questions = serializers.IntegerField(
         required=False, default=5, min_value=5, max_value=30,
     )

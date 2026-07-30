@@ -34,7 +34,7 @@ from features.quiz.serializers.quiz_leaderboard_serializer import (
 )
 from features.quiz.services.quiz_service import QuizService
 from features.quiz.services.quiz_leaderboard_service import QuizLeaderboardService
-from features.quiz.services.quiz_generation_service import QuizGenerationService, QUIZ_TYPES, _extract_pdf_text
+from features.quiz.services.quiz_generation_service import QuizGenerationService, _extract_pdf_text
 from features.quiz.tasks.generate_quiz_task import generate_quiz_task
 from features.quiz.tasks.serializers import (
     QuizGenerateTaskResponseSerializer,
@@ -76,20 +76,12 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         data['assigned_classrooms'] = QuizAssignmentResponseSerializer(assignments, many=True).data
         return Response(data)
 
-    @action(detail=False, methods=['get'], url_path='types')
-    def types(self, request):
-        labels = {
-            'multiple_choice': 'Trắc nghiệm 4 đáp án',
-        }
-        return Response([{'value': t, 'label': labels.get(t, t)} for t in QUIZ_TYPES])
-
     @action(detail=False, methods=['post'], url_path='generate')
     def generate(self, request):
         req_serializer = QuizGenerateRequestSerializer(data=request.data)
         req_serializer.is_valid(raise_exception=True)
         params = req_serializer.validated_data
 
-        quiz_type     = params.get('quiz_type', 'multiple_choice')
         num_questions = params.get('num_questions', 5)
 
         uploaded_file = request.FILES.get('file')
@@ -103,8 +95,7 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
 
         try:
             ai_data = QuizGenerationService.generate(
-                content=content,
-                quiz_type=quiz_type, num_questions=num_questions,
+                content=content, num_questions=num_questions,
             )
         except Exception as exc:
             return Response({'detail': f'AI generation failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
@@ -135,7 +126,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         req_serializer.is_valid(raise_exception=True)
         params = req_serializer.validated_data
 
-        quiz_type     = params.get('quiz_type', 'multiple_choice')
         num_questions = params.get('num_questions', 5)
 
         uploaded_file = request.FILES.get('file')
@@ -165,8 +155,7 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
             total = 0
             try:
                 for event in QuizGenerationService.generate_stream(
-                    content=content,
-                    quiz_type=quiz_type, num_questions=num_questions,
+                    content=content, num_questions=num_questions,
                 ):
                     if event['type'] == 'error':
                         yield f"data: {json.dumps(event)}\n\n"
@@ -376,7 +365,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         req_serializer.is_valid(raise_exception=True)
         params = req_serializer.validated_data
 
-        quiz_type = params.get('quiz_type', 'multiple_choice')
         num_questions = params.get('num_questions', 5)
 
         uploaded_file = request.FILES.get('file')
@@ -396,7 +384,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
             generate_quiz_task,
             teacher_uid=str(request.user.uid),
             content=content,
-            quiz_type=quiz_type,
             num_questions=num_questions,
             job_id=str(uuid.uuid4()),
             job_timeout=300,

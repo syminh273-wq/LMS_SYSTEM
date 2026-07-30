@@ -259,9 +259,6 @@ class RAGPipeline:
             logger.info("\n".join(lines))
         return hits
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # ⑤ build_context() — ghép chunks thành context, dedupe sources
-    # ─────────────────────────────────────────────────────────────────────────
 
     def _build_messages(self, question: str, context: str, system_prompt: str = None) -> list:
         system = (system_prompt or _SYSTEM_PROMPT).format(context=context)
@@ -351,9 +348,6 @@ class RAGPipeline:
                     raise RuntimeError(str(chunk[1]))
                 # __FULL__ / __TOOL_CALLS__ → bỏ qua, stream đã kết thúc
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Public API — high level
-    # ─────────────────────────────────────────────────────────────────────────
 
     def ingest(
         self,
