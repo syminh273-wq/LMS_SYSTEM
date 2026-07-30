@@ -1,6 +1,7 @@
 from core.serializers.fields import VnDateTimeField
 
 from rest_framework import serializers
+from django.contrib.auth.hashers import is_password_usable
 from django.contrib.auth.password_validation import validate_password
 from features.account.space.models.space import Space
 
@@ -38,6 +39,10 @@ class SpaceAccountSerializer(serializers.Serializer):
     created_at = VnDateTimeField(read_only=True)
     updated_at = VnDateTimeField(read_only=True)
     portfolio = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
+
+    def get_has_password(self, obj):
+        return is_password_usable(getattr(obj, 'password', ''))
 
     def get_portfolio(self, obj):
         try:

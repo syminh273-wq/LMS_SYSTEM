@@ -1,6 +1,7 @@
 from core.serializers.fields import VnDateTimeField
 
 from rest_framework import serializers
+from django.contrib.auth.hashers import is_password_usable
 from django.contrib.auth.password_validation import validate_password
 from features.account.consumer.models.consumer import Consumer
 
@@ -17,6 +18,10 @@ class ConsumerAccountSerializer(serializers.Serializer):
     role = serializers.CharField(read_only=True)
     created_at = VnDateTimeField(read_only=True)
     updated_at = VnDateTimeField(read_only=True)
+    has_password = serializers.SerializerMethodField()
+
+    def get_has_password(self, obj):
+        return is_password_usable(getattr(obj, 'password', ''))
 
     def get_avatar_url(self, obj):
         if not obj.avatar_url:
