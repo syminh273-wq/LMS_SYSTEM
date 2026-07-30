@@ -26,6 +26,7 @@ class UserSettingService(BaseService):
 
     def set_setting(self, user_id, user_type, key, value):
         """Set a single setting."""
+        user_type = getattr(user_type, 'value', user_type)
         return self.repository.set_value(user_id, user_type, key, json.dumps(value))
 
     def update_bulk_settings(self, user_id, user_type, settings_dict: dict):

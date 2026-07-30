@@ -1,2 +1,4 @@
 from .space_exam_viewset import SpaceExamViewSet
 from .consumer_exam_viewset import ConsumerExamViewSet
+from .space_assignment_viewset import SpaceAssignmentViewSet
+from .consumer_assignment_viewset import ConsumerAssignmentViewSet

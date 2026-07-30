@@ -19,27 +19,34 @@ class ExamRepository(BaseRepository):
 
         return Exam.objects(uid=exam_uid, is_deleted=False).first()
 
-    def list_by_teacher(self, teacher_id, status=None, exam_mode=None):
+    def list_by_teacher(self, teacher_id, status=None, exam_mode=None, exam_type=None):
         qs = list(Exam.objects(teacher_id=teacher_id, is_deleted=False))
         if status:
             statuses = status if isinstance(status, list) else [status]
             qs = [e for e in qs if e.status in statuses]
         if exam_mode:
             qs = [e for e in qs if e.exam_mode == exam_mode]
+        if exam_type:
+            qs = [e for e in qs if getattr(e, "exam_type", "assignment") == exam_type]
         return qs
 
-    def list_by_classroom(self, classroom_id, status=None, exam_mode=None):
+    def list_by_classroom(self, classroom_id, status=None, exam_mode=None, exam_type=None):
         qs = list(Exam.objects(classroom_id=classroom_id, is_deleted=False))
         if status:
             statuses = status if isinstance(status, list) else [status]
             qs = [e for e in qs if e.status in statuses]
         if exam_mode:
             qs = [e for e in qs if e.exam_mode == exam_mode]
+        if exam_type:
+            qs = [e for e in qs if getattr(e, "exam_type", "assignment") == exam_type]
         return qs
 
-    def list_published_by_classroom(self, classroom_id):
+    def list_published_by_classroom(self, classroom_id, exam_type=None):
         qs = list(Exam.objects(classroom_id=classroom_id, is_deleted=False))
-        return [e for e in qs if e.status in ('published', 'ongoing', 'closed')]
+        qs = [e for e in qs if e.status in ('published', 'ongoing', 'closed')]
+        if exam_type:
+            qs = [e for e in qs if getattr(e, "exam_type", "assignment") == exam_type]
+        return qs
 
     def update(self, exam, **data):
         for key, value in data.items():

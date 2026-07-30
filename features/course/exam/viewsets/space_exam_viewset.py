@@ -6,6 +6,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.serializers.classroom import ClassroomResponseSerializer
 from core.views.mixins import SpaceScopeMixin
 from features.course.exam.serializers import (
     ExamSubmissionAIGradeSerializer,
@@ -14,9 +15,10 @@ from features.course.exam.serializers import (
     serialize_audit_log_entry,
     summarize_audit_logs,
 )
-from features.course.exam.services import ExamService, ExamSubmissionService, ExamSessionService
+from features.course.exam.services import ExamService, ExamSubmissionService, ExamSessionService, ExamAnalyticsService
 from features.course.exam.repositories import ExamAuditLogRepository, ExamRepository
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
+from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 
 
 def _parse_meta(raw) -> dict:
@@ -107,6 +109,7 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
         self.exam_service = ExamService()
         self.submission_service = ExamSubmissionService()
         self.session_service = ExamSessionService()
+        self.analytics_service = ExamAnalyticsService()
         self.audit_repo = ExamAuditLogRepository()
         self.exam_repo = ExamRepository()
 
@@ -116,11 +119,13 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
         classroom_id = request.query_params.get("classroom_id")
         status = request.query_params.getlist("status") or request.query_params.get("status") or None
         exam_mode = request.query_params.get("exam_mode") or None
+        exam_type = request.query_params.get("exam_type") or None
         exams = self.exam_service.list_teacher_exams(
             teacher_id=request.user.uid,
             classroom_id=classroom_id,
             status=status,
             exam_mode=exam_mode,
+            exam_type=exam_type,
         )
         return Response([_serialize_exam(e) for e in exams])
 
@@ -190,6 +195,21 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
                 target_name=exam_title,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── ANALYTICS (exam-scoped) ─────────────────────────────────────────────────
+
+    def analytics(self, request, exam_uid=None):
+        try:
+            data = self.analytics_service.get_exam_analytics(exam_uid, request.user.uid)
+        except ValueError as exc:
+            return _submission_error_response(exc)
+        return Response({
+            "exam": _serialize_exam(data["exam"]),
+            "classroom": ClassroomResponseSerializer(data["classroom"]).data,
+            "students": [ClassroomMemberService.serialize_member(m) for m in data["members"]],
+            "submissions": [serialize_exam_submission(s) for s in data["submissions"]],
+            "stats": data["stats"],
+        })
 
     # ── SUBMISSIONS (exam-scoped) ──────────────────────────────────────────────
 

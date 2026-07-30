@@ -90,6 +90,70 @@
 
 ---
 
+## 4a. Google OAuth Login (Consumer / Space)
+
+### Actors
+- **Teacher or Student**
+- **Google**
+- **Platform**
+
+### Preconditions
+- None (works for both first-time and returning users).
+
+### Steps
+1. User authenticates with Google; platform receives a verified Google `sub` (id) and email.
+2. Platform looks up `SocialAccount` by `provider='google'` + `provider_id=sub`.
+3. **If linked**: resolve the account directly by the linked `user_uid`.
+4. **If not linked but email matches an existing account**: create a `SocialAccount` link to that existing account. The account's password is left untouched.
+5. **If no match at all**: create a new account with `password=make_password(None)` (an unusable password hash) and create the `SocialAccount` link.
+6. Platform issues JWT tokens for the resolved account.
+
+### Notes
+- A Google-only account (never set a real password) is identified indirectly via `is_password_usable(password)` — there is no explicit `auth_provider` field.
+- Step 4 auto-links Google to an existing email/password account without additional confirmation.
+
+---
+
+## 4b. Change Password
+
+### Actors
+- **Teacher or Student** (authenticated)
+- **Platform**
+
+### Preconditions
+- User is authenticated (valid JWT).
+
+### Steps
+1. User submits `current_password`, `new_password`, `confirm_password`.
+2. Platform checks whether the account currently has a usable password (`is_password_usable`).
+3. **If usable** (normal account): `current_password` must match, and `new_password` must differ from it.
+4. **If not usable** (Google-only account that never set a real password): `current_password` is not required — this call sets the account's first real password.
+5. Platform hashes and saves `new_password`.
+
+### Edge Cases
+- **Google-only account**: can now set a password directly while logged in, without needing `current_password`. Once set, subsequent calls require `current_password` like a normal account.
+- **Wrong current_password** (normal account): rejected with a field error.
+- **Same as current password**: rejected (normal account only).
+
+---
+
+## 4c. Forgot / Reset Password via OTP
+
+### Actors
+- **Teacher or Student**
+- **Platform**
+
+### Steps
+1. User requests an OTP for their email (`request_otp`). Platform responds with a generic message regardless of whether the email exists, to avoid enumeration.
+2. User submits the OTP (`verify_otp`); platform issues a short-lived `reset_token` on success.
+3. User submits `reset_token` + `new_password` (`reset_password`); platform sets the new password unconditionally — no `current_password` or password-usability check.
+
+### Notes
+- Works identically for Google-only accounts and normal accounts: this is the intended account-recovery path when a user has lost access to both their password and their Google account.
+- This flow does not check `is_password_usable`, by design — it is the "recovery" path, so no prior credential is required.
+
+---
+
 ## 5. Profile Update
 
 ### Actors

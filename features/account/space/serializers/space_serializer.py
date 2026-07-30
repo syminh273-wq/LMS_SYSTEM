@@ -166,7 +166,7 @@ class SpaceSettingsSerializer(serializers.Serializer):
 
 
 class SpaceChangePasswordSerializer(serializers.Serializer):
-    current_password = serializers.CharField(write_only=True)
+    current_password = serializers.CharField(write_only=True, required=False, allow_blank=True, default='')
     new_password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
 

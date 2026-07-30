@@ -138,6 +138,76 @@ class PortfolioService(BaseService):
 
         return result
 
+    def get_public_profile_bundle(self, owner_id) -> dict:
+        """Profile settings/visibility flags + address + consumer/space account summary.
+
+        Does not enforce visibility itself — callers decide whether/how to gate
+        access based on the returned `profile_visibility` field.
+        """
+        from features.account.consumer.services import ConsumerService
+        from features.account.consumer.serializers import ConsumerAccountSerializer
+        from features.account.consumer.services.address_service import AddressService
+        from features.account.space.models.space import Space
+        from core.storages.storage_service import storage_service
+
+        data = self.get_profile_settings_or_public(owner_id)
+
+        owner_type = None
+        consumer_dict = None
+        try:
+            consumer = ConsumerService().find(owner_id)
+            consumer_dict = ConsumerAccountSerializer(consumer).data
+            owner_type = 'consumer'
+        except Exception:
+            consumer_dict = None
+
+        if not consumer_dict:
+            try:
+                space_rows = list(Space.objects.filter(uid=uuid.UUID(str(owner_id))).limit(1))
+                if space_rows:
+                    space = space_rows[0]
+                    avatar_raw = space.avatar_url or space.logo_url or ''
+                    consumer_dict = {
+                        'uid': str(space.uid),
+                        'pid': getattr(space, 'pid', '') or '',
+                        'username': space.name or space.slug or '',
+                        'email': space.email or '',
+                        'first_name': '',
+                        'last_name': '',
+                        'full_name': space.full_name or space.name or '',
+                        'phone': '',
+                        'avatar_url': storage_service.get_public_url(avatar_raw) if avatar_raw else '',
+                        'is_active': bool(getattr(space, 'is_active', True)),
+                        'created_at': space.created_at.isoformat() if getattr(space, 'created_at', None) else '',
+                        'updated_at': space.updated_at.isoformat() if getattr(space, 'updated_at', None) else '',
+                    }
+                    owner_type = 'space'
+            except Exception:
+                consumer_dict = None
+
+        if data.get('show_address') and owner_type:
+            try:
+                addr_dict = AddressService().get_for_owner(owner_id, owner_type)
+                data['address'] = self._format_address_public(addr_dict or {})
+            except Exception:
+                data['address'] = ''
+        else:
+            data['address'] = ''
+
+        data['consumer'] = consumer_dict
+        return data
+
+    @staticmethod
+    def _format_address_public(addr_dict: dict) -> str:
+        if not addr_dict:
+            return ''
+        parts = []
+        for key in ('line1', 'ward_name', 'province_name'):
+            value = (addr_dict.get(key) or '').strip()
+            if value:
+                parts.append(value)
+        return ', '.join(parts)
+
     def get_social_profile(self, owner_id, owner_type: str) -> dict:
         if isinstance(owner_id, str):
             try:

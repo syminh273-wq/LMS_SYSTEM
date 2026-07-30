@@ -18,6 +18,7 @@ urlpatterns = [
     path('classrooms/', include('features.course.classroom.routing.urls')),
     path('meeting-rooms/', include('features.course.meeting_room.routing.urls')),
     path('exams/', include('features.course.exam.routing.urls')),
+    path('assignments/', include('features.course.exam.routing.assignment_urls')),
     path('ai/', include('features.course.ai.routing.urls')),
     path('students/search/', TeacherStudentSearchView.as_view(), name='teacher-students-search'),
     path('students/', TeacherStudentListView.as_view(), name='teacher-students-list'),

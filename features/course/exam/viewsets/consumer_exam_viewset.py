@@ -79,8 +79,34 @@ class ConsumerExamViewSet(ConsumerScopeMixin, ViewSet):
         self.member_repo = ClassroomMemberRepository()
 
     def list_classroom_exams(self, request, uid=None):
-        exams = self.exam_service.list_student_exams(uid)
+        exam_type = request.query_params.get("exam_type") or None
+        exams = self.exam_service.list_student_exams(uid, exam_type=exam_type)
         return Response([_serialize_exam(e) for e in exams])
+
+    def retrieve(self, request, exam_uid=None):
+        try:
+            exam = self.exam_service.get_exam(exam_uid)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+
+        if exam.status != "published":
+            return Response({"error": "Exam not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not self.member_repo.is_member(exam.classroom_id, request.user.uid):
+            return Response({"error": "You are not a member of this classroom"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            submission = self.submission_service.get_my_submission(
+                exam_id=exam_uid,
+                student_id=request.user.uid,
+            )
+        except ValueError:
+            submission = None
+
+        return Response({
+            **_serialize_exam(exam),
+            "submission": serialize_exam_submission(submission) if submission else None,
+        })
 
     def submit(self, request, exam_uid=None):
         serializer = ExamSubmissionRequestSerializer(data=request.data)

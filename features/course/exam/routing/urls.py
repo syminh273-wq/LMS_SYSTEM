@@ -7,6 +7,7 @@ urlpatterns = [
     path('<uuid:uid>/open-online/', SpaceExamViewSet.as_view({'post': 'open_online'})),
     path('<uuid:uid>/close-online/', SpaceExamViewSet.as_view({'post': 'close_online'})),
     path('<uuid:uid>/online-sessions/', SpaceExamViewSet.as_view({'get': 'list_online_sessions'})),
+    path('<uuid:exam_uid>/analytics/', SpaceExamViewSet.as_view({'get': 'analytics'})),
     path('<uuid:exam_uid>/submissions/', SpaceExamViewSet.as_view({'get': 'list_submissions'})),
     path('<uuid:exam_uid>/submissions/ai-grade/', SpaceExamViewSet.as_view({'post': 'ai_grade_exam_submissions'})),
     path('submissions/<uuid:submission_uid>/', SpaceExamViewSet.as_view({'get': 'get_submission'})),

@@ -232,12 +232,12 @@ class ExamService(BaseService):
             raise ValueError("Exam not found")
         return exam
 
-    def list_teacher_exams(self, teacher_id, classroom_id=None, status=None, exam_mode=None):
+    def list_teacher_exams(self, teacher_id, classroom_id=None, status=None, exam_mode=None, exam_type=None):
         if classroom_id:
-            exams = self.exam_repo.list_by_classroom(classroom_id, status=status, exam_mode=exam_mode)
+            exams = self.exam_repo.list_by_classroom(classroom_id, status=status, exam_mode=exam_mode, exam_type=exam_type)
             exams = [e for e in exams if str(e.teacher_id) == str(teacher_id)]
         else:
-            exams = self.exam_repo.list_by_teacher(teacher_id, status=status, exam_mode=exam_mode)
+            exams = self.exam_repo.list_by_teacher(teacher_id, status=status, exam_mode=exam_mode, exam_type=exam_type)
         return exams
 
     def update_exam(self, uid, data):
@@ -263,5 +263,5 @@ class ExamService(BaseService):
         LMSIndexer.remove_exam(str(uid))
         return result
 
-    def list_student_exams(self, classroom_id):
-        return self.exam_repo.list_published_by_classroom(classroom_id)
+    def list_student_exams(self, classroom_id, exam_type=None):
+        return self.exam_repo.list_published_by_classroom(classroom_id, exam_type=exam_type)

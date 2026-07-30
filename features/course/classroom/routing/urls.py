@@ -45,6 +45,7 @@ urlpatterns = [
     path('<str:classroom_uid>/members/<str:member_id>/reject/', SpaceClassroomMemberViewSet.as_view({'delete': 'reject'}), name='classroom-members-reject'),
     path('<str:classroom_uid>/members/<str:member_id>/kick/', SpaceClassroomMemberViewSet.as_view({'delete': 'kick'}), name='classroom-members-kick'),
     path('<str:classroom_uid>/members/<str:member_id>/submissions/', SpaceClassroomMemberViewSet.as_view({'get': 'student_submissions'}), name='classroom-members-submissions'),
+    path('<str:classroom_uid>/members/<str:member_id>/stats/', SpaceClassroomMemberViewSet.as_view({'get': 'student_stats'}), name='classroom-members-stats'),
     path('<str:uid>/blacklist/', SpaceClassroomBlacklistView.as_view(), name='classroom-blacklist'),
     path('<str:uid>/blacklist/<str:consumer_uid>/', SpaceClassroomBlacklistDetailView.as_view(), name='classroom-blacklist-detail'),
 ]

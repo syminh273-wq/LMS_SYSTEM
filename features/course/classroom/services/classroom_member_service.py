@@ -9,6 +9,20 @@ class ClassroomMemberService(BaseService):
     def __init__(self):
         self.repo = ClassroomMemberRepository()
 
+    @staticmethod
+    def serialize_member(m):
+        if not m:
+            return None
+        return {
+            'member_id': str(m.member_id),
+            'member_type': m.member_type,
+            'member_name': m.member_name,
+            'member_avatar': m.member_avatar or '',
+            'role': m.role,
+            'status': getattr(m, 'status', 'approved'),
+            'joined_at': m.joined_at.isoformat() if m.joined_at else None,
+        }
+
     def join(self, classroom_uid, user, role='student'):
         existing = self.repo.get_member(classroom_uid, user.uid)
         if existing and not existing.is_deleted:
@@ -224,6 +238,60 @@ class ClassroomMemberService(BaseService):
 
     def get_members(self, classroom_uid):
         return list(self.repo.get_members(classroom_uid))
+
+    def get_submissions(self, classroom_uid, member_id):
+        from features.course.exam.repositories import ExamRepository, ExamSubmissionRepository
+        from features.course.exam.serializers import serialize_exam_submission
+
+        exam_repo = ExamRepository()
+        submission_repo = ExamSubmissionRepository()
+
+        result = []
+        for exam in exam_repo.list_by_classroom(classroom_uid):
+            subs = submission_repo.list_by_exam_and_student(exam.uid, member_id)
+            sub = subs[0] if subs else None
+            result.append({
+                'exam': {
+                    'uid': str(exam.uid),
+                    'title': exam.title,
+                    'status': exam.status,
+                    'due_date': exam.due_date.isoformat() if exam.due_date else None,
+                },
+                'submission': serialize_exam_submission(sub) if sub else None,
+            })
+        return result
+
+    def get_student_stats(self, classroom_uid, member_id):
+        """Aggregates member info + public profile + submissions + ranking for the
+        teacher-facing student detail page into a single call.
+        """
+        from features.ranking.services.xp_service import XPService
+        from features.ranking.services.achievement_service import AchievementService
+        from features.ranking.views.space_ranking_views import _serialize_student_xp
+        from features.ranking.serializers.achievement_serializer import AchievementSerializer
+        from features.portfolio.services.portfolio_service import PortfolioService
+
+        member = self.repo.get_member(classroom_uid, member_id)
+        submissions = self.get_submissions(classroom_uid, member_id)
+
+        xp, _ = XPService().get_or_create(member_id)
+        achievements = AchievementService().list_for_student(member_id)
+
+        try:
+            profile = PortfolioService().get_public_profile_bundle(member_id)
+        except Exception:
+            logger.warning(f"[ClassroomMember] Failed to load public profile for {member_id}")
+            profile = None
+
+        return {
+            'member': self.serialize_member(member),
+            'profile': profile,
+            'submissions': submissions,
+            'ranking': {
+                'profile': _serialize_student_xp(xp, member_id),
+                'achievements': AchievementSerializer(achievements, many=True).data,
+            },
+        }
 
     def is_member(self, classroom_uid, member_id):
         return self.repo.is_member(classroom_uid, member_id)

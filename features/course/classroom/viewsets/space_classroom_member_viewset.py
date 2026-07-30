@@ -12,15 +12,7 @@ from features.course.classroom.services.classroom_activity_log_service import Cl
 class SpaceClassroomMemberViewSet(SpaceScopeMixin, ViewSet):
 
     def _serialize_member(self, m):
-        return {
-            'member_id': str(m.member_id),
-            'member_type': m.member_type,
-            'member_name': m.member_name,
-            'member_avatar': m.member_avatar or '',
-            'role': m.role,
-            'status': getattr(m, 'status', 'approved'),
-            'joined_at': m.joined_at.isoformat() if m.joined_at else None,
-        }
+        return ClassroomMemberService.serialize_member(m)
 
     def list(self, request, classroom_uid=None):
         """GET /classrooms/<uid>/members/?status=pending|approved"""
@@ -143,24 +135,14 @@ class SpaceClassroomMemberViewSet(SpaceScopeMixin, ViewSet):
         """GET /classrooms/<uid>/members/<member_id>/submissions/
         Returns all exams in the classroom paired with the student's submission (or null).
         """
-        from features.course.exam.repositories import ExamRepository, ExamSubmissionRepository
-        from features.course.exam.serializers import serialize_exam_submission
-
-        exam_repo = ExamRepository()
-        submission_repo = ExamSubmissionRepository()
-
-        exams = list(exam_repo.list_by_classroom(classroom_uid))
-        result = []
-        for exam in exams:
-            submissions = submission_repo.list_by_exam_and_student(exam.uid, member_id)
-            sub = submissions[0] if submissions else None
-            result.append({
-                'exam': {
-                    'uid': str(exam.uid),
-                    'title': exam.title,
-                    'status': exam.status,
-                    'due_date': exam.due_date.isoformat() if exam.due_date else None,
-                },
-                'submission': serialize_exam_submission(sub) if sub else None,
-            })
+        result = ClassroomMemberService().get_submissions(classroom_uid, member_id)
         return Response(result)
+
+    @action(detail=False, methods=['get'], url_path=r'(?P<member_id>[^/.]+)/stats')
+    def student_stats(self, request, classroom_uid=None, member_id=None):
+        """GET /classrooms/<uid>/members/<member_id>/stats/
+        Returns submissions + ranking (XP + achievements) for a student in a classroom,
+        aggregated into a single call for the student detail page.
+        """
+        data = ClassroomMemberService().get_student_stats(classroom_uid, member_id)
+        return Response(data)

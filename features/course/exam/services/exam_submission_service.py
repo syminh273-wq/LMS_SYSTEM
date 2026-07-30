@@ -205,6 +205,12 @@ class ExamSubmissionService(BaseService):
         submission_type = data.get("submission_type", "file")
         is_mc = submission_type in ("multiple_choice", "online_quiz")
 
+        exam_type = getattr(exam, "exam_type", "assignment")
+        if exam_type == "quiz" and not is_mc:
+            raise ValueError("This exam is a quiz; submission_type must be multiple_choice or online_quiz")
+        if exam_type == "assignment" and is_mc:
+            raise ValueError("This exam is an assignment; submission_type must be file or essay")
+
         if is_mc:
             self.assert_no_existing_mc_submission(exam, student_id)
 
