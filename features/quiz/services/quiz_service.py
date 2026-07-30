@@ -53,7 +53,6 @@ class QuizService(BaseService):
         questions = list(self.question_repo.get_by_quiz(quiz_uid))
         return quiz, questions
 
-    # ── Assignment ───────────────────────────────────────────────────────────
 
     def get_assigned_classrooms(self, quiz_uid):
         return self.assignment_repo.get_by_quiz(quiz_uid)
@@ -100,13 +99,16 @@ class QuizService(BaseService):
         current = now or now_vn()
         return current < opens_at
 
-    def is_assignment_open(self, quiz_uid, classroom_id, now=None):
-        assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
+    def is_assignment_open(self, quiz_uid, classroom_id, assignment=None, now=None):
+        if assignment is None:
+            assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
         return self._is_open(assignment, now=now)
 
-    def get_assignment_status(self, quiz_uid, classroom_id, now=None):
+    def get_assignment_status(self, quiz_uid, classroom_id, assignment=None, now=None):
+        """Pass an already-fetched `assignment` to avoid re-querying it."""
         from core.utils.datetime import now_vn
-        assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
+        if assignment is None:
+            assignment = self.assignment_repo.find_assignment(quiz_uid, classroom_id)
         current = now or now_vn()
         is_open = self._is_open(assignment, now=current)
         is_closed_flag = bool(getattr(assignment, 'is_closed', False)) if assignment else False
@@ -215,7 +217,12 @@ class QuizService(BaseService):
         LMSIndexer.index_quiz(updated)
         return updated
 
-    # ── Logs (all scoped by classroom) ────────────────────────────────────────
+
+    def is_classroom_member(self, classroom_id, student_id) -> bool:
+        from features.course.classroom.repositories.classroom_member_repository import (
+            ClassroomMemberRepository,
+        )
+        return ClassroomMemberRepository().is_member(classroom_id, student_id)
 
     def get_student_attempt_count(self, quiz_uid, classroom_id, student_uid) -> int:
         return self.log_repo.count_by_student(quiz_uid, classroom_id, student_uid)
