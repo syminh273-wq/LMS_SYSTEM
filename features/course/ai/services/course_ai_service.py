@@ -13,8 +13,10 @@ Metadata stored in LanceDB during ingest
   resource_id  : str(UUID)   always present (the resource's uid)
 """
 
+import json
 import os
 import tempfile
+from typing import Generator
 
 import requests
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -113,9 +115,73 @@ class CourseAIService:
             cls._check_document_permission(document_id, teacher_id)
 
         # ── RAG query ─────────────────────────────────────────────────────
-        filter_meta = cls._build_filter(classroom_id, document_id)
-        result = _pipeline.ask(question, top_k=top_k, filter_meta=filter_meta)
+        result = _pipeline.ask(
+            question,
+            classroom_id=classroom_id,
+            document_id=document_id,
+            top_k=top_k,
+        )
         return result
+
+    @classmethod
+    def ask_stream(
+        cls,
+        teacher_id,
+        question: str,
+        classroom_id=None,
+        document_id=None,
+        top_k: int = 3,
+    ) -> Generator[str, None, None]:
+        """
+        Permission checks run immediately (raise before any response is sent),
+        then the SSE body is produced lazily by `_stream_answer`.
+        """
+        if classroom_id:
+            cls._check_classroom_permission(classroom_id, teacher_id)
+        if document_id:
+            cls._check_document_permission(document_id, teacher_id)
+
+        return cls._stream_answer(question, classroom_id, document_id, top_k)
+
+    @classmethod
+    def _stream_answer(
+        cls,
+        question: str,
+        classroom_id,
+        document_id,
+        top_k: int,
+    ) -> Generator[str, None, None]:
+        """
+        RAGPipeline.ask_stream → SSE lines.
+
+        Same event shape as ClassroomAIService: 'chunk' / 'sources' / 'error',
+        always ending with 'data: [DONE]\\n\\n'.
+        """
+        try:
+            for item in _pipeline.ask_stream(
+                question,
+                classroom_id=classroom_id,
+                document_id=document_id,
+                top_k=top_k,
+            ):
+                if isinstance(item, str):
+                    yield cls._sse({"type": "chunk", "text": item})
+                elif isinstance(item, tuple):
+                    signal, data = item
+                    if signal == "__SOURCES__":
+                        yield cls._sse({"type": "sources", "data": data or []})
+                    elif signal == "__NO_DOC__":
+                        yield cls._sse({"type": "chunk", "text": data})
+                    elif signal == "__ERROR__":
+                        yield cls._sse({"type": "error", "message": str(data)})
+        except Exception as exc:
+            yield cls._sse({"type": "error", "message": str(exc)})
+        finally:
+            yield "data: [DONE]\n\n"
+
+    @staticmethod
+    def _sse(payload: dict) -> str:
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
     @classmethod
     def ingest(

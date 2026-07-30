@@ -1,0 +1,19 @@
+# Local TURN server for testing WebRTC media relay (RTC_MEETING_LIVE_DETECTION_BUG.md).
+# Run:   docker compose -f docker-compose.coturn.yml up -d
+# Stop:  docker compose -f docker-compose.coturn.yml down
+# Logs:  docker compose -f docker-compose.coturn.yml logs -f
+#
+# NOT for production — see docker/coturn/turnserver.conf for caveats
+# (static credentials, no TLS, loopback-peers allowed).
+services:
+  coturn:
+    image: coturn/coturn:4.6.2
+    container_name: lms-coturn-dev
+    restart: unless-stopped
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    volumes:
+      - ./docker/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49160-49200:49160-49200/udp"

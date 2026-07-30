@@ -1,8 +1,10 @@
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.ai.streaming.async_stream import to_async_iterator
 from core.views.mixins import SpaceScopeMixin
 from features.course.ai.serializers.ai_serializer import (
     AIAskSerializer,
@@ -47,6 +49,29 @@ class CourseAIViewSet(SpaceScopeMixin, ViewSet):
             top_k=body.validated_data["top_k"],
         )
         return Response(result, status=status.HTTP_200_OK)
+
+    # ── POST ai/ask-stream/ ──────────────────────────────────────────────────
+
+    @action(detail=False, methods=["post"], url_path="ask-stream")
+    def ask_stream(self, request):
+        params = self._parse_query_params(request)
+
+        body = AIAskSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+
+        resp = StreamingHttpResponse(
+            to_async_iterator(CourseAIService.ask_stream(
+                teacher_id=request.user.uid,
+                question=body.validated_data["question"],
+                classroom_id=params.get("classroom_id"),
+                document_id=params.get("document_id"),
+                top_k=body.validated_data["top_k"],
+            )),
+            content_type="text/event-stream; charset=utf-8",
+        )
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"
+        return resp
 
     # ── POST ai/ingest/ ──────────────────────────────────────────────────────
 

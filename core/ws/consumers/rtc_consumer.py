@@ -65,7 +65,7 @@ class RTCConsumer(BaseWebSocketConsumer):
     async def handle_message(self, data):
         msg_type = data.get('type')
 
-        if msg_type in ['offer', 'answer', 'ice-candidate', 'renegotiate']:
+        if msg_type in ['offer', 'answer', 'ice-candidate', 'renegotiate', 'video-frame']:
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {

@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from core.ai.streaming.async_stream import to_async_iterator
 from core.views.mixins import SpaceScopeMixin
 from features.ai.services.ai_conversation_session_service import AIConversationSessionService
 from features.course.classroom.services import ClassroomAIService
@@ -88,7 +89,7 @@ class SpaceClassroomAIViewSet(SpaceScopeMixin, ViewSet):
         document_id = request.data.get('document_id')
 
         resp = StreamingHttpResponse(
-            ai_service.ask_stream(
+            to_async_iterator(ai_service.ask_stream(
                 question=question,
                 session_id=session_id,
                 user_id=request.user.uid,
@@ -96,7 +97,7 @@ class SpaceClassroomAIViewSet(SpaceScopeMixin, ViewSet):
                 mode=mode,
                 document_id=document_id,
                 section=section
-            ),
+            )),
             content_type='text/event-stream; charset=utf-8'
         )
         resp['Cache-Control'] = 'no-cache'

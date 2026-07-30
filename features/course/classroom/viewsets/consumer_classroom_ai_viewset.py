@@ -8,6 +8,7 @@ from rest_framework.viewsets import ViewSet
 
 from core.ai.langchain.agent import LMSAgent
 from core.ai.langchain.tools import build_langchain_tools
+from core.ai.streaming.async_stream import to_async_iterator
 from core.ai.tools.tool_executor import LMSToolExecutor
 from core.views.mixins import ConsumerScopeMixin
 from features.ai.services.ai_conversation_session_service import AIConversationSessionService
@@ -102,7 +103,7 @@ class ConsumerClassroomAIViewSet(ConsumerScopeMixin, ViewSet):
         document_id = request.data.get('document_id')
 
         resp = StreamingHttpResponse(
-            ai_service.ask_stream(
+            to_async_iterator(ai_service.ask_stream(
                 question=question,
                 session_id=session_id,
                 user_id=request.user.uid,
@@ -110,7 +111,7 @@ class ConsumerClassroomAIViewSet(ConsumerScopeMixin, ViewSet):
                 mode=mode,
                 document_id=document_id,
                 section=section
-            ),
+            )),
             content_type='text/event-stream; charset=utf-8'
         )
         resp['Cache-Control'] = 'no-cache'
