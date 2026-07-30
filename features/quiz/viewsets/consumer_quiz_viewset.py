@@ -103,7 +103,6 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
         payload = self.leaderboard_service.build(
             quiz_id=pk,
             classroom_id=classroom_id,
-            current_user_id=request.user.uid,
             limit=limit,
         )
         payload['closed_at'] = status_payload['closed_at']
