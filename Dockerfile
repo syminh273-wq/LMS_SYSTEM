@@ -46,10 +46,12 @@ COPY --from=builder /usr/local /usr/local
 
 WORKDIR /app
 COPY . .
-# Normalize CRLF -> LF: on Windows hosts, a bind-mounted or COPY'd script can carry
-# CRLF line endings even with .gitattributes, which breaks the `#!/usr/bin/env bash`
-# shebang (`bash\r: No such file or directory`) inside this Linux image.
-RUN sed -i 's/\r$//' docker/backend/entrypoint.sh && chmod +x docker/backend/entrypoint.sh
+# Normalize CRLF -> LF: on Windows hosts the script can carry CRLF line endings even
+# with .gitattributes set, which breaks the `#!/usr/bin/env bash` shebang
+# (`bash\r: No such file or directory`) inside this Linux image. Write the stripped
+# content to a fresh file instead of `sed -i` in place, to avoid any rename-over-existing-
+# file edge cases (same reasoning as the scylla entrypoint fix in docker-compose.yml).
+RUN sed 's/\r$//' docker/backend/entrypoint.sh > /entrypoint.sh && chmod +x /entrypoint.sh
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -58,7 +60,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 EXPOSE 8000
 # Entrypoint runs sync_cassandra (creates any missing column families) before
 # exec-ing into CMD.
-ENTRYPOINT ["docker/backend/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
 # `manage.py runserver` (not raw `daphne LMS_SYSTEM.asgi:application`) — the
 # latter imports asgi.py before django.setup() runs, which crashes with
 # AppRegistryNotReady because asgi.py imports app models at module level.
