@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ── Stage 1: build ──────────────────────────────────────────────────────────
 FROM python:3.11-slim AS builder
 
@@ -18,8 +19,16 @@ WORKDIR /app
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel Cython==3.0.11 poetry==2.3.2 \
     && poetry config virtualenvs.create false
 
+# Large binary wheels (opencv, onnxruntime, pyarrow, numpy...) can take longer
+# than Poetry's default 15s read timeout to download, especially with many
+# parallel workers splitting bandwidth — raise the timeout and cap workers to
+# avoid spurious ReadTimeoutError failures during build.
+ENV POETRY_REQUESTS_TIMEOUT=120
+ENV POETRY_INSTALLER_MAX_WORKERS=4
+
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-root --only main --no-interaction --no-ansi \
+RUN --mount=type=cache,target=/root/.cache/pypoetry \
+    poetry install --no-root --only main --no-interaction --no-ansi \
     && pip uninstall -y poetry
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
