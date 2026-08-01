@@ -46,7 +46,10 @@ COPY --from=builder /usr/local /usr/local
 
 WORKDIR /app
 COPY . .
-RUN chmod +x docker/backend/entrypoint.sh
+# Normalize CRLF -> LF: on Windows hosts, a bind-mounted or COPY'd script can carry
+# CRLF line endings even with .gitattributes, which breaks the `#!/usr/bin/env bash`
+# shebang (`bash\r: No such file or directory`) inside this Linux image.
+RUN sed -i 's/\r$//' docker/backend/entrypoint.sh && chmod +x docker/backend/entrypoint.sh
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
