@@ -40,6 +40,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libstdc++6 \
     curl \
+    tesseract-ocr \
+    tesseract-ocr-vie \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local /usr/local
