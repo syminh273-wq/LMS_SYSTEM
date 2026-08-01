@@ -11,7 +11,7 @@ class ExamSubmissionRequestSerializer(serializers.Serializer):
     )
     ref_id          = serializers.UUIDField(required=False, allow_null=True)
     answers         = serializers.DictField(
-        child=serializers.ListField(child=serializers.CharField()), required=False,
+        child=serializers.ListField(child=serializers.IntegerField(min_value=0)), required=False,
     )
     content         = serializers.CharField(required=False, allow_blank=True)
     time_taken_seconds = serializers.IntegerField(required=False, default=0)
