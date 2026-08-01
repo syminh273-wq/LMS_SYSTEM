@@ -34,10 +34,12 @@ services:
       CASSANDRA_KEYSPACE: ${DB_DATABASE:-lms_keyspace}
       CASSANDRA_USER: ${DB_USERNAME:-cassandra}
       CASSANDRA_PASSWORD: ${DB_PASSWORD:-cassandra}
-    # sed strips CRLF before exec: entrypoint-init-keyspace.sh is bind-mounted straight
-    # from the host, so on Windows it can carry CRLF line endings even with
-    # .gitattributes set, which breaks the `#!/usr/bin/env bash` shebang inside the container.
-    entrypoint: ["/bin/bash", "-c", "sed -i 's/\\r$//' /entrypoint-init-keyspace.sh && exec /entrypoint-init-keyspace.sh"]
+    # entrypoint-init-keyspace.sh is bind-mounted straight from the host, so on Windows
+    # it can carry CRLF line endings even with .gitattributes set, which breaks the
+    # `#!/usr/bin/env bash` shebang inside the container. `sed -i` can't fix it in place
+    # (bind-mounted single files can't be renamed-over: "Device or resource busy"), so
+    # copy the CRLF-stripped content into a fresh file in /tmp and exec that instead.
+    entrypoint: ["/bin/bash", "-c", "sed 's/\\r$//' /entrypoint-init-keyspace.sh > /tmp/entrypoint-init-keyspace.sh && chmod +x /tmp/entrypoint-init-keyspace.sh && exec /tmp/entrypoint-init-keyspace.sh"]
     volumes:
       - scylla_data:/var/lib/scylla
       - ./docker/scylla/scylla.yaml:/etc/scylla/scylla.yaml
