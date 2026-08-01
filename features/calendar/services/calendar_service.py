@@ -100,9 +100,9 @@ class CalendarService(BaseService):
     def _ensure_classroom_ownership(self, classroom_id, requester_id):
         if not classroom_id:
             return
-        from features.course.classroom.services.classroom_service import Service
+        from features.course.classroom.services.classroom_service import ClassroomService
         try:
-            classroom = Service().find(str(classroom_id))
+            classroom = ClassroomService().find(str(classroom_id))
         except Exception as exc:
             raise NotFound("Lớp học không tồn tại.") from exc
         if str(classroom.teacher_id) != str(requester_id):

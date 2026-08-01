@@ -13,6 +13,7 @@ dependencies = [
     "djangorestframework",
     "djangorestframework-simplejwt",
     "django-filter",
+    "django-extensions",
     "channels",
     "daphne",
     "django-cors-headers",
@@ -57,6 +58,7 @@ django-cassandra-engine = "^1.10.0"
 djangorestframework = "^3.17.1"
 djangorestframework-simplejwt = "^5.5.1"
 django-filter = "^25.1"
+django-extensions = "^3.2.3"
 channels = "^4.3.2"
 daphne = "^4.2.1"
 django-cors-headers = "^4.9.0"

@@ -1,0 +1,36 @@
+# Scylla storage config YAML
+num_tokens: 256
+commitlog_sync: periodic
+commitlog_sync_period_in_ms: 10000
+commitlog_segment_size_in_mb: 32
+seed_provider:
+    - class_name: org.apache.cassandra.locator.SimpleSeedProvider
+      parameters:
+          # If you specify addresses of more than one node, use a comma to separate them. For example: "<IP1>,<IP2>,<IP3>"
+          - seeds: "127.0.0.1"
+listen_address: localhost
+native_transport_port: 9042
+native_shard_aware_transport_port: 19042
+read_request_timeout_in_ms: 5000
+write_request_timeout_in_ms: 2000
+cas_contention_timeout_in_ms: 1000
+endpoint_snitch: SimpleSnitch
+# The address or interface to bind the Thrift RPC service and native transport server to.
+rpc_address: localhost
+broadcast_rpc_address: 127.0.0.1
+rpc_port: 9160
+# port for REST API server
+api_port: 10000
+# IP for the REST API server
+api_address: 127.0.0.1
+batch_size_warn_threshold_in_kb: 128
+# Fail any multiple-partition batch exceeding this value. 1 MiB (8x warn threshold) by default.
+batch_size_fail_threshold_in_kb: 1024
+# Authentication backend
+authenticator: PasswordAuthenticator
+partitioner: org.apache.cassandra.dht.Murmur3Partitioner
+commitlog_total_space_in_mb: -1
+murmur3_partitioner_ignore_msb_bits: 12
+force_schema_commit_log: true
+api_ui_dir: /opt/scylladb/swagger-ui/dist/
+api_doc_dir: /opt/scylladb/api/api-doc/

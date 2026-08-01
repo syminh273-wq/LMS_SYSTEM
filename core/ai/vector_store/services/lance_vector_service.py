@@ -15,7 +15,6 @@ class LanceVectorService:
         self._embed_dim = embed_dim
         self._tbl = None
 
-    # ── Internal ──────────────────────────────────────────────────────────────
 
     def _table(self):
         """
@@ -69,7 +68,6 @@ class LanceVectorService:
         except Exception:
             return False
 
-    # ── Public API ────────────────────────────────────────────────────────────
 
     def add(self, vector: list, doc_id: str, document: str = "", metadata: dict = None):
         tbl = self._table()

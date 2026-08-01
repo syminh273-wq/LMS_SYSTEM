@@ -64,8 +64,8 @@ class ClassroomBlacklistService(BaseService):
         return list(self.repo.list_for_teacher(_u(teacher_id), classroom_uid=GLOBAL_SENTINEL))
 
     def _verify_ownership(self, classroom_uid, teacher_id):
-        from features.course.classroom.services.classroom_service import Service
-        classroom = Service().find(str(classroom_uid))
+        from features.course.classroom.services.classroom_service import ClassroomService
+        classroom = ClassroomService().find(str(classroom_uid))
         if str(classroom.teacher_id) != str(teacher_id):
             raise PermissionDenied("Chỉ giáo viên của lớp mới có quyền quản lý danh sách chặn.")
         return classroom

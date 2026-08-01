@@ -203,7 +203,7 @@ class RAGPipeline:
             raise ValueError("classroom_id is required for retrieval (security: prevent cross-classroom leakage)")
 
         query_vector = self._embed_query(query)
-        store = self._get_store()
+        store = self._get_store(embed_dim=len(query_vector))
         raw_hits = store.query(query_vector, n_results=k, where=where, per_resource_cap=cap)
 
         hits = [h for h in raw_hits if h.get("score", 0) >= threshold]

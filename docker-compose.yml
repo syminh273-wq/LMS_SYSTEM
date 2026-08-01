@@ -1,0 +1,153 @@
+# LMS_BACKEND: Django app + its datastores (Redis, ScyllaDB/Cassandra, Typesense).
+# Values line up with .env / .env.example (REDIS_*, DB_*, TYPESENSE_*) — don't change
+# ports/credentials here without updating those too.
+# Run:   docker compose up -d
+# Stop:  docker compose down
+# Logs:  docker compose logs -f
+services:
+  redis:
+    image: docker.io/bitnami/redis:latest
+    container_name: lms-redis
+    restart: unless-stopped
+    environment:
+      # ALLOW_EMPTY_PASSWORD matches REDIS_PASSWORD being unset in .env (dev only).
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/bitnami/redis/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  scylla:
+    image: scylladb/scylla:5.1.4
+    container_name: lms-scylla
+    restart: always
+    ports:
+      - "9042:9042"
+    environment:
+      # Matches .env: DB_DATABASE / DB_USERNAME / DB_PASSWORD.
+      CASSANDRA_KEYSPACE: ${DB_DATABASE:-lms_keyspace}
+      CASSANDRA_USER: ${DB_USERNAME:-cassandra}
+      CASSANDRA_PASSWORD: ${DB_PASSWORD:-cassandra}
+    entrypoint: ["/entrypoint-init-keyspace.sh"]
+    volumes:
+      - scylla_data:/var/lib/scylla
+      - ./docker/scylla/scylla.yaml:/etc/scylla/scylla.yaml
+      - ./docker/scylla/entrypoint-init-keyspace.sh:/entrypoint-init-keyspace.sh
+    command: --seeds=scylla --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0 --broadcast-rpc-address 127.0.0.1
+    healthcheck:
+      # CQL binds to the container's own IP, not loopback — see entrypoint-init-keyspace.sh.
+      test: ["CMD-SHELL", "cqlsh -u $$CASSANDRA_USER -p $$CASSANDRA_PASSWORD -e 'SELECT release_version FROM system.local' $$(hostname -i) 9042"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  typesense:
+    image: typesense/typesense:29.0
+    container_name: lms-typesense
+    restart: unless-stopped
+    ports:
+      - "8108:8108"
+    volumes:
+      - typesense_data:/data
+    environment:
+      TYPESENSE_API_KEY: xyz
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_ENABLE_CORS: "true"
+    command: >
+      --data-dir /data
+      --api-key=xyz
+      --enable-cors
+    healthcheck:
+      # No curl/wget in this image — use bash's /dev/tcp to check the port accepts connections.
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8108' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  face-service:
+    build:
+      context: ./face_service
+      dockerfile: Dockerfile
+    container_name: lms-face-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    healthcheck:
+      # No curl in this image either — python is, since it's the app runtime.
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8001/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override localhost/127.0.0.1 from .env — inside the compose network
+      # the datastores are reachable by service name, not localhost.
+      DB_HOST: scylla
+      REDIS_HOST: redis
+      TYPESENSE_HOST: typesense
+      FACE_SERVICE_URL: http://face-service:8001
+      # Ollama stays native on the host (Docker Desktop on Mac can't pass
+      # through Metal GPU to containers — native is much faster for inference).
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    depends_on:
+      scylla:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      typesense:
+        condition: service_healthy
+      face-service:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Same overrides as backend — worker runs the same Django app/settings.
+      DB_HOST: scylla
+      REDIS_HOST: redis
+      TYPESENSE_HOST: typesense
+      FACE_SERVICE_URL: http://face-service:8001
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["python", "manage.py", "rqworker", "default", "high"]
+    depends_on:
+      scylla:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      typesense:
+        condition: service_healthy
+      face-service:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+  scylla_data:
+  typesense_data:

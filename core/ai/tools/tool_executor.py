@@ -23,8 +23,8 @@ class LMSToolExecutor:
 
     def _get_classroom_svc(self):
         if self._classroom_svc is None:
-            from features.course.classroom.services.classroom_service import Service
-            self._classroom_svc = Service()
+            from features.course.classroom.services.classroom_service import ClassroomService
+            self._classroom_svc = ClassroomService()
         return self._classroom_svc
 
     # ── Dispatcher ────────────────────────────────────────────────────────────

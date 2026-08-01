@@ -56,11 +56,11 @@ class ClassroomMemberService(BaseService):
         still has to approve. The student sees a 'Đã thanh toán · Chờ duyệt'
         state in the UI until approval.
         """
-        from features.course.classroom.services.classroom_service import Service
+        from features.course.classroom.services.classroom_service import ClassroomService
         from features.account.consumer.repositories import ConsumerRepository
         from datetime import datetime
 
-        classroom = Service().find(str(classroom_uid))
+        classroom = ClassroomService().find(str(classroom_uid))
         consumer = ConsumerRepository().find(consumer_id)
         if not consumer:
             logger.warning(f"[ClassroomMember] mark_paid_pending: consumer {consumer_id} not found")
@@ -122,11 +122,11 @@ class ClassroomMemberService(BaseService):
         )
 
     def approve(self, classroom_uid, member_id, approved_by_id):
-        from features.course.classroom.services.classroom_service import Service
+        from features.course.classroom.services.classroom_service import ClassroomService
         from features.course.classroom.repositories.teacher_contact_repository import TeacherContactRepository
         from rest_framework.exceptions import PermissionDenied, NotFound
 
-        classroom = Service().find(str(classroom_uid))
+        classroom = ClassroomService().find(str(classroom_uid))
         if str(classroom.teacher_id) != str(approved_by_id):
             raise PermissionDenied("Chỉ giáo viên mới có thể duyệt thành viên.")
 
@@ -181,9 +181,9 @@ class ClassroomMemberService(BaseService):
         return member
 
     def reject(self, classroom_uid, member_id, rejected_by_id):
-        from features.course.classroom.services.classroom_service import Service
+        from features.course.classroom.services.classroom_service import ClassroomService
         from rest_framework.exceptions import PermissionDenied
-        classroom = Service().find(str(classroom_uid))
+        classroom = ClassroomService().find(str(classroom_uid))
         if str(classroom.teacher_id) != str(rejected_by_id):
             raise PermissionDenied("Chỉ giáo viên mới có thể từ chối thành viên.")
         self.leave(classroom_uid, member_id)
@@ -209,9 +209,9 @@ class ClassroomMemberService(BaseService):
         return list(self.repo.get_pending_members(classroom_uid))
 
     def _notify_teacher_pending(self, classroom_uid, user, student_name):
-        from features.course.classroom.services.classroom_service import Service
+        from features.course.classroom.services.classroom_service import ClassroomService
         from features.notification.services.notification_service import NotificationService
-        classroom = Service().find(str(classroom_uid))
+        classroom = ClassroomService().find(str(classroom_uid))
         if not classroom or not classroom.teacher_id:
             return
         NotificationService().send_notification(
@@ -293,9 +293,9 @@ class ClassroomMemberService(BaseService):
         return self.repo.is_member(classroom_uid, member_id)
 
     def kick(self, classroom_uid, member_id, kicked_by_id):
-        from features.course.classroom.services.classroom_service import Service
+        from features.course.classroom.services.classroom_service import ClassroomService
         from rest_framework.exceptions import PermissionDenied
-        classroom = Service().find(str(classroom_uid))
+        classroom = ClassroomService().find(str(classroom_uid))
         if str(classroom.teacher_id) != str(kicked_by_id):
             raise PermissionDenied("Chỉ giáo viên mới có thể kick sinh viên.")
         self.leave(classroom_uid, member_id)
