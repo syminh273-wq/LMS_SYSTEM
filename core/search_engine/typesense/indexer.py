@@ -1,19 +1,3 @@
-"""
-LMSIndexer — called directly from services after create/update/delete.
-
-Cassandra models do not reliably fire Django post_save/post_delete signals,
-so we hook at the service layer instead of using signal handlers.
-
-Usage:
-    from core.search_engine.typesense.indexer import LMSIndexer
-
-    # After create/update:
-    LMSIndexer.index(classroom_instance)
-
-    # After soft-delete or hard delete:
-    LMSIndexer.remove_classroom(uid)
-"""
-
 from __future__ import annotations
 
 from typing import Any

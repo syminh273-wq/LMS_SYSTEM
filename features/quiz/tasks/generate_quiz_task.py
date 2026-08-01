@@ -1,12 +1,3 @@
-"""
-Background task for AI quiz generation.
-
-The view enqueues this with django-rq and returns task_id immediately.
-The worker calls QuizGenerationService.generate (sync mode) and persists
-the quiz + questions. The job's result attribute stores the payload
-returned to the frontend. Job meta is updated at every state transition
-so the list endpoint can show live progress even for failed jobs.
-"""
 import logging
 import traceback
 

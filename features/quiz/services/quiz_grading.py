@@ -1,9 +1,3 @@
-"""Shared grading logic for quiz questions — used by quiz_log_service,
-consumer_quiz_viewset, and the exam-linked quiz grading path so the
-correctness rule stays identical everywhere.
-"""
-
-
 def get_correct_answers(question) -> list:
     """Authoritative correct answer indices for a question (0-based, into `options`)."""
     return list(question.correct_option_indices or [])

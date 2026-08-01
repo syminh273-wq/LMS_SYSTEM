@@ -1,9 +1,3 @@
-"""
-Datetime helpers. The product is single-timezone (Asia/Ho_Chi_Minh, UTC+7).
-- Backend stores naive datetimes in Cassandra, interpreted as VN time.
-- API responses emit ISO without a `Z` suffix; FE reads them as-is.
-- This avoids the 7-hour drift the UTC convention caused in dev.
-"""
 from datetime import datetime, timezone, timedelta
 
 

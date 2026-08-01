@@ -1,7 +1,3 @@
-"""
-ChromaVectorService — thin wrapper around a ChromaDB persistent collection.
-"""
-
 import os
 
 import chromadb

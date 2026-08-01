@@ -1,5 +1,3 @@
-"""Handle package compatibility."""
-
 try:
     from cassandra import cqlengine
     from cassandra.auth import PlainTextAuthProvider

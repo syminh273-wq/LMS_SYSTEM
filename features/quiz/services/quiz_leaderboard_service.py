@@ -1,15 +1,3 @@
-"""Per-quiz per-classroom leaderboard (Bảng vàng).
-
-Ranking rule:
-    1) best score_pct  DESC
-    2) best time_taken_seconds  ASC  (tie-break)
-    3) best submitted_at  ASC  (final tie-break)
-
-Source of truth: QuizLog rows for the given (quiz_id, classroom_id).
-Only students who are approved members of the classroom are ranked
-(attempted but not member → still shown for completeness, with name
-hydrated via ConsumerRepository).
-"""
 from collections import defaultdict
 from datetime import datetime
 from uuid import UUID

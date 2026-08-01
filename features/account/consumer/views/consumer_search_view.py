@@ -1,13 +1,3 @@
-"""
-Consumer search endpoint.
-
-GET /api/v1/consumer/account/search/
-  q        (required) search query
-  types    classroom,exam,resource  (default: all)
-  limit    (default 10, max 50)
-  offset   (default 0)
-"""
-
 from rest_framework.response import Response
 from rest_framework.views import APIView
 

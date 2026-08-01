@@ -1,18 +1,3 @@
-"""
-CourseAIService — RAG for classroom documents.
-
-Permission rules
-────────────────
-  classroom_id passed → teacher must own the classroom (Classroom.teacher_id == user.uid)
-  document_id  passed → teacher must own the resource  (Resource.owner_id  == user.uid)
-                         OR the resource belongs to a classroom the teacher owns
-
-Metadata stored in LanceDB during ingest
-──────────────────────────────────────────
-  classroom_id : str(UUID)   present when classroom_id was supplied at ingest
-  resource_id  : str(UUID)   always present (the resource's uid)
-"""
-
 import json
 import os
 import tempfile

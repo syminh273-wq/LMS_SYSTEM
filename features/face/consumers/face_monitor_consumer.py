@@ -1,19 +1,3 @@
-"""
-WebSocket consumer for real-time face monitoring during exams.
-
-Frontend connects to:
-  ws://host/ws/face/monitor/<exam_uid>/?token=<jwt>
-
-Protocol (client → server):
-  { "type": "frame", "image": "<base64>" }   — periodic frame (every 5-10s)
-
-Protocol (server → client):
-  { "type": "session_info", "camera_required": bool }
-  { "type": "verification_result", "camera_open": bool, "recognized": bool,
-    "multiple_faces": bool, "face_count": int, "similarity": float }
-  { "type": "error", "message": "..." }
-  { "type": "no_enrollment" }
-"""
 import json
 import logging
 

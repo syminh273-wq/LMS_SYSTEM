@@ -1,12 +1,3 @@
-"""
-OllamaClient — AI calls via local Ollama (http://localhost:11434).
-
-Requires Ollama running locally. Set OLLAMA_BASE_URL / OLLAMA_MODEL /
-OLLAMA_EMBED_MODEL in your .env to customise.
-
-Used via AIClient — do not import directly.
-"""
-
 import json
 from typing import Generator, List, Union
 

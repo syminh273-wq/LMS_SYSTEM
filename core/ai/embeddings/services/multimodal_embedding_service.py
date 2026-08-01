@@ -1,9 +1,3 @@
-"""
-MultimodalEmbeddingService — image embeddings via Ollama vision model.
-
-Flow: image → Ollama vision model describes it → embed the description → (vector, hash).
-"""
-
 import base64
 import hashlib
 from typing import Tuple

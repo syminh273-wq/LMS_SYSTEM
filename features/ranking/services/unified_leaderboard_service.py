@@ -1,10 +1,3 @@
-"""Build a unified per-classroom leaderboard: academic score, computed
-directly from `ExamSubmission` grades and weighted by the exam's
-`exam_period` (final ×3, midterm ×2, regular ×1).
-
-This service aggregates that data per student and enriches each row
-with a human-readable `explanation` string.
-"""
 import logging
 from collections import defaultdict
 

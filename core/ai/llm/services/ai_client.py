@@ -1,16 +1,3 @@
-"""
-AIClient — unified AI gateway backed by local Ollama.
-
-Set OLLAMA_BASE_URL / OLLAMA_MODEL / OLLAMA_EMBED_MODEL in your .env to customise.
-
-Usage:
-    from core.ai.llm import AIClient
-
-    answer  = AIClient.chat_sync(messages)
-    vectors = AIClient.embed_texts(["hello", "world"])
-    result  = AIClient.chat_with_tools(messages, tools=[...])
-"""
-
 from typing import Generator, List, Union
 
 from core.ai.llm.services.ollama_client import OllamaClient as _Backend

@@ -1,10 +1,3 @@
-"""
-OllamaLangChainLLM — wraps AIClient into a proper LangChain BaseChatModel.
-
-Implements bind_tools() so create_tool_calling_agent can use it.
-Converts between LangChain message objects and Ollama dict format.
-"""
-
 import json
 import uuid
 from typing import Any, Iterator, List, Optional, Sequence, Union

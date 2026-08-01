@@ -1,10 +1,3 @@
-"""
-RAGService — thin compatibility wrapper around RAGPipeline.
-
-Existing code that calls RAGService.process_document / get_context continues to work.
-New code should use RAGPipeline directly for the full pipeline experience.
-"""
-
 import uuid
 
 from core.ai.embeddings.services.multimodal_embedding_service import get_multimodal_service

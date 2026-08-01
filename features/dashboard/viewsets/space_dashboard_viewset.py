@@ -1,9 +1,3 @@
-"""Space (teacher) dashboard endpoints.
-
-Provides aggregate KPIs, weekly trend, top classes and recent activity
-in a single round-trip so the dashboard can render without N+1 calls.
-"""
-
 from __future__ import annotations
 
 import logging

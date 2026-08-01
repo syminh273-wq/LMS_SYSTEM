@@ -1,8 +1,3 @@
-"""
-Converts LMSToolExecutor methods into LangChain StructuredTools.
-Each tool has a typed Pydantic schema so the LLM can call them correctly.
-"""
-
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
 

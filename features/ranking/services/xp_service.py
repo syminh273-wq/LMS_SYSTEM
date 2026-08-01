@@ -1,5 +1,3 @@
-"""Centralized XP awarding. Hooked from exam/quiz/attendance/cert/doc/classroom
-services. Idempotent per (student, event_type, ref_type, ref_id)."""
 import json
 import logging
 from datetime import datetime, date

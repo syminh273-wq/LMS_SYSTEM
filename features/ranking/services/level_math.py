@@ -1,17 +1,3 @@
-"""XP / level math. Pure functions, no DB access.
-
-Level curve: total XP needed to *reach* level N is round(100 * (N-1) ** 1.5).
-    Level 1: 0
-    Level 2: 100
-    Level 3: 283
-    Level 5: 1118
-    Level 10: 3162
-    Level 20: 8944
-    Level 50: 35355
-
-These are deliberately soft numbers — visible in /levels/ and the profile
-progress bar.
-"""
 import math
 from typing import Tuple
 

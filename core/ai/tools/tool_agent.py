@@ -1,13 +1,3 @@
-"""
-ToolAgent — ReAct-style agent loop.
-
-Flow:
-  1. Send messages + tools to LLM
-  2. If response contains tool_calls → execute each → append results → repeat
-  3. If response is plain text (no tool_calls) → return as final answer
-  4. Stop after MAX_ITERATIONS to prevent infinite loops
-"""
-
 import json
 from typing import List, Optional
 

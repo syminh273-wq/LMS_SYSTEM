@@ -1,5 +1,3 @@
-"""DRF serializers for the Space dashboard summary endpoint."""
-
 from rest_framework import serializers
 
 

@@ -1,10 +1,3 @@
-"""Resolve user UID -> email canonical key.
-
-Hệ thống có 2 bảng user: Consumer và Space. Cùng 1 người có thể có 2 UID khác nhau
-(1 Consumer + 1 Space) nhưng chung email. Canonical key = email (lowercase, stripped).
-
-Nếu user không có email, fallback về chính UID (giữ behavior cũ).
-"""
 from __future__ import annotations
 
 import logging

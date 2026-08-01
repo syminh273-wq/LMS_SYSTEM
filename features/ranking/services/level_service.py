@@ -1,5 +1,3 @@
-"""Level catalog. Returns the full list of levels + thresholds so the FE
-can render badges/progress without hardcoding curve constants."""
 from features.ranking.services.level_math import required_xp_for_level, MAX_LEVEL
 
 

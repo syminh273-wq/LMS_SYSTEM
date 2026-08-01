@@ -1,10 +1,3 @@
-"""Consumer (student) dashboard endpoints.
-
-Provides GPA, class/assignment/attendance KPIs, today's schedule, recent
-grades and recent certificates in a single round-trip so the dashboard can
-render without N+1 calls.
-"""
-
 from __future__ import annotations
 
 import logging

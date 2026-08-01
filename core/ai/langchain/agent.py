@@ -1,13 +1,3 @@
-"""
-LMSAgent — LangChain-native agent with tools + in-memory conversation history.
-
-Uses:
-  - ChatOllama            : LLM with tool-calling support
-  - create_tool_calling_agent : ReAct-style agent built by LangChain
-  - AgentExecutor         : manages the tool-call loop
-  - RunnableWithMessageHistory : wires HybridChatHistory (RAM + Cassandra)
-"""
-
 import queue
 import threading
 from typing import Any, Generator, Union

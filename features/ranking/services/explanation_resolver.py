@@ -1,12 +1,3 @@
-"""Map XP event types and score breakdowns to human-readable Vietnamese.
-
-Used by:
-    - /consumer/ranking/me/transactions/        (per-transaction explanation)
-    - /.../classrooms/<uid>/leaderboard/        (per-entry explanation)
-    - /consumer/ranking/me/classroom/<uid>/     (my-stats explanation)
-"""
-
-
 EVENT_TITLES = {
     'classroom_joined':     'Tham gia lớp học',
     'attendance_present':   'Điểm danh có mặt',

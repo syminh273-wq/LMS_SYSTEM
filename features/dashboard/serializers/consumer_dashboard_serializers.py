@@ -1,5 +1,3 @@
-"""DRF serializers for the Consumer (student) dashboard summary endpoint."""
-
 from rest_framework import serializers
 
 from core.serializers.fields import VnDateTimeField

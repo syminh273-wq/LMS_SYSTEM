@@ -1,4 +1,3 @@
-"""Global student leaderboard — top-N by total_xp with optional period filter."""
 import logging
 from datetime import datetime, timedelta
 from uuid import UUID

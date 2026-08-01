@@ -1,11 +1,3 @@
-"""
-Tool definitions (OpenAI schema) for LMS classroom management.
-
-build_tool_definitions(classroom_id=None) returns the appropriate tool list:
-  - Always includes search_documents
-  - If classroom_id is given, also includes classroom management tools
-"""
-
 SEARCH_TOOL_DEFINITION = {
     "type": "function",
     "function": {

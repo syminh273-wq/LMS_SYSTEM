@@ -1,7 +1,3 @@
-"""
-Calls the Face Recognition Microservice (FastAPI + InsightFace).
-Django does not import insightface directly — all heavy lifting is delegated.
-"""
 import logging
 from datetime import datetime
 

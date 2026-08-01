@@ -1,15 +1,3 @@
-"""
-User suggestions endpoint.
-
-GET /api/v1/consumer/social/suggestions/   (Consumer auth)
-GET /api/v1/space/social/suggestions/      (Space / teacher auth)
-  limit  (default 6, max 20)
-
-Returns active accounts (Consumers + Spaces) that the current user is
-NOT yet following (excluding self). Profile data is sourced from the
-social UserProfile when available.
-"""
-
 import uuid
 
 from rest_framework.response import Response

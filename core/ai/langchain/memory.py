@@ -1,15 +1,3 @@
-"""
-LangChain hybrid memory.
-
-InMemoryChatMessageHistory  → LLM context window only (pure RAM, volatile).
-chat_messages (Cassandra)   → FE display / persistence (read by get_display_messages).
-
-Separation of concerns:
-  - The AI reads from RAM. No DB read during conversation.
-  - Messages are persisted to Cassandra on every add_message() for FE display.
-  - Server restart → RAM is cleared, but Cassandra still has all messages for display.
-"""
-
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 

@@ -1,18 +1,3 @@
-"""
-LMS Typesense Search API
-
-Endpoints:
-  GET /api/v1/space/search/          — teacher: search classrooms, exams, quizzes, consumers
-  GET /api/v1/space/search/health/   — health check
-
-Query params (space search):
-  q           (required) search query
-  types       classroom,exam,quiz,consumer  (default: all)
-  classroom_id  filter exams by classroom
-  limit       (default 10, max 50)
-  offset      (default 0)
-"""
-
 from rest_framework.response import Response
 from rest_framework.views import APIView
 

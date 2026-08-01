@@ -1,8 +1,3 @@
-"""Public-ID generator shared by Consumer, Space, Course, Classroom.
-
-PID format: ``LMS{YY}{8-digit-random}`` → 10 chars, 8^10 = 100M ids/year.
-Cassandra secondary index is NOT unique, so we must retry on collision.
-"""
 import random
 import string
 from datetime import datetime

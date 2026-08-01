@@ -1,20 +1,3 @@
-"""
-QuizGenerationService
-
-Two modes:
-  generate()        → sync, returns full dict (legacy)
-  generate_stream() → generator, yields parsed question dicts one by one
-                      as the AI produces them (NDJSON streaming)
-
-Each question can have a different number of answer options (2..MAX_OPTIONS) —
-callers pass `option_counts`, a list of length `num_questions` giving the
-required option count per question (e.g. [2,2,2,3,3] for a 5-question quiz
-where 3 questions have 2 options and 2 questions have 3 options). Options are
-generated/stored as a plain list — the letter shown to the user (A, B, C, ...)
-is purely positional and never part of the AI contract or the persisted data;
-`correct` is always a 0-based index (or list of indices for multi_answer) into
-that list.
-"""
 import io
 import json
 import logging

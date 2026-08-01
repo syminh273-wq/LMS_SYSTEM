@@ -1,12 +1,3 @@
-"""
-Embedding backends for LMS_BACKEND.
-
-OllamaEmbeddings — calls nomic-embed-text via local Ollama (default).
-HashEmbeddings   — local n-gram hash, 1024 dims, zero deps, never rate-limited.
-
-get_embedding_service() returns OllamaEmbeddings by default.
-"""
-
 import hashlib
 from typing import List
 

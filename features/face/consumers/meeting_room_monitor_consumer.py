@@ -1,18 +1,3 @@
-"""
-WebSocket consumer for real-time face presence monitoring during meeting rooms.
-
-Frontend connects to:
-  ws://host/ws/face/meeting/<room_uid>/?token=<jwt>
-
-Protocol (client → server):
-  { "type": "frame", "image": "<base64>" }
-
-Protocol (server → client):
-  { "type": "verification_result", "camera_open": bool, "recognized": bool,
-    "multiple_faces": bool, "face_count": int, "similarity": float }
-  { "type": "no_enrollment" }
-  { "type": "error", "message": "..." }
-"""
 import json
 import logging
 

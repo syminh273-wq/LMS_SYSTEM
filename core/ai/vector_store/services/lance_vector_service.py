@@ -1,11 +1,3 @@
-"""
-LanceVectorService — local vector store backed by LanceDB.
-
-Data lives in {BASE_DIR}/lancedb/<collection_name>/ as Arrow files.
-Schema has a top-level `classroom_id` column for native SQL pre-filtering
-via LanceDB's .where(..., prefilter=True).
-"""
-
 import json
 import os
 

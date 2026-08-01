@@ -1,7 +1,3 @@
-"""
-Sync Cassandra tables — tạo các table còn thiếu trong Cassandra mà không cần drop.
-Usage: python manage.py lms_sync_cassandra
-"""
 from django.core.management.base import BaseCommand
 from django.conf import settings
 

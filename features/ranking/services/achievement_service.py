@@ -1,8 +1,3 @@
-"""Achievement definitions + auto-unlock.
-
-The catalog is static (12 achievements). On every XP event, the service
-re-evaluates relevant achievements for that student.
-"""
 import logging
 from datetime import datetime
 

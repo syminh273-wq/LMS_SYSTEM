@@ -1,10 +1,3 @@
-"""
-LMSToolExecutor — executes tool calls from the AI agent.
-
-Constructed with teacher_id (for authorization) and filter_meta (for RAG scoping).
-Each tool method maps 1-to-1 to a tool name defined in classroom_tools.py.
-"""
-
 import json
 
 from core.ai.rag.services.rag_pipeline import RAGPipeline

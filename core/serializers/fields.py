@@ -1,10 +1,3 @@
-"""
-Shared DRF field helpers.
-
-`VnDateTimeField` serializes datetimes as naive ISO (no Z suffix).
-The product is single-timezone: backend stores + returns wall-clock
-VN time, FE displays it as-is. See `core.utils.datetime`.
-"""
 from rest_framework import serializers
 from core.utils.datetime import to_vn, to_vn_iso
 
