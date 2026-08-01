@@ -121,7 +121,6 @@ class ClassroomAIService:
             if sources_payload:
                 yield self._sse({"type": "sources", "data": sources_payload})
 
-            # Lưu lịch sử hội thoại
             full_answer = "".join(full_response).strip()
             if full_answer and mode in ("doc", "free"):
                 try:

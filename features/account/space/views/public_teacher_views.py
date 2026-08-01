@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound
 
 from features.account.space.serializers import PublicSpaceSerializer
-from features.account.space.services import Service as SpaceService
+from features.account.space.services import SpaceService
 
 
 class PublicTeacherView(APIView):

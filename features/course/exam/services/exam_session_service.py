@@ -196,9 +196,7 @@ class ExamSessionService(BaseService):
         """
         Teacher bật/tắt `is_effective` cho submission. Cho phép teacher quyết định
         điểm có hiệu lực hay không — kể cả khi student đã bị force_submit.
-
-        Raises:
-          ValueError nếu submission không tồn tại hoặc teacher không sở hữu exam.
+        @raise: ValueError nếu submission không tồn tại hoặc teacher không sở hữu exam.
         """
         from features.course.exam.repositories import ExamSubmissionRepository
 

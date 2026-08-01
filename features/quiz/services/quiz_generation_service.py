@@ -308,8 +308,6 @@ def _iter_ndjson(chunks):
 
 class QuizGenerationService:
 
-    # ── Option / index normalization ─────────────────────────────────────────
-
     @classmethod
     def _extract_options(cls, q: dict) -> list:
         """Accept an `options` array (preferred), a legacy {"a":..,"b":..} dict,
@@ -393,8 +391,6 @@ class QuizGenerationService:
                     correct.append(i)
             correct.sort()
         return correct
-
-    # ── Sync (legacy) ────────────────────────────────────────────────────────
 
     @classmethod
     def _parse_quiz_payload(
@@ -578,8 +574,6 @@ class QuizGenerationService:
         except ValueError:
             logger.error("[QuizGen] Final parse failed. Raw AI output:\n%s", raw)
             raise
-
-    # ── Streaming ─────────────────────────────────────────────────────────────
 
     @classmethod
     def generate_stream(

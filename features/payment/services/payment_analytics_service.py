@@ -98,7 +98,6 @@ class PaymentAnalyticsService(BaseService):
             'approximated': truncated,
         }
 
-    # ── data fetching ────────────────────────────────────────────────────
     def _fetch_payments(self, teacher_id: str, status: str | None) -> list:
         try:
             qs = self.repo.get_by_teacher(teacher_id, status=status, limit=MAX_PAYMENTS_PER_QUERY)
@@ -131,7 +130,6 @@ class PaymentAnalyticsService(BaseService):
             if str(_parse_meta(getattr(p, 'extra_data', '')).get('resource_id') or '') == target
         ]
 
-    # ── aggregations ────────────────────────────────────────────────────
     @staticmethod
     def _aggregate_kpis(payments: list) -> dict:
         total_revenue = 0

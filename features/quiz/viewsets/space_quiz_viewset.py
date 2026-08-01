@@ -124,7 +124,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         data['assigned_classrooms'] = []
         return Response(data, status=status.HTTP_201_CREATED)
 
-    # ── GENERATE STREAM  POST /quizzes/generate-stream/ ───────────────────
     @action(detail=False, methods=['post'], url_path='generate-stream')
     def generate_stream(self, request):
         req_serializer = QuizGenerateRequestSerializer(data=request.data)
@@ -198,7 +197,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         response['X-Accel-Buffering'] = 'no'
         return response
 
-    # ── ASSIGN  POST /quizzes/<uid>/assign/ ───────────────────────────────
     @action(detail=True, methods=['post'], url_path='assign')
     def assign(self, request, uid=None):
         serializer = QuizAssignRequestSerializer(data=request.data)
@@ -228,7 +226,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         )
         return Response(QuizAssignmentResponseSerializer(assignment).data, status=status.HTTP_201_CREATED)
 
-    # ── UPDATE ASSIGNMENT  PATCH /quizzes/<uid>/assign/<classroom_id>/ ────
     @action(detail=True, methods=['patch'], url_path=r'assign/(?P<classroom_id>[^/.]+)')
     def update_assignment(self, request, uid=None, classroom_id=None):
         serializer = QuizAssignUpdateRequestSerializer(data=request.data)
@@ -238,13 +235,11 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         )
         return Response(QuizAssignmentResponseSerializer(assignment).data)
 
-    # ── UNASSIGN  DELETE /quizzes/<uid>/assign/<classroom_id>/ ────────────
     @action(detail=True, methods=['delete'], url_path=r'unassign/(?P<classroom_id>[^/.]+)')
     def unassign(self, request, uid=None, classroom_id=None):
         self.service.unassign_from_classroom(quiz_uid=uid, classroom_id=classroom_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # ── CLOSE  POST /quizzes/<uid>/assign/<classroom_id>/close/ ───────────
     @action(detail=True, methods=['post'], url_path=r'assign/(?P<classroom_id>[^/.]+)/close')
     def close(self, request, uid=None, classroom_id=None):
         serializer = QuizCloseRequestSerializer(data=request.data)
@@ -276,7 +271,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         })
         return Response(payload)
 
-    # ── REOPEN  POST /quizzes/<uid>/assign/<classroom_id>/reopen/ ─────────
     @action(detail=True, methods=['post'], url_path=r'assign/(?P<classroom_id>[^/.]+)/reopen')
     def reopen(self, request, uid=None, classroom_id=None):
         serializer = QuizReopenRequestSerializer(data=request.data)
@@ -309,7 +303,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         })
         return Response(payload)
 
-    # ── LEADERBOARD  GET /quizzes/<uid>/assign/<classroom_id>/leaderboard/ ─
     @action(detail=True, methods=['get'], url_path=r'assign/(?P<classroom_id>[^/.]+)/leaderboard')
     def leaderboard(self, request, uid=None, classroom_id=None):
         try:
@@ -324,7 +317,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         )
         return Response(QuizLeaderboardResponseSerializer(payload).data)
 
-    # ── STUDENT DETAIL  GET /quizzes/<uid>/assign/<classroom_id>/leaderboard/<student_uid>/ ─
     @action(detail=True, methods=['get'], url_path=r'assign/(?P<classroom_id>[^/.]+)/leaderboard/(?P<student_uid>[^/.]+)')
     def leaderboard_student(self, request, uid=None, classroom_id=None, student_uid=None):
         payload = QuizLeaderboardService().student_detail(
@@ -334,7 +326,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         )
         return Response(QuizLeaderboardStudentDetailSerializer(payload).data)
 
-    # ── ATTEMPTS  GET /quizzes/<uid>/attempts/?classroom_id=<id> ──────────
     @action(detail=True, methods=['get'], url_path='attempts')
     def attempts(self, request, **kwargs):
         classroom_id = request.query_params.get('classroom_id')
@@ -343,7 +334,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         attempts = self.service.get_all_attempts(kwargs['uid'], classroom_id)
         return Response(QuizLogResponseSerializer(list(attempts), many=True).data)
 
-    # ── UPDATE QUESTION  PATCH /quizzes/<uid>/questions/<question_uid>/ ──────
     @action(detail=True, methods=['patch'], url_path=r'questions/(?P<question_uid>[^/.]+)')
     def update_question(self, request, uid=None, question_uid=None):
         serializer = QuizQuestionUpdateRequestSerializer(data=request.data)
@@ -361,13 +351,11 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(QuizQuestionSerializer(updated).data)
 
-    # ── DELETE QUESTION  DELETE /quizzes/<uid>/questions/<question_uid>/ ────
     @action(detail=True, methods=['delete'], url_path=r'questions/(?P<question_uid>[^/.]+)')
     def destroy_question(self, request, uid=None, question_uid=None):
         self.service.delete_question(uid, question_uid)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # ── UPDATE  PATCH /quizzes/<uid>/ ─────────────────────────────────────
     def partial_update(self, request, *args, **kwargs):
         quiz = self.service.find(kwargs['uid'])
         serializer = QuizUpdateRequestSerializer(data=request.data)
@@ -375,7 +363,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         updated = self.service.update(quiz, **serializer.validated_data)
         return Response(QuizResponseSerializer(updated).data)
 
-    # ── DELETE  DELETE /quizzes/<uid>/ ────────────────────────────────────
     def destroy(self, request, *args, **kwargs):
         self.service.delete_quiz(kwargs['uid'])
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -433,22 +420,18 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         }).data
         return Response(data, status=status.HTTP_202_ACCEPTED)
 
-    # ── GENERATE TASK  POST /quizzes/generate-task/ ──────────────────────────
     @action(detail=False, methods=['post'], url_path='generate-task')
     def generate_task(self, request):
         return self._enqueue_generate_task(request, question_type='single_answer')
 
-    # ── GENERATE TASK MULTI  POST /quizzes/generate-task-multi/ ──────────────
     @action(detail=False, methods=['post'], url_path='generate-task-multi')
     def generate_task_multi(self, request):
         return self._enqueue_generate_task(request, question_type='multi_answer')
 
-    # ── GENERATE TASK TRUE/FALSE  POST /quizzes/generate-task-tf/ ─────────────
     @action(detail=False, methods=['post'], url_path='generate-task-tf')
     def generate_task_tf(self, request):
         return self._enqueue_generate_task(request, question_type='true_false')
 
-    # ── TASK STATUS  GET /quizzes/tasks/<task_id>/ ──────────────────────────
     RQ_STATUS_MAP = {
         JobStatus.QUEUED: 'queued',
         JobStatus.STARTED: 'running',
@@ -540,7 +523,6 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         }).data
         return Response(data)
 
-    # ── LIST TASKS  GET /quizzes/tasks/ ──────────────────────────────────────
     @action(detail=False, methods=['get'], url_path='tasks')
     def list_tasks(self, request):
         try:

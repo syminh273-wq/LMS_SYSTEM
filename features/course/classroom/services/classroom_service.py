@@ -1,12 +1,17 @@
 import string
 import random
-from features.course.classroom.repositories import Repository
+from features.course.classroom.repositories import ClassroomRepository
 from core.search_engine.typesense.indexer import LMSIndexer
 from core.services.base_service import BaseService
 
-class Service(BaseService):
+class ClassroomService(BaseService):
+    """
+    Classroom service
+    """
+    repository: ClassroomRepository
+
     def __init__(self):
-        self.repository = Repository()
+        self.repository = ClassroomRepository()
 
     def all(self):
         return self.repository.all()
@@ -32,7 +37,6 @@ class Service(BaseService):
         pid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         classroom = self.repository.create(teacher_id=teacher_id, pid=pid, **data)
 
-        # Auto-create default folders: Preview, Docs, Bài kiểm tra (with 3 sub-folders)
         try:
             from features.resource.services.resource_folder_seed_service import ResourceFolderSeedService
             ResourceFolderSeedService().ensure_default_folders(classroom.uid, teacher_id)

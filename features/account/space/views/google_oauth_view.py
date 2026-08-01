@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.models.social_account import SocialAccount
-from features.account.space.repositories.space_repository import Repository as SpaceRepository
+from features.account.space.repositories.space_repository import SpaceRepository
 
 
 class GoogleSpaceOAuthLoginView(APIView):

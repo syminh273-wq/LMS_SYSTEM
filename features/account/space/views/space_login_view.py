@@ -3,13 +3,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from features.account.space.serializers import SpaceAccountLoginSerializer
-from features.account.space.services.space_service import Service
+from features.account.space.services.space_service import SpaceService
 
 class SpaceLoginView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = SpaceAccountLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = Service().authenticate(
+        user = SpaceService().authenticate(
             username=serializer.validated_data['email'],
             password=serializer.validated_data['password']
         )

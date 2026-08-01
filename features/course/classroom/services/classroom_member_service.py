@@ -138,19 +138,16 @@ class ClassroomMemberService(BaseService):
         if not member:
             raise NotFound("Không tìm thấy thành viên.")
 
-        # Register student in teacher's contact list (idempotent)
         try:
             TeacherContactRepository().register(
                 teacher_id=classroom.teacher_id,
                 consumer_uid=member_id,
             )
         except Exception:
-            pass  # never block the approval flow
+            pass
 
-        # Realtime Firebase event → student frontend
         self._push_membership_event(member_id, classroom_uid, classroom.name, 'approved')
 
-        # Persistent notification for student (bell icon + history)
         try:
             from features.notification.services.notification_service import NotificationService
             NotificationService().send_notification(
@@ -167,7 +164,6 @@ class ClassroomMemberService(BaseService):
         except Exception as e:
             logger.warning(f"[ClassroomMember] Failed to send approval notification: {e}")
 
-        # XP: award when a student is approved into a classroom (idempotent per classroom).
         try:
             from features.ranking.services.xp_service import XPService
             XPService().award(

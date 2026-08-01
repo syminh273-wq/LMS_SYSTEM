@@ -1,3 +1,8 @@
-from .consumer_viewset import ViewSet
+from .consumer_viewset import ConsumerViewSet
 
-__all__ = ['ViewSet']
+ViewSet = ConsumerViewSet  # backward-compat
+
+__all__ = [
+    'ConsumerViewSet',
+    'ViewSet',
+]

@@ -2,7 +2,10 @@ from core.repositories.base_repository import BaseRepository
 from core.utils.pid import generate_unique_pid
 from features.course.classroom.models import Classroom
 
-class Repository(BaseRepository):
+class ClassroomRepository(BaseRepository):
+    """
+    Classroom repository
+    """
     model = Classroom
 
     def create(self, **kwargs):

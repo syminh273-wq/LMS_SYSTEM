@@ -13,7 +13,10 @@ from features.account.consumer.serializers import (
 from features.account.consumer.services import ConsumerService
 
 
-class ViewSet(ConsumerScopeMixin, BaseModelViewSet):
+class ConsumerViewSet(ConsumerScopeMixin, BaseModelViewSet):
+    """
+    Consumer model view set
+    """
     serializer_class = ConsumerAccountSerializer
 
     def get_queryset(self):

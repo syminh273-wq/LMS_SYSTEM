@@ -11,7 +11,7 @@ from features.course.ai.serializers.ai_serializer import (
     AIIngestSerializer,
     AIQueryParamSerializer,
 )
-from features.course.ai.services.course_ai_service import CourseAIService
+from features.ai.services.course_ai_service import CourseAIService
 
 
 class CourseAIViewSet(SpaceScopeMixin, ViewSet):
@@ -32,8 +32,6 @@ class CourseAIViewSet(SpaceScopeMixin, ViewSet):
         qs.is_valid(raise_exception=True)
         return qs.validated_data
 
-    # ── POST ai/ask/ ─────────────────────────────────────────────────────────
-
     @action(detail=False, methods=["post"], url_path="ask")
     def ask(self, request):
         params = self._parse_query_params(request)
@@ -49,8 +47,6 @@ class CourseAIViewSet(SpaceScopeMixin, ViewSet):
             top_k=body.validated_data["top_k"],
         )
         return Response(result, status=status.HTTP_200_OK)
-
-    # ── POST ai/ask-stream/ ──────────────────────────────────────────────────
 
     @action(detail=False, methods=["post"], url_path="ask-stream")
     def ask_stream(self, request):
@@ -73,8 +69,6 @@ class CourseAIViewSet(SpaceScopeMixin, ViewSet):
         resp["X-Accel-Buffering"] = "no"
         return resp
 
-    # ── POST ai/ingest/ ──────────────────────────────────────────────────────
-
     @action(detail=False, methods=["post"], url_path="ingest")
     def ingest(self, request):
         params = self._parse_query_params(request)
@@ -91,8 +85,6 @@ class CourseAIViewSet(SpaceScopeMixin, ViewSet):
 
         code = status.HTTP_200_OK if result.get("success") else status.HTTP_400_BAD_REQUEST
         return Response(result, status=code)
-
-    # ── DELETE ai/index/ ─────────────────────────────────────────────────────
 
     @action(detail=False, methods=["delete"], url_path="index")
     def delete_index(self, request):

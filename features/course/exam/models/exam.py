@@ -38,12 +38,10 @@ class Exam(BaseTimeStampModel):
     exam_mode = columns.Text(default='offline')
     duration_seconds = columns.Integer(default=0)
 
-    # Online session tracking
     is_online_active = columns.Boolean(default=False)
     opened_at = columns.DateTime(required=False)
     late_threshold_seconds = columns.Integer(default=0)
 
-    # Anti-cheat limits
     # max_visibility_breaks: gộp tất cả (tab leave, window blur, app blur, fullscreen exit, visibility hidden)
     # max_face_warnings: cảnh báo camera/face (camera_lost, face_not_recognized, multiple_faces)
     # = 0 nghĩa là không giới hạn

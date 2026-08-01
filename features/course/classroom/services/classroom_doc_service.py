@@ -9,7 +9,6 @@ from features.resource.services.resource_folder_service import ResourceFolderSer
 from features.resource.services.resource_service import ResourceService
 from core.services.base_service import BaseService
 
-# File types that can be parsed + indexed in LanceDB
 _INDEXABLE_EXTENSIONS = {
     '.pdf', '.txt', '.md', '.doc', '.docx',
     '.xls', '.xlsx', '.ppt', '.pptx',

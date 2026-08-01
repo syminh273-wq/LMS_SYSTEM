@@ -33,10 +33,6 @@ _INDEXABLE_TYPES = {"pdf", "txt", "md", "csv"}
 
 class CourseAIService:
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Permission helpers
-    # ─────────────────────────────────────────────────────────────────────────
-
     @staticmethod
     def _get_classroom(classroom_id):
         classroom = Classroom.objects.filter(uid=classroom_id).allow_filtering().first()
@@ -74,10 +70,6 @@ class CourseAIService:
                 return resource
         raise PermissionDenied("You do not have permission to access this document.")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Filter builder  (meta stored/queried in LanceDB)
-    # ─────────────────────────────────────────────────────────────────────────
-
     @staticmethod
     def _build_filter(classroom_id=None, document_id=None) -> dict:
         """
@@ -92,10 +84,6 @@ class CourseAIService:
             f["resource_uid"] = str(document_id)
         return f or None
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Public API
-    # ─────────────────────────────────────────────────────────────────────────
-
     @classmethod
     def ask(
         cls,
@@ -108,13 +96,11 @@ class CourseAIService:
         """
         Permission → build filter → similarity search → LLM answer.
         """
-        # ── Permission checks ──────────────────────────────────────────────
         if classroom_id:
             cls._check_classroom_permission(classroom_id, teacher_id)
         if document_id:
             cls._check_document_permission(document_id, teacher_id)
 
-        # ── RAG query ─────────────────────────────────────────────────────
         result = _pipeline.ask(
             question,
             classroom_id=classroom_id,
@@ -197,14 +183,11 @@ class CourseAIService:
         document_id in query_params is treated as an additional metadata filter;
         resource_id in the request body is the file to ingest.
         """
-        # ── Permission: classroom ──────────────────────────────────────────
         if classroom_id:
             cls._check_classroom_permission(classroom_id, teacher_id)
 
-        # ── Permission: the resource being ingested ────────────────────────
         resource = cls._check_document_permission(resource_id, teacher_id)
 
-        # ── Check file type ────────────────────────────────────────────────
         if resource.file_type.lower() not in _INDEXABLE_TYPES:
             return {
                 "success": False,
@@ -212,14 +195,12 @@ class CourseAIService:
                            f"Supported types: {', '.join(sorted(_INDEXABLE_TYPES))}",
             }
 
-        # ── Build metadata for LanceDB ─────────────────────────────────────
         metadata = {"resource_uid": str(resource.uid)}
         if classroom_id:
             metadata["classroom_id"] = str(classroom_id)
         if document_id:
             metadata["extra_document_id"] = str(document_id)
 
-        # ── Download file to temp dir → ingest ────────────────────────────
         suffix = f".{resource.file_type.lower()}"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp_path = tmp.name

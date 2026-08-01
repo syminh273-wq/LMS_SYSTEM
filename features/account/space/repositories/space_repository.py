@@ -3,7 +3,10 @@ from core.utils.pid import generate_unique_pid
 from features.account.space.models import Space
 
 
-class Repository(BaseRepository):
+class SpaceRepository(BaseRepository):
+    """
+    Space repository
+    """
     model = Space
 
     def create(self, **kwargs):

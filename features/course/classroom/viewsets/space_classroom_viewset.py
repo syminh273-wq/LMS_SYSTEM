@@ -13,7 +13,7 @@ from core.views.api.base_viewset import BaseModelViewSet
 from core.views.mixins import SpaceScopeMixin
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
-from features.course.classroom.services import Service
+from features.course.classroom.services import ClassroomService
 from features.course.classroom.services.classroom_doc_service import ClassroomDocService
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
@@ -22,7 +22,7 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
     serializer_class = ClassroomResponseSerializer
 
     def get_queryset(self):
-        return Service().get_by_teacher(self.request.user.uid)
+        return ClassroomService().get_by_teacher(self.request.user.uid)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -36,13 +36,13 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
         return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
-        instance = Service().find(kwargs['uid'])
+        instance = ClassroomService().find(kwargs['uid'])
         return Response(ClassroomResponseSerializer(instance).data)
 
     def create(self, request, *args, **kwargs):
         serializer = ClassroomRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance = Service().create_classroom(
+        instance = ClassroomService().create_classroom(
             teacher_id=request.user.uid,
             data=serializer.validated_data,
         )
@@ -58,10 +58,9 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
         return Response(ClassroomResponseSerializer(instance).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        service = Service()
+        service = ClassroomService()
         instance = service.find(kwargs['uid'])
 
-        # Ownership check
         if instance.teacher_id != request.user.uid:
             raise PermissionDenied("You do not have permission to update this classroom.")
 
@@ -71,10 +70,9 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
         return Response(ClassroomResponseSerializer(instance).data)
 
     def destroy(self, request, *args, **kwargs):
-        service = Service()
+        service = ClassroomService()
         instance = service.find(kwargs['uid'])
 
-        # Ownership check
         if instance.teacher_id != request.user.uid:
             raise PermissionDenied("You do not have permission to delete this classroom.")
 
@@ -92,7 +90,7 @@ class SpaceClassroomViewSet(SpaceScopeMixin, BaseModelViewSet):
 
     @action(detail=True, methods=['get'])
     def sharing_link(self, request, uid=None):
-        classroom = Service().find(uid)
+        classroom = ClassroomService().find(uid)
         return Response({
             'code': classroom.pid,
             'url': f'/join/{classroom.pid}',

@@ -6,31 +6,30 @@ from core.ai.memory.conversation_memory import ConversationMemory
 
 _memory = ConversationMemory()
 
-class MemoryState(TypedDict):
-    # LangGraph will automatically handle appending to this list
-    messages: Annotated[list, add_messages]
 
 class LangGraphMemoryManager:
     """
     Focused tool to use LangGraph for standardized memory management
     while keeping your existing RAG/AI logic outside.
     """
-    
+
+    class MemoryState(TypedDict):
+        messages: Annotated[list, add_messages]
+
     def __init__(self):
         self.checkpointer = _memory.get_langgraph_checkpointer()
         self.graph = self._build_graph()
 
     def _build_graph(self):
-        workflow = StateGraph(MemoryState)
-        
-        # Simple "pass-through" node that just ensures state is saved
-        def sync_memory(state: MemoryState):
+        workflow = StateGraph(self.MemoryState)
+
+        def sync_memory(state):
             return state
 
         workflow.add_node("sync", sync_memory)
         workflow.add_edge(START, "sync")
         workflow.add_edge("sync", END)
-        
+
         return workflow.compile(checkpointer=self.checkpointer)
 
     def load_history(self, session_id: str) -> list:

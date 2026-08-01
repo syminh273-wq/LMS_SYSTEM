@@ -4,12 +4,15 @@ from django.contrib.auth.hashers import is_password_usable
 from rest_framework import exceptions
 from core.backend.auth.base_auth_services import BaseAuthService
 from features.account.space.models import Space
-from features.account.space.repositories import Repository
+from features.account.space.repositories import SpaceRepository
 from features.account.user_setting.services.user_setting_service import UserSettingService
 from features.account.user_setting.enums import UserTypes as SettingUserTypes
 
 
-class Service(BaseAuthService):
+class SpaceService(BaseAuthService):
+    """
+    Space service
+    """
     editable_profile_fields = {
         'full_name',
         'hometown',
@@ -27,7 +30,7 @@ class Service(BaseAuthService):
     }
 
     def __init__(self):
-        self.repository = Repository()
+        self.repository = SpaceRepository()
 
     def all(self):
         return self.repository.all()

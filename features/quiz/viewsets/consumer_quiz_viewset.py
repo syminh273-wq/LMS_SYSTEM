@@ -29,7 +29,6 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
     service = QuizService()
     leaderboard_service = QuizLeaderboardService()
 
-    # ── LIST  GET /consumer/quiz/?classroom_id=<uid> ──────────────────────
     def list(self, request):
         classroom_id = request.query_params.get('classroom_id')
         if not classroom_id:
@@ -37,7 +36,6 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
         quizzes = self.service.get_by_classroom(classroom_id)
         return Response(QuizResponseSerializer(list(quizzes), many=True).data)
 
-    # ── RETRIEVE  GET /consumer/quiz/<uid>/?classroom_id=<id> ─────────────
     def retrieve(self, request, pk=None):
         classroom_id = request.query_params.get('classroom_id')
         quiz, questions = self.service.get_with_questions(pk)
@@ -80,7 +78,6 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
 
         return Response(data)
 
-    # ── MY ATTEMPTS  GET /consumer/quiz/<uid>/attempts/?classroom_id=<id> ─
     @action(detail=True, methods=['get'], url_path='attempts')
     def attempts(self, request, pk=None):
         classroom_id = request.query_params.get('classroom_id')
@@ -89,7 +86,6 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
         my_attempts = self.service.get_student_attempts(pk, classroom_id, request.user.uid)
         return Response(QuizLogResponseSerializer(list(my_attempts), many=True).data)
 
-    # ── LEADERBOARD  GET /consumer/quiz/<uid>/leaderboard/?classroom_id=<id> ─
     @action(detail=True, methods=['get'], url_path='leaderboard')
     def leaderboard(self, request, pk=None):
         classroom_id = request.query_params.get('classroom_id')
@@ -110,7 +106,6 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
         payload['closes_at'] = status_payload['closes_at']
         return Response(QuizLeaderboardResponseSerializer(payload).data)
 
-    # ── STUDENT DETAIL  GET /consumer/quiz/<uid>/leaderboard/<student_uid>/?classroom_id=<id> ─
     @action(detail=True, methods=['get'], url_path=r'leaderboard/(?P<student_uid>[^/.]+)')
     def leaderboard_student(self, request, pk=None, student_uid=None):
         classroom_id = request.query_params.get('classroom_id')
@@ -124,7 +119,6 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
         )
         return Response(QuizLeaderboardStudentDetailSerializer(payload).data)
 
-    # ── SUBMIT  POST /consumer/quiz/<uid>/submit/ ─────────────────────────
     @action(detail=True, methods=['post'], url_path='submit')
     def submit(self, request, pk=None):
         serializer = QuizSubmitRequestSerializer(data=request.data)

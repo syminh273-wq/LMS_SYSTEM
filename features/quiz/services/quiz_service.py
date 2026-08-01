@@ -27,8 +27,6 @@ class QuizService(BaseService):
         self.assignment_repo = QuizAssignmentRepository()
         self.log_repo = QuizLogRepository()
 
-    # ── Quiz queries ─────────────────────────────────────────────────────────
-
     def get_by_teacher(self, teacher_id):
         return self.repository.get_by_teacher(teacher_id)
 
@@ -153,8 +151,6 @@ class QuizService(BaseService):
         if closes_at is not None:
             payload['closes_at'] = closes_at
         return self.assignment_repo.update_close_state(quiz_uid, classroom_id, **payload)
-
-    # ── Quiz creation ─────────────────────────────────────────────────────────
 
     @staticmethod
     def _normalize_correct(correct, question_type: str = None) -> tuple:
@@ -285,8 +281,6 @@ class QuizService(BaseService):
     def get_student_attempts(self, quiz_uid, classroom_id, student_uid):
         return self.log_repo.get_by_student(quiz_uid, classroom_id, student_uid)
 
-    # ── Question update ───────────────────────────────────────────────────────
-
     def find_question(self, quiz_id, question_uid):
         return self.question_repo.find_question(quiz_id, question_uid)
 
@@ -325,8 +319,6 @@ class QuizService(BaseService):
         updated = self.repository.update(quiz, questions_count=len(remaining))
         LMSIndexer.index_quiz(updated)
         return updated
-
-    # ── Delete ─────────────────────────────────────────────────────────────────
 
     def delete_quiz(self, quiz_uid):
         quiz = self.repository.find(quiz_uid)

@@ -1,3 +1,8 @@
-from .space_viewset import ViewSet
+from .space_viewset import SpaceViewSet
 
-__all__ = ['ViewSet']
+ViewSet = SpaceViewSet  # backward-compat
+
+__all__ = [
+    'SpaceViewSet',
+    'ViewSet',
+]

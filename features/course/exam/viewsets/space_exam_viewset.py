@@ -113,8 +113,6 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
         self.audit_repo = ExamAuditLogRepository()
         self.exam_repo = ExamRepository()
 
-    # ── EXAM CRUD ─────────────────────────────────────────────────────────────
-
     def list(self, request):
         classroom_id = request.query_params.get("classroom_id")
         status = request.query_params.getlist("status") or request.query_params.get("status") or None
@@ -197,8 +195,6 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # ── ANALYTICS (exam-scoped) ─────────────────────────────────────────────────
-
     def analytics(self, request, exam_uid=None):
         try:
             data = self.analytics_service.get_exam_analytics(exam_uid, request.user.uid)
@@ -211,8 +207,6 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
             "submissions": [serialize_exam_submission(s) for s in data["submissions"]],
             "stats": data["stats"],
         })
-
-    # ── SUBMISSIONS (exam-scoped) ──────────────────────────────────────────────
 
     def list_submissions(self, request, exam_uid=None):
         submissions = self.submission_service.list_exam_submissions(
@@ -233,8 +227,6 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
         except ValueError as exc:
             return _submission_error_response(exc)
         return Response(_serialize_ai_grade_batch(results))
-
-    # ── SUBMISSIONS (submission-scoped) ───────────────────────────────────────
 
     def get_submission(self, request, submission_uid=None):
         submission = self.submission_service.get_teacher_submission(
@@ -265,8 +257,6 @@ class SpaceExamViewSet(SpaceScopeMixin, ViewSet):
         except ValueError as exc:
             return _submission_error_response(exc)
         return Response(serialize_exam_submission(submission))
-
-    # ── ONLINE SESSION MANAGEMENT ─────────────────────────────────────────────
 
     def open_online(self, request, uid=None):
         try:

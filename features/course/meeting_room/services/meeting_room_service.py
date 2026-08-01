@@ -106,8 +106,7 @@ class MeetingRoomService(BaseService):
     def _notify_meeting_started(self, room):
         """Notify all members of the classroom about the meeting."""
         members = self.member_repo.get_members(room.classroom_uid)
-        
-        # 1. Realtime DB notification (existing)
+
         payload = {
             'type': 'meeting_started',
             'room_uid': str(room.uid),
@@ -116,12 +115,11 @@ class MeetingRoomService(BaseService):
             'host_name': room.host_name,
             'started_at': datetime.utcnow().isoformat()
         }
-        
+
         for member in members:
             channel = f"notifications/{member.member_id}"
             self.notification_service.push_message(channel, payload)
 
-        # 2. FCM Push Notification (via topic)
         topic = f"classroom_{str(room.classroom_uid)}"
         fcm_payload = NotificationPayloadDto(
             event="MEETING",

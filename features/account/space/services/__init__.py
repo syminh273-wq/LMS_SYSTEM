@@ -1,3 +1,8 @@
-from .space_service import Service
+from .space_service import SpaceService
 
-__all__ = ['Service']
+Service = SpaceService  # backward-compat
+
+__all__ = [
+    'SpaceService',
+    'Service',
+]

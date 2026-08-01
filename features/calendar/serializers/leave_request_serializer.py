@@ -123,7 +123,7 @@ class LeaveRequestSerializer(serializers.Serializer):
         if classroom_id in cache:
             return cache[classroom_id]
         try:
-            from features.course.classroom.repositories.classroom_repository import Repository as ClassroomRepository
+            from features.course.classroom.repositories.classroom_repository import ClassroomRepository
             classroom = ClassroomRepository().find(classroom_id)
             cache[classroom_id] = classroom.name
             return classroom.name

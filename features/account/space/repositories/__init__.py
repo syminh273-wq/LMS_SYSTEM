@@ -1,3 +1,8 @@
-from .space_repository import Repository
+from .space_repository import SpaceRepository
 
-__all__ = ['Repository']
+Repository = SpaceRepository  # backward-compat
+
+__all__ = [
+    'SpaceRepository',
+    'Repository',
+]

@@ -19,8 +19,6 @@ VERIFY_THRESHOLD = getattr(settings, "FACE_VERIFY_THRESHOLD", 0.45)
 
 class FaceRecognitionService:
 
-    # ── Enrollment ─────────────────────────────────────────────────────────
-
     def enroll(self, student_id, image_b64: str) -> FaceEmbedding:
         """
         Extract embedding from photo and save to DB.
@@ -36,7 +34,6 @@ class FaceRecognitionService:
 
         embedding = resp.json()["embedding"]
 
-        # Deactivate old embeddings
         existing = FaceEmbedding.objects.filter(student_id=student_id).allow_filtering()
         for old in existing:
             old.update(is_active=False)
@@ -59,8 +56,6 @@ class FaceRecognitionService:
             if r.is_active:
                 return r.get_embedding()
         return None
-
-    # ── Verification ───────────────────────────────────────────────────────
 
     def verify(self, student_id, exam_id, image_b64: str) -> dict:
         """
@@ -107,8 +102,6 @@ class FaceRecognitionService:
             raise ValueError("Face service error")
         return resp.json()
 
-    # ── Logging ────────────────────────────────────────────────────────────
-
     def _log(self, student_id, exam_id, result: dict):
         ExamEventLogRepository().log_face(
             exam_id=exam_id,
@@ -122,8 +115,6 @@ class FaceRecognitionService:
 
     def get_student_exam_logs(self, exam_id, student_id) -> list:
         return ExamEventLogRepository().get_face_logs_for_student(exam_id, student_id)
-
-    # ── Classroom session ──────────────────────────────────────────────────
 
     SESSION_TTL_HOURS = 8
 

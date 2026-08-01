@@ -11,15 +11,12 @@ router.register(r'', SpaceClassroomViewSet, basename='classroom')
 
 urlpatterns = [
     path('', include(router.urls)),
-    # POST upload doc / GET list docs /classrooms/<uid>/docs/
     path('<str:uid>/docs/',
          SpaceClassroomViewSet.as_view({'post': 'docs_upload', 'get': 'docs_list'}),
          name='classroom-docs'),
-    # DELETE /classrooms/<uid>/docs/<resource_uid>/
     path('<str:uid>/docs/<str:resource_uid>/',
          SpaceClassroomViewSet.as_view({'delete': 'docs_delete'}),
          name='classroom-docs-delete'),
-    # AI Q&A bot — served by SpaceClassroomAIViewSet
     path('<str:uid>/ask/',
          SpaceClassroomAIViewSet.as_view({'post': 'ask'}),
          name='classroom-ask'),

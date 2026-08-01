@@ -28,7 +28,6 @@ class MeetingRoomParticipantService(BaseService):
             joined_at=datetime.utcnow(),
         )
 
-        # Increment participant_count on the room
         try:
             room = self.room_repo.find(room_uid)
             self.room_repo.update(room, participant_count=room.participant_count + 1)
@@ -42,7 +41,6 @@ class MeetingRoomParticipantService(BaseService):
         if existing and not existing.is_deleted:
             existing.update(is_deleted=True, left_at=datetime.utcnow())
 
-            # Decrement participant_count on the room
             try:
                 room = self.room_repo.find(room_uid)
                 count = max(0, room.participant_count - 1)

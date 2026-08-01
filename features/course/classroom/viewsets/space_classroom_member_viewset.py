@@ -4,7 +4,7 @@ from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
 
 from core.views.mixins import SpaceScopeMixin
-from features.course.classroom.services import Service
+from features.course.classroom.services import ClassroomService
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 from features.course.classroom.services.classroom_activity_log_service import ClassroomActivityLogService
 
@@ -27,7 +27,7 @@ class SpaceClassroomMemberViewSet(SpaceScopeMixin, ViewSet):
     @action(detail=False, methods=['post'])
     def join(self, request, classroom_uid=None):
         """POST /classrooms/<uid>/members/join/"""
-        classroom = Service().find(classroom_uid)
+        classroom = ClassroomService().find(classroom_uid)
         member = ClassroomMemberService().join(
             classroom_uid=classroom.uid,
             user=request.user,

@@ -32,7 +32,6 @@ class SpaceClassroomBlacklistView(SpaceScopeMixin, APIView):
             added_by=request.user.uid,
             reason=serializer.validated_data.get('reason', ''),
         )
-        # Auto-kick the member if they're still in the classroom
         try:
             from features.course.classroom.services.classroom_member_service import ClassroomMemberService
             ClassroomMemberService().kick(

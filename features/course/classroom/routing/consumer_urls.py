@@ -6,7 +6,6 @@ router = DefaultRouter()
 router.register(r'classrooms', ConsumerClassroomViewSet, basename='consumer-classroom')
 
 urlpatterns = [
-    # AI Q&A bot — served by ConsumerClassroomAIViewSet
     path('classrooms/<str:pk>/ask/',
          ConsumerClassroomAIViewSet.as_view({'post': 'ask'}),
          name='consumer-classroom-ask'),

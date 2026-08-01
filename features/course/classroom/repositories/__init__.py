@@ -1,3 +1,14 @@
-from .classroom_repository import Repository
+from .classroom_repository import ClassroomRepository
+from .classroom_member_repository import ClassroomMemberRepository
+from .teacher_blacklist_repository import TeacherBlacklistRepository
+from .teacher_contact_repository import TeacherContactRepository
 
-__all__ = ['Repository']
+Repository = ClassroomRepository  # backward-compat
+
+__all__ = [
+    'ClassroomRepository',
+    'ClassroomMemberRepository',
+    'TeacherBlacklistRepository',
+    'TeacherContactRepository',
+    'Repository',
+]

@@ -31,8 +31,6 @@ class ExamEventLogRepository(BaseRepository):
     EVENT_KIND_AUDIT = 'audit'
     EVENT_KIND_FACE = 'face'
 
-    # ── audit writes ──────────────────────────────────────────────────────────
-
     def log(self, exam_id, student_id, event_type: str, event_data: dict | None = None):
         try:
             ExamEventLog.create(
@@ -50,8 +48,6 @@ class ExamEventLogRepository(BaseRepository):
     def log_audit(self, exam_id, student_id, event_type: str, event_data: dict | None = None):
         return self.log(exam_id, student_id, event_type, event_data)
 
-    # ── face writes ───────────────────────────────────────────────────────────
-
     def log_face(self, exam_id, student_id, result: dict, verified_at=None):
         try:
             payload = dict(result or {})
@@ -66,8 +62,6 @@ class ExamEventLogRepository(BaseRepository):
             )
         except Exception as exc:
             logger.warning(f"ExamEventLog.log_face failed: {exc}")
-
-    # ── reads (audit) ─────────────────────────────────────────────────────────
 
     def list_by_exam(self, exam_id) -> list:
         return list(
@@ -85,8 +79,6 @@ class ExamEventLogRepository(BaseRepository):
             ).allow_filtering()
         )
 
-    # ── reads (face) ──────────────────────────────────────────────────────────
-
     def get_face_logs_for_exam(self, exam_id) -> list:
         return list(
             ExamEventLog.objects.filter(
@@ -102,8 +94,6 @@ class ExamEventLogRepository(BaseRepository):
                 event_kind=self.EVENT_KIND_FACE,
             ).allow_filtering()
         )
-
-    # ── helpers used by serializers / views ───────────────────────────────────
 
     @staticmethod
     def parse_event_data(row) -> dict:

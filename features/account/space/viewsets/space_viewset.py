@@ -14,12 +14,15 @@ from features.account.space.serializers import (
     SpaceSettingsSerializer,
     SpaceChangePasswordSerializer,
 )
-from features.account.space.services import Service
-from features.account.space.repositories import Repository
+from features.account.space.services import SpaceService
+from features.account.space.repositories import SpaceRepository
 
 
-class ViewSet(SpaceScopeMixin, BaseModelViewSet):
-    repository = Repository()
+class SpaceViewSet(SpaceScopeMixin, BaseModelViewSet):
+    """
+    Space model view set
+    """
+    repository = SpaceRepository()
     queryset = repository.all()
     serializer_class = SpaceAccountSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -28,7 +31,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         """
         Listing spaces
         """
-        service = Service()
+        service = SpaceService()
         self.queryset = service.get_active_spaces()
         return super().list(request, *args, **kwargs)
 
@@ -39,7 +42,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         """
         if not request.user or not request.user.is_authenticated:
             return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
-        service = Service()
+        service = SpaceService()
         space = service.get_mine(request.user)
         return Response(SpaceAccountSerializer(instance=space).data)
 
@@ -54,7 +57,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         serializer = SpaceAccountProfileUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
-        service = Service()
+        service = SpaceService()
         space = service.update_mine(request.user, serializer.validated_data)
         return Response(SpaceAccountSerializer(instance=space).data, status=status.HTTP_200_OK)
 
@@ -66,7 +69,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         if not request.user or not request.user.is_authenticated:
             return Response({"detail": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        service = Service()
+        service = SpaceService()
         return Response(service.get_settings(request.user))
 
     @action(detail=False, methods=['patch'], url_path='settings')
@@ -80,7 +83,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         serializer = SpaceSettingsSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
-        service = Service()
+        service = SpaceService()
         updated = service.update_settings(request.user, serializer.validated_data)
         return Response(updated, status=status.HTTP_200_OK)
 
@@ -89,7 +92,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         serializer = SpaceChangePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        service = Service()
+        service = SpaceService()
         service.change_password(
             request.user,
             serializer.validated_data['current_password'],
@@ -112,7 +115,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         serializer = SpaceAccountCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        service = Service()
+        service = SpaceService()
         # Note: SpaceService.register handles the logic
         space = service.register(serializer.validated_data)
 
@@ -150,7 +153,7 @@ class ViewSet(SpaceScopeMixin, BaseModelViewSet):
         serializer = SpaceAccountUpdateSerializer(data=data, partial=True)
         serializer.is_valid(raise_exception=True)
 
-        service = Service()
+        service = SpaceService()
         instance = service.update(instance, **serializer.validated_data)
 
         serialize_data = SpaceAccountSerializer(instance=instance)

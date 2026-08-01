@@ -21,7 +21,6 @@ class ConversationViewSet(UserScopeMixin, ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         service = ConversationService()
-        # Auto-create channel if none exists
         conv = service.get_or_create_channel(
             classroom_uid=uuid.UUID(classroom_uid),
             created_by_id=request.user.uid if request.user else None,
@@ -61,7 +60,6 @@ class ConversationViewSet(UserScopeMixin, ViewSet):
             user_a_id=request.user.uid,
             user_b_id=uuid.UUID(str(target_user_id)),
         )
-        # Add both users as members when first created
         if created:
             member_service = ConversationMemberService()
             member_service.add_member(conv.uid, request.user)

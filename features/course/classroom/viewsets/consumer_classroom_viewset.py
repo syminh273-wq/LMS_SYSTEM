@@ -12,7 +12,7 @@ from core.views.mixins import ConsumerScopeMixin
 from features.chat.serializers.conversation_serializer import ConversationSerializer
 from features.chat.services.conversation_service import ConversationService
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
-from features.course.classroom.services import Service
+from features.course.classroom.services import ClassroomService
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 
 
@@ -27,7 +27,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         @return: joined classrooms
         """
         uids = ClassroomMemberService().get_joined_classroom_uids(request.user.uid)
-        service = Service()
+        service = ClassroomService()
         classrooms = []
         for uid in uids:
             try:
@@ -59,7 +59,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
             return Response({'error': 'teacher_id không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            rows = list(Service().get_by_teacher(teacher_uuid))
+            rows = list(ClassroomService().get_by_teacher(teacher_uuid))
         except Exception:
             rows = []
 
@@ -104,7 +104,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         if pricing_type and pricing_type not in ('free', 'paid'):
             return Response({'error': 'pricing_type không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        classrooms = list(Service().list_discoverable(
+        classrooms = list(ClassroomService().list_discoverable(
             category=category,
             pricing_type=pricing_type,
             search=search,
@@ -223,7 +223,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         except ValueError:
             return Response({'error': 'ID lớp không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        instance = Service().find(pk)
+        instance = ClassroomService().find(pk)
         if getattr(instance, 'visibility_type', 'public') == 'private':
             return Response({'error': 'Lớp học này không khả dụng.'}, status=status.HTTP_403_FORBIDDEN)
         from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
@@ -292,9 +292,9 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         if not code:
             return Response({'error': 'Mã lớp không được để trống.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        from features.course.classroom.repositories import Repository
+        from features.course.classroom.repositories import ClassroomRepository
         from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
-        classroom = Repository().filter(pid=code).first()
+        classroom = ClassroomRepository().filter(pid=code).first()
         if not classroom or getattr(classroom, 'is_deleted', False) or classroom.status not in ('active',):
             return Response({'error': 'Mã lớp không hợp lệ hoặc lớp không còn hoạt động.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -343,14 +343,14 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         a PENDING payment exists and returns the MoMo pay_url.
         @return: classroom_uid, amount, pay_url, order_id
         """
-        from features.course.classroom.repositories import Repository
+        from features.course.classroom.repositories import ClassroomRepository
         from features.payment.enums import PaymentStatus
         from features.payment.repositories import PaymentRepository
         from features.payment.services import PaymentService
         from features.payment.utils import parse_meta
 
         try:
-            classroom = Repository().find(str(pk))
+            classroom = ClassroomRepository().find(str(pk))
         except Exception:
             return Response({'error': 'Lớp học không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -397,25 +397,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         Poll access status for a classroom during the checkout flow.
         @return: access status
         """
-        return Response(Service().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
-
-    # @action(detail=True, methods=['get'], url_path='preview-folder')
-    # def preview_folder(self, request, pk=None):
-    #     """
-    #     Get the preview folder and its documents for a classroom. Always accessible.
-    #     @return: folder, docs
-    #     """
-    #     from features.resource.serializers.resource_folder_serializer import ResourceFolderResponseSerializer
-    #     from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
-    #
-    #     folder = ClassroomDocService().get_preview_folder(str(pk))
-    #     if not folder:
-    #         return Response({'folder': None, 'docs': []})
-    #     docs = ClassroomDocService().list_folder(classroom_uid=str(pk), folder_id=str(folder.uid))
-    #     return Response({
-    #         'folder': ResourceFolderResponseSerializer(folder).data,
-    #         'docs': ResourceResponseSerializer(docs, many=True).data,
-    #     })
+        return Response(ClassroomService().get_access_for_consumer(str(pk), consumer_id=str(request.user.uid)))
 
     @action(detail=True, methods=['get'], url_path='preview')
     def preview(self, request, pk=None):
@@ -423,11 +405,11 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         Get the classroom landing-page payload for a prospective student.
         @return: classroom info, preview folder + docs, next action (join/checkout/none)
         """
-        from features.course.classroom.repositories import Repository as ClassroomRepo
+        from features.course.classroom.repositories import ClassroomRepository
         from features.course.classroom.services.classroom_blacklist_service import ClassroomBlacklistService
 
         try:
-            classroom = ClassroomRepo().find(str(pk))
+            classroom = ClassroomRepository().find(str(pk))
         except Exception:
             return Response({'error': 'Lớp học không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -448,7 +430,7 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
             )
 
         consumer_id = str(request.user.uid) if request.user and getattr(request.user, 'uid', None) is not None else None
-        payload = Service().get_preview_for_consumer(classroom.uid, consumer_id=consumer_id)
+        payload = ClassroomService().get_preview_for_consumer(classroom.uid, consumer_id=consumer_id)
         return Response(payload)
 
     @action(detail=True, methods=['get'])
@@ -505,10 +487,10 @@ class ConsumerClassroomViewSet(ConsumerScopeMixin, ViewSet):
         from features.resource.serializers.resource_folder_serializer import ResourceFolderTreeSerializer
         from features.resource.serializers.resource_response_serializer import ResourceResponseSerializer
 
-        from features.course.classroom.repositories import Repository
+        from features.course.classroom.repositories import ClassroomRepository
         from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
         try:
-            classroom = Repository().find(str(pk))
+            classroom = ClassroomRepository().find(str(pk))
         except Exception:
             return Response({'error': 'Lớp học không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
 

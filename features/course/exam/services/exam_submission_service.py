@@ -21,8 +21,6 @@ class ExamSubmissionService(BaseService):
         self.resource_repo   = ResourceRepository()
         self.ai_grading_service = ExamAIGradingService()
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
-
     def _quiz_log_service(self):
         from features.quiz.services.quiz_log_service import QuizLogService
         return QuizLogService()
@@ -101,8 +99,6 @@ class ExamSubmissionService(BaseService):
         if timezone.is_naive(due_date):
             due_date = timezone.make_aware(due_date, datetime_timezone.utc)
         return "late" if now > due_date else "submitted"
-
-    # ── Prepare submission data based on type ──────────────────────────────────
 
     def prepare_submission(self, exam, student_id, data: dict) -> dict:
         submission_type = data.get("submission_type")
@@ -193,8 +189,6 @@ class ExamSubmissionService(BaseService):
             )
 
         return data
-
-    # ── Main submit ────────────────────────────────────────────────────────────
 
     def submit_exam(self, exam_id, student_id, data: dict):
         exam = self.get_exam_for_submission(exam_id)
@@ -306,8 +300,6 @@ class ExamSubmissionService(BaseService):
 
         return result_submission, created
 
-    # ── Read ───────────────────────────────────────────────────────────────────
-
     def get_submission(self, uid):
         submission = self.submission_repo.get_by_uid(uid)
         if not submission:
@@ -327,8 +319,6 @@ class ExamSubmissionService(BaseService):
         if str(exam.teacher_id) != str(teacher_id):
             raise ValueError("You do not own this exam")
         return self.submission_repo.list_by_exam(exam_id)
-
-    # ── Teacher grading ────────────────────────────────────────────────────────
 
     def get_teacher_submission(self, submission_id, teacher_id):
         submission = self.get_submission(submission_id)
@@ -407,8 +397,6 @@ class ExamSubmissionService(BaseService):
             except Exception as exc:
                 results.append({"submission": sub, "success": False, "error": str(exc)})
         return results
-
-    # ── Force submit (anti-cheat) ──────────────────────────────────────────────
 
     def force_submit(self, exam_id, student_id, reason, data: dict | None = None):
         """

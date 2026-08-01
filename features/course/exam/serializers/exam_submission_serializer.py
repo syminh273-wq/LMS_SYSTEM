@@ -54,7 +54,6 @@ def serialize_exam_submission(submission):
         "content": submission.content,
         "meta": meta,
 
-        # Convenience fields derived from meta — keeps backward compat
         "resource_url":  meta.get("url") if not is_mc else None,
         "resource_name": meta.get("name") if not is_mc else None,
         "quiz_result": {

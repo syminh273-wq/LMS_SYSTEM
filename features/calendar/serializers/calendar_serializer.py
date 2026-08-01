@@ -2,7 +2,7 @@ from core.serializers.fields import VnDateTimeField
 
 from rest_framework import serializers
 
-from features.course.classroom.repositories.classroom_repository import Repository as ClassroomRepository
+from features.course.classroom.repositories.classroom_repository import ClassroomRepository
 
 
 class CalendarEventSerializer(serializers.Serializer):

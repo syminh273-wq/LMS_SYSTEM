@@ -11,7 +11,7 @@ from features.account.consumer.models import Consumer
 from features.account.consumer.repositories import ConsumerRepository
 from features.calendar.repositories.calendar_event_repository import CalendarEventRepository
 from features.course.classroom.models.classroom import Classroom
-from features.course.classroom.repositories.classroom_repository import Repository as ClassroomRepository
+from features.course.classroom.repositories.classroom_repository import ClassroomRepository
 from core.services.base_service import BaseService
 from features.course.classroom.services.classroom_member_service import ClassroomMemberService
 

@@ -22,8 +22,6 @@ class ClassroomActivityLogService:
         )
     """
 
-    # ── Write ─────────────────────────────────────────────────────────────────
-
     def log(
         self,
         classroom_uid,
@@ -50,9 +48,7 @@ class ClassroomActivityLogService:
                 created_at=datetime.utcnow(),
             )
         except Exception:
-            pass  # logging must never crash the main request
-
-    # ── Read ──────────────────────────────────────────────────────────────────
+            pass
 
     def list(
         self,
@@ -83,8 +79,6 @@ class ClassroomActivityLogService:
             return [self._serialize(r) for r in rows]
         except Exception:
             return []
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def _serialize(row: ClassroomActivityLog) -> dict:

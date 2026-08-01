@@ -10,7 +10,7 @@ from features.course.classroom.repositories.classroom_member_repository import (
     ClassroomMemberRepository,
 )
 from features.course.classroom.repositories.classroom_repository import (
-    Repository as ClassroomRepository,
+    ClassroomRepository,
 )
 from features.course.exam.repositories.exam_repositories import ExamRepository
 from features.course.exam.repositories.exam_submission_repository import (
