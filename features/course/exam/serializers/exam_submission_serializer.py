@@ -10,7 +10,9 @@ class ExamSubmissionRequestSerializer(serializers.Serializer):
         default="online_quiz",
     )
     ref_id          = serializers.UUIDField(required=False, allow_null=True)
-    answers         = serializers.DictField(child=serializers.CharField(), required=False)
+    answers         = serializers.DictField(
+        child=serializers.ListField(child=serializers.CharField()), required=False,
+    )
     content         = serializers.CharField(required=False, allow_blank=True)
     time_taken_seconds = serializers.IntegerField(required=False, default=0)
 

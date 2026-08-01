@@ -279,12 +279,13 @@ class PostService:
         profile_avatars = self._profile_avatar_map([c.owner_id for c in comments])
         return [self._serialize_comment(c, profile_avatars) for c in comments]
 
-    def add_comment(self, post_uid: str, owner_id, owner_name: str, owner_avatar: str, content: str) -> dict:
+    def add_comment(self, post_uid: str, owner_id, owner_name: str, owner_avatar: str, content: str,
+                     owner_type: str = 'consumer') -> dict:
         p_uid = uuid.UUID(post_uid)
         comment = SocialPostComment.create(
             post_uid=p_uid,
             owner_id=uuid.UUID(str(owner_id)),
-            owner_type='consumer',
+            owner_type=owner_type,
             owner_name=owner_name,
             owner_avatar=owner_avatar,
             content=content,

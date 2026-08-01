@@ -6,6 +6,7 @@ from django.utils import timezone
 from features.course.classroom.repositories.classroom_member_repository import ClassroomMemberRepository
 from features.course.exam.repositories import ExamRepository, ExamSubmissionRepository
 from features.course.exam.services.exam_ai_grading_service import ExamAIGradingService
+from features.quiz.services.quiz_grading import get_correct_answers, is_answer_correct
 from features.resource.repositories import ResourceRepository
 from core.services.base_service import BaseService
 
@@ -109,7 +110,7 @@ class ExamSubmissionService(BaseService):
         if submission_type in ("multiple_choice", "online_quiz"):
             answers = data.get("answers") or {}
             if not isinstance(answers, dict):
-                raise ValueError("answers must be a dict of {question_uid: letter}")
+                raise ValueError("answers must be a dict of {question_uid: [selected_answer_letters]}")
 
             quiz_id = getattr(exam, "ref_id", None)
             if not quiz_id:
@@ -135,13 +136,13 @@ class ExamSubmissionService(BaseService):
             results = []
             for q in questions:
                 q_uid = str(q.uid)
-                chosen = answers.get(q_uid)
-                is_correct = bool(chosen and chosen == q.correct_answer)
+                chosen = answers.get(q_uid) or []
+                is_correct = is_answer_correct(q, chosen)
                 results.append({
                     "question_uid":  q_uid,
                     "question_text": q.question_text,
                     "chosen":        chosen,
-                    "correct_answer": q.correct_answer,
+                    "correct_answers": get_correct_answers(q),
                     "is_correct":    is_correct,
                     "explanation":   q.explanation or "",
                 })

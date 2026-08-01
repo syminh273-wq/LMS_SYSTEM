@@ -17,6 +17,7 @@ class QuizTaskListItemSerializer(serializers.Serializer):
     id = serializers.CharField()
     kind = serializers.CharField()
     title = serializers.CharField(allow_blank=True)
+    question_type = serializers.CharField(required=False, default='single_answer')
     status = serializers.CharField()
     progress = serializers.IntegerField(required=False, default=0)
     current_step = serializers.IntegerField(required=False, default=0)

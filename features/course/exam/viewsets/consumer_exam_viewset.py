@@ -204,10 +204,8 @@ class ConsumerExamViewSet(ConsumerScopeMixin, ViewSet):
             {
                 "uid": str(q.uid),
                 "question_text": q.question_text,
-                "option_a": q.option_a,
-                "option_b": q.option_b,
-                "option_c": q.option_c,
-                "option_d": q.option_d,
+                "options": q.options,
+                "question_type": q.question_type,
                 "order": q.order,
             }
             for q in questions

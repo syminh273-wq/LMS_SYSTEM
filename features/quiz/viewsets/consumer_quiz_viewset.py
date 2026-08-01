@@ -18,6 +18,7 @@ from features.quiz.serializers.quiz_leaderboard_serializer import (
 )
 from features.quiz.services.quiz_service import QuizService
 from features.quiz.services.quiz_leaderboard_service import QuizLeaderboardService
+from features.quiz.services.quiz_grading import get_correct_answers, is_answer_correct
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,10 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
     def submit(self, request, pk=None):
         serializer = QuizSubmitRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        answers            = serializer.validated_data['answers']
+        answers = {
+            str(item['question_uid']): item['selected_answers']
+            for item in serializer.validated_data['answers']
+        }
         classroom_id       = str(serializer.validated_data['classroom_id'])
         time_taken_seconds = serializer.validated_data.get('time_taken_seconds', 0)
         student_id         = request.user.uid
@@ -168,7 +172,7 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
             total_questions=total,
             score_pct=round(score_pct),
             time_taken_seconds=time_taken_seconds,
-            answers={str(k): str(v) for k, v in answers.items()},
+            answers=answers,
         )
 
         self._link_exam_submission(pk, classroom_id, student_id, answers, time_taken_seconds)
@@ -233,20 +237,21 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
 
     @staticmethod
     def _grade_answers(questions, answers):
-        """Score each question against the student's answers. Returns (results, correct_count)."""
+        """Score each question against the student's answers.
+        `answers` is {question_uid: [selected_answer_letters]}. Returns (results, correct_count)."""
         results = []
         correct_count = 0
         for question in questions:
             q_uid = str(question.uid)
-            chosen = answers.get(q_uid)
-            is_correct = bool(chosen) and chosen == question.correct_answer
+            chosen = answers.get(q_uid) or []
+            is_correct = is_answer_correct(question, chosen)
             if is_correct:
                 correct_count += 1
             results.append({
                 'question_uid': q_uid,
                 'question_text': question.question_text,
                 'chosen': chosen,
-                'correct_answer': question.correct_answer,
+                'correct_answers': get_correct_answers(question),
                 'is_correct': is_correct,
                 'explanation': question.explanation,
             })
@@ -256,7 +261,7 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
     def _strip_answer_key(results):
         for r in results:
             r.pop('explanation', None)
-            r.pop('correct_answer', None)
+            r.pop('correct_answers', None)
 
     def _link_exam_submission(self, quiz_id, classroom_id, student_id, answers, time_taken_seconds):
         """If this quiz is linked to a quiz-type exam in the classroom, record the grade there too."""
@@ -274,7 +279,7 @@ class ConsumerQuizViewSet(ConsumerScopeMixin, ViewSet):
                         student_id=student_id,
                         data={
                             "submission_type": "online_quiz",
-                            "answers": {str(k): str(v) for k, v in answers.items()},
+                            "answers": answers,
                             "time_taken_seconds": time_taken_seconds,
                         },
                     )

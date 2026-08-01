@@ -6,25 +6,23 @@ class QuizQuestionSerializer(serializers.Serializer):
     uid           = serializers.UUIDField(read_only=True)
     quiz_id       = serializers.UUIDField(read_only=True)
     question_text = serializers.CharField()
-    option_a      = serializers.CharField()
-    option_b      = serializers.CharField()
-    option_c      = serializers.CharField()
-    option_d      = serializers.CharField()
-    correct_answer = serializers.CharField()
+    options       = serializers.ListField(child=serializers.CharField())
+    question_type   = serializers.CharField(default='single_answer')
+    correct_answers = serializers.ListField(
+        child=serializers.IntegerField(), default=list, source='correct_option_indices',
+    )
     explanation   = serializers.CharField()
     order         = serializers.IntegerField()
     created_at    = serializers.DateTimeField(read_only=True)
 
 
 class QuizQuestionPublicSerializer(serializers.Serializer):
-    """For students — omits correct_answer and explanation."""
+    """For students — omits correct_answer(s) and explanation."""
     uid           = serializers.UUIDField(read_only=True)
     quiz_id       = serializers.UUIDField(read_only=True)
     question_text = serializers.CharField()
-    option_a      = serializers.CharField()
-    option_b      = serializers.CharField()
-    option_c      = serializers.CharField()
-    option_d      = serializers.CharField()
+    options       = serializers.ListField(child=serializers.CharField())
+    question_type = serializers.CharField(default='single_answer')
     order         = serializers.IntegerField()
 
 

@@ -83,6 +83,10 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         params = req_serializer.validated_data
 
         num_questions = params.get('num_questions', 5)
+        question_type = params.get('question_type', 'single_answer')
+        num_options = params.get('num_options', 4)
+        option_counts = params.get('option_counts')
+        correct_counts = params.get('correct_counts')
 
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
@@ -95,7 +99,8 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
 
         try:
             ai_data = QuizGenerationService.generate(
-                content=content, num_questions=num_questions,
+                content=content, num_questions=num_questions, question_type=question_type,
+                num_options=num_options, option_counts=option_counts, correct_counts=correct_counts,
             )
         except Exception as exc:
             return Response({'detail': f'AI generation failed: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
@@ -127,6 +132,10 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         params = req_serializer.validated_data
 
         num_questions = params.get('num_questions', 5)
+        question_type = params.get('question_type', 'single_answer')
+        num_options = params.get('num_options', 4)
+        option_counts = params.get('option_counts')
+        correct_counts = params.get('correct_counts')
 
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
@@ -155,7 +164,8 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
             total = 0
             try:
                 for event in QuizGenerationService.generate_stream(
-                    content=content, num_questions=num_questions,
+                    content=content, num_questions=num_questions, question_type=question_type,
+                    num_options=num_options, option_counts=option_counts, correct_counts=correct_counts,
                 ):
                     if event['type'] == 'error':
                         yield f"data: {json.dumps(event)}\n\n"
@@ -338,12 +348,24 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
     def update_question(self, request, uid=None, question_uid=None):
         serializer = QuizQuestionUpdateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if 'correct_answer' not in serializer.validated_data:
-            return Response({'detail': 'correct_answer is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
+        data = serializer.validated_data
+        if not data:
+            return Response(
+                {'detail': 'At least one field (options, correct_answers, question_text, ...) is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         question = self.service.find_question(uid, question_uid)
-        updated = self.service.update_question(question, **serializer.validated_data)
+        try:
+            updated = self.service.update_question(question, **data)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(QuizQuestionSerializer(updated).data)
+
+    # ── DELETE QUESTION  DELETE /quizzes/<uid>/questions/<question_uid>/ ────
+    @action(detail=True, methods=['delete'], url_path=r'questions/(?P<question_uid>[^/.]+)')
+    def destroy_question(self, request, uid=None, question_uid=None):
+        self.service.delete_question(uid, question_uid)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ── UPDATE  PATCH /quizzes/<uid>/ ─────────────────────────────────────
     def partial_update(self, request, *args, **kwargs):
@@ -358,14 +380,15 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
         self.service.delete_quiz(kwargs['uid'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # ── GENERATE TASK  POST /quizzes/generate-task/ ──────────────────────────
-    @action(detail=False, methods=['post'], url_path='generate-task')
-    def generate_task(self, request):
+    def _enqueue_generate_task(self, request, question_type='single_answer'):
         req_serializer = QuizGenerateRequestSerializer(data=request.data)
         req_serializer.is_valid(raise_exception=True)
         params = req_serializer.validated_data
 
         num_questions = params.get('num_questions', 5)
+        num_options = params.get('num_options', 4)
+        option_counts = params.get('option_counts')
+        correct_counts = params.get('correct_counts')
 
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
@@ -385,12 +408,17 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
             teacher_uid=str(request.user.uid),
             content=content,
             num_questions=num_questions,
+            question_type=question_type,
+            num_options=num_options,
+            option_counts=option_counts,
+            correct_counts=correct_counts,
             job_id=str(uuid.uuid4()),
             job_timeout=300,
         )
         job.meta['teacher_uid'] = str(request.user.uid)
         job.meta['kind'] = 'generate'
         job.meta['title'] = params.get('title') or 'Tạo Quiz bằng AI'
+        job.meta['question_type'] = question_type
         job.meta['total_steps'] = num_questions
         job.meta['current_step'] = 0
         job.meta['progress'] = 0
@@ -404,6 +432,21 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
             'status': 'queued',
         }).data
         return Response(data, status=status.HTTP_202_ACCEPTED)
+
+    # ── GENERATE TASK  POST /quizzes/generate-task/ ──────────────────────────
+    @action(detail=False, methods=['post'], url_path='generate-task')
+    def generate_task(self, request):
+        return self._enqueue_generate_task(request, question_type='single_answer')
+
+    # ── GENERATE TASK MULTI  POST /quizzes/generate-task-multi/ ──────────────
+    @action(detail=False, methods=['post'], url_path='generate-task-multi')
+    def generate_task_multi(self, request):
+        return self._enqueue_generate_task(request, question_type='multi_answer')
+
+    # ── GENERATE TASK TRUE/FALSE  POST /quizzes/generate-task-tf/ ─────────────
+    @action(detail=False, methods=['post'], url_path='generate-task-tf')
+    def generate_task_tf(self, request):
+        return self._enqueue_generate_task(request, question_type='true_false')
 
     # ── TASK STATUS  GET /quizzes/tasks/<task_id>/ ──────────────────────────
     RQ_STATUS_MAP = {
@@ -457,6 +500,7 @@ class SpaceQuizViewSet(SpaceScopeMixin, BaseModelViewSet):
             'id': job.id,
             'kind': meta.get('kind') or 'generate',
             'title': meta.get('title') or 'Tạo Quiz bằng AI',
+            'question_type': meta.get('question_type') or 'single_answer',
             'status': frontend_status,
             'progress': progress,
             'current_step': current_step,

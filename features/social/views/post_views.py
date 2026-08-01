@@ -156,7 +156,8 @@ class PostCommentView(APIView):
         if not content:
             return Response({'error': 'Nội dung bình luận không được để trống'}, status=status.HTTP_400_BAD_REQUEST)
         name, avatar = _author_info(request.user)
-        comment = PostService().add_comment(uid, request.user.uid, name, avatar, content)
+        owner_type = _detect_owner_type(request.user)
+        comment = PostService().add_comment(uid, request.user.uid, name, avatar, content, owner_type=owner_type)
         return Response(comment, status=status.HTTP_201_CREATED)
 
 

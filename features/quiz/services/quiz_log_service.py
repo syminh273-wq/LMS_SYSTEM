@@ -1,5 +1,6 @@
 from features.quiz.repositories.quiz_log_repository import QuizLogRepository
 from features.quiz.repositories.quiz_question_repository import QuizQuestionRepository
+from features.quiz.services.quiz_grading import is_answer_correct
 from core.services.base_service import BaseService
 
 
@@ -9,6 +10,7 @@ class QuizLogService(BaseService):
         self.question_repo = QuizQuestionRepository()
 
     def _grade(self, quiz_id, answers: dict, max_grade: float):
+        """`answers` is {question_uid: [selected_answer_letters]}."""
         questions = list(self.question_repo.get_by_quiz(quiz_id))
         total = len(questions)
         if not total:
@@ -16,7 +18,7 @@ class QuizLogService(BaseService):
 
         correct_count = sum(
             1 for q in questions
-            if str(q.uid) in answers and answers[str(q.uid)] == q.correct_answer
+            if is_answer_correct(q, answers.get(str(q.uid)))
         )
         score_pct = round((correct_count / total) * 100)
         score     = round((correct_count / total) * float(max_grade), 2)

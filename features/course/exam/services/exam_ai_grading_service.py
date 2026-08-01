@@ -90,7 +90,9 @@ class ExamAIGradingService:
             },
         ]
 
-        raw = AIClient.chat_sync(messages, timeout=180)
+        raw = AIClient.chat_sync_with_fallback(
+            messages, validator=self._is_valid_json_response, timeout=180
+        )
         result = self._parse_json(raw)
         result["grade"] = self._clamp_float(result.get("grade"), 0, max_grade)
         result["confidence"] = self._clamp_float(result.get("confidence", 0), 0, 1)
@@ -319,14 +321,28 @@ class ExamAIGradingService:
         )
         return description
 
+    def _is_valid_json_response(self, raw):
+        try:
+            self._parse_json(raw)
+            return True
+        except ValueError:
+            return False
+
     def _parse_json(self, raw):
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", raw, re.DOTALL)
             if not match:
-                raise ValueError("AI did not return valid grading JSON")
-            return json.loads(match.group(0))
+                raise ValueError(
+                    f"AI did not return valid grading JSON: {raw[:300]!r}"
+                )
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"AI returned malformed grading JSON: {exc}. Raw: {raw[:300]!r}"
+                ) from exc
 
     def _clamp_float(self, value, minimum, maximum):
         try:

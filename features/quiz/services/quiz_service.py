@@ -5,6 +5,7 @@ from django.conf import settings
 from core.services.base_service import BaseService
 from core.utils.uuid import uuid7
 from core.search_engine.typesense.indexer import LMSIndexer
+from features.quiz.models.quiz_question import QuizQuestion
 from features.quiz.repositories.quiz_repository import QuizRepository
 from features.quiz.repositories.quiz_question_repository import QuizQuestionRepository
 from features.quiz.repositories.quiz_assignment_repository import QuizAssignmentRepository
@@ -155,6 +156,38 @@ class QuizService(BaseService):
 
     # ── Quiz creation ─────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _normalize_correct(correct, question_type: str = None) -> tuple:
+        """Accept either a single 0-based index (int) or a list of indices ([0, 2]).
+        A list means multi_answer regardless of how many indices it holds —
+        `question_type` is a mode the caller chose upfront, not derived from the count.
+        Pass `question_type` explicitly when the caller already knows the intended mode
+        (e.g. editing an existing question) to avoid misclassifying a 1-answer multi_answer
+        question as single_answer.
+        Returns (question_type, correct_option_indices)."""
+        if isinstance(correct, (list, tuple, set)):
+            indices = sorted({int(c) for c in correct})
+            inferred_type = 'multi_answer'
+        else:
+            indices = [int(correct)]
+            inferred_type = 'single_answer'
+        return question_type or inferred_type, indices
+
+    @staticmethod
+    def _validate_options(options: list):
+        if not isinstance(options, list) or not (
+            QuizQuestion.MIN_OPTIONS <= len(options) <= QuizQuestion.MAX_OPTIONS
+        ):
+            raise ValueError(
+                f"A question must have between {QuizQuestion.MIN_OPTIONS} and "
+                f"{QuizQuestion.MAX_OPTIONS} options (got {len(options) if isinstance(options, list) else 'invalid'})."
+            )
+
+    @staticmethod
+    def _validate_indices(indices: list, options: list):
+        if not indices or any(i < 0 or i >= len(options) for i in indices):
+            raise ValueError(f"correct_answers indices must be within 0..{len(options) - 1}.")
+
     def create_quiz_with_questions(self, created_by, title, description, resource_id, questions: list):
         quiz_uid = uuid7()
         quiz = self.repository.create(
@@ -166,21 +199,21 @@ class QuizService(BaseService):
             questions_count=len(questions),
             status='published',
         )
-        question_payloads = [
-            {
+        question_payloads = []
+        for idx, q in enumerate(questions):
+            self._validate_options(q['options'])
+            question_type, indices = self._normalize_correct(q['correct'], question_type=q.get('question_type'))
+            self._validate_indices(indices, q['options'])
+            question_payloads.append({
                 'quiz_id': quiz_uid,
                 'uid': uuid7(),
                 'question_text': q['question'],
-                'option_a': q['options']['a'],
-                'option_b': q['options']['b'],
-                'option_c': q['options']['c'],
-                'option_d': q['options']['d'],
-                'correct_answer': q['correct'],
+                'options': q['options'],
+                'question_type': question_type,
+                'correct_option_indices': indices,
                 'explanation': q.get('explanation', ''),
                 'order': idx,
-            }
-            for idx, q in enumerate(questions)
-        ]
+            })
         created_questions = self.question_repo.bulk_create(question_payloads)
         LMSIndexer.index_quiz(quiz)
         return quiz, created_questions
@@ -199,15 +232,18 @@ class QuizService(BaseService):
         return quiz
 
     def add_question(self, quiz, question_data: dict, index: int):
+        self._validate_options(question_data['options'])
+        question_type, indices = self._normalize_correct(
+            question_data['correct'], question_type=question_data.get('question_type'),
+        )
+        self._validate_indices(indices, question_data['options'])
         return self.question_repo.create(
             quiz_id=quiz.uid,
             uid=uuid7(),
             question_text=question_data['question'],
-            option_a=question_data['options']['a'],
-            option_b=question_data['options']['b'],
-            option_c=question_data['options']['c'],
-            option_d=question_data['options']['d'],
-            correct_answer=question_data['correct'],
+            options=question_data['options'],
+            question_type=question_type,
+            correct_option_indices=indices,
             explanation=question_data.get('explanation', ''),
             order=index,
         )
@@ -255,7 +291,40 @@ class QuizService(BaseService):
         return self.question_repo.find_question(quiz_id, question_uid)
 
     def update_question(self, question, **fields):
+        """`options` (if present) fully replaces the option list; `correct_answers`
+        (if present) is a list of 0-based indices into the *resulting* options list.
+        Either can be sent alone or together — indices are always validated against
+        whichever options list will be in effect after this update."""
+        options = fields.get('options', question.options)
+        if 'options' in fields:
+            self._validate_options(fields['options'])
+
+        if 'correct_answers' in fields:
+            explicit_type = fields.pop('question_type', None) or getattr(question, 'question_type', None)
+            question_type, indices = self._normalize_correct(
+                fields.pop('correct_answers'), question_type=explicit_type,
+            )
+            self._validate_indices(indices, options)
+            fields['correct_option_indices'] = indices
+            fields['question_type'] = question_type
+        elif 'options' in fields:
+            self._validate_indices(list(question.correct_option_indices or []), options)
+
         return self.question_repo.update(question, **fields)
+
+    def delete_question(self, quiz_uid, question_uid):
+        question = self.question_repo.find_question(quiz_uid, question_uid)
+        self.question_repo.delete(question)
+
+        remaining = sorted(self.question_repo.get_by_quiz(quiz_uid), key=lambda q: q.order)
+        for idx, q in enumerate(remaining):
+            if q.order != idx:
+                self.question_repo.update(q, order=idx)
+
+        quiz = self.repository.find(quiz_uid)
+        updated = self.repository.update(quiz, questions_count=len(remaining))
+        LMSIndexer.index_quiz(updated)
+        return updated
 
     # ── Delete ─────────────────────────────────────────────────────────────────
 

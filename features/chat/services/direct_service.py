@@ -13,6 +13,7 @@ def _serialize_direct(conv: Conversation, other_member: ConversationMember, unre
         'conversation_uid': str(conv.uid),
         'other_user': {
             'uid': str(other_member.member_id),
+            'type': other_member.member_type or 'consumer',
             'name': other_member.member_name or '',
             'avatar': other_member.member_avatar or '',
             'last_seen_at': other_member.last_seen_at.isoformat() if other_member.last_seen_at else None,
@@ -54,6 +55,7 @@ def find_conversation_with_target(user_uid, target_uid):
         'conversation_uid': str(conv.uid),
         'other_user': {
             'uid': str(other.member_id),
+            'type': other.member_type or 'consumer',
             'name': other.member_name or '',
             'avatar': other.member_avatar or '',
         },

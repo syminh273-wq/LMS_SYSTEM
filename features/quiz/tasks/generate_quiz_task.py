@@ -40,6 +40,10 @@ def generate_quiz_task(
     teacher_uid: str,
     content: str,
     num_questions: int = 5,
+    question_type: str = 'single_answer',
+    num_options: int = 4,
+    option_counts: list = None,
+    correct_counts: list = None,
 ) -> dict:
     """
     Run AI quiz generation synchronously inside the RQ worker.
@@ -49,8 +53,8 @@ def generate_quiz_task(
     — the status view reads job.is_failed to surface them.
     """
     logger.info(
-        "[generate_quiz_task] start teacher=%s n=%s",
-        teacher_uid, num_questions,
+        "[generate_quiz_task] start teacher=%s n=%s type=%s options=%s",
+        teacher_uid, num_questions, question_type, option_counts or num_options,
     )
 
     _save_meta(status='running', progress=5, current_step=1)
@@ -59,6 +63,10 @@ def generate_quiz_task(
         ai_data = QuizGenerationService.generate(
             content=content,
             num_questions=num_questions,
+            question_type=question_type,
+            num_options=num_options,
+            option_counts=option_counts,
+            correct_counts=correct_counts,
         )
     except Exception as exc:
         tb = traceback.format_exc(limit=2)
